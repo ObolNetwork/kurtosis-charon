@@ -1,4 +1,4 @@
-# Project Name
+# Kurtosis-Charon setup
 
 ## Setup and Run
 
