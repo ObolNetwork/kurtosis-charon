@@ -31,7 +31,7 @@ exec lighthouse validator \
   --metrics-port "5064" \
   --use-long-timeouts \
   --testnet-dir "/opt/lighthouse/network-configs" \
-  --builder-proposals
+  --builder-proposals \
   --distributed \
   --debug-level "trace"
 
