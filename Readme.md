@@ -41,3 +41,18 @@ To tear down the project, run the following command:
     ```bash
     make clean
     ```
+
+## Troubleshooting
+If the project setup fails or hangs, try the following:
+    ```
+    restart docker-desktop manually
+    delete all running containers
+    ```
+Clean kurtosis setup by running the following command:
+    ```
+    kurtosis clean
+    ```
+
+## Note
+
+The docker compose and the run_charon.sh use charon v0.19.2. Change to other versions based on your testing needs.
