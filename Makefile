@@ -1,22 +1,22 @@
 .PHONY: run clean
 
-run-geth-lighthouse:
+geth-lighthouse:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_lighthouse.yaml > planprint
 
-run-geth-nimbus:
+geth-nimbus:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_nimbus.yaml > planprint
 
-run-geth-lodestar:
+geth-lodestar:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_lodestar.yaml > planprint
 
-run-geth-prysm:
+geth-prysm:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_prysm.yaml > planprint
 
-run-geth-teku:
+geth-teku:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_teku.yaml > planprint
 
