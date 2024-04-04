@@ -6,7 +6,7 @@ Ensure you have docker installed on your machine.
 
 ## TL;DR
 ```bash
-make geth-lightouse
+make geth-lighthouse
 make charon
 make run-charon-lodestar
 ```
@@ -20,9 +20,9 @@ Follow the ```Makefile``` to run other combinations.
 Step 1: Run the following command to run geth-lighthouse setup:
     
     ```bash
-    make geth-lightouse
+    make geth-lighthouse
     ```
-Step 2: Verify that the setup is running and wait for 10 seconds. Create a Charon setup by running the following command:
+Step 2: Verify that the setup is running in your docker-desktop and wait for 10 seconds. Create a Charon setup by running the following command:
     
     ```bash
     make charon
