@@ -46,6 +46,8 @@ To tear down the project, run the following command:
 If the project setup fails or hangs, try the following:
     ```
     restart docker-desktop manually
+    ```
+    ```
     delete all running containers
     ```
 Clean kurtosis setup by running the following command:
