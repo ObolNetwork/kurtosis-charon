@@ -182,11 +182,11 @@ if [ -n "$uuid" ]; then
         enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-advertised-ip=/ {print $2}')
         enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-api-port=/ {print $2}')
     elif [[ $beaconClient == *"nimbus"* ]]; then
-        enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--nat=extip:/ {print $2}')
+        enr_address=$(echo "$kurtosis_inspect_output" | awk -F: '/--nat=extip:/ {print $2}')
         enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-port=/ {print $2}')
     elif [[ $beaconClient == *"prysm"* ]]; then
-        enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--grpc-gateway-port=/ {print $2}')
-        enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rpc-port=/ {print $2}')
+        enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-host-ip=/ {print $2}')
+        enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--grpc-gateway-port=/ {print $2}')
     elif [[ $beaconClient == *"lodestar"* ]]; then
         enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr.ip=/ {print $2}')
         enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest.port=/ {print $2}')

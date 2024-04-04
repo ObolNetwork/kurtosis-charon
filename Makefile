@@ -3,32 +3,40 @@
 run-geth-lighthouse:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_lighthouse.yaml > planprint
-	sleep 10
-	./run_charon.sh
 
 run-geth-nimbus:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_nimbus.yaml > planprint
-	sleep 10
-	./run_charon.sh
 
 run-geth-lodestar:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_lodestar.yaml > planprint
-	sleep 10
-	./run_charon.sh
 
 run-geth-prysm:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_prysm.yaml > planprint
-	sleep 10
-	./run_charon.sh
 
 run-geth-teku:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_teku.yaml > planprint
-	sleep 10
+
+charon:
 	./run_charon.sh
+
+run-charon-lighthouse:
+	docker compose up node0 node1 vc0-lighthouse vc1-lighthouse -d
+
+run-charon-nimbus:
+	docker compose up node0 node1 vc0-nimbus vc1-nimbus -d
+
+run-charon-lodestar:
+	docker compose up node0 node1 vc0-lodestar vc1-lodestar -d
+
+run-charon-prysm:
+	docker compose up node0 node1 vc0-prysm vc1-prysm -d
+
+run-charon-teku:
+	docker compose up node0 node1 vc0-teku vc1-teku -d
 
 clean:
 	kurtosis enclave stop local-eth-testnet
