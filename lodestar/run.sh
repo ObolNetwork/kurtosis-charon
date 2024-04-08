@@ -31,5 +31,5 @@ exec node /usr/app/packages/cli/bin/lodestar validator \
     --builder.selection="$BUILDER_SELECTION" \
     --paramsFile="/opt/lodestar/config.yaml" \
     --distributed \
-    --useProduceBlockV3=false
+    --useProduceBlockV3=true
 
