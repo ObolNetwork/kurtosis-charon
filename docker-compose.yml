@@ -130,7 +130,7 @@ services:
       - ./testnet/network-configs:/opt/lighthouse/network-configs
 
   vc0-teku:
-    image: consensys/teku:${TEKU_VERSION:-24.2.0}
+    image: consensys/teku:${TEKU_VERSION:-24.3.1}
     networks: [ network1 ]
     # network_mode: "host"
     depends_on: [ node0 ]
@@ -139,7 +139,7 @@ services:
       validator-client
       --beacon-node-api-endpoint="http://node0:3600"
       --config-file "/opt/charon/teku/teku-config.yaml"
-      --Xblock-v3-enabled false
+      --Xblock-v3-enabled true
       --validators-external-signer-slashing-protection-enabled true
       --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
       --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
@@ -150,7 +150,7 @@ services:
       - ./testnet/network-configs/config.yaml:/opt/teku/config.yaml
 
   vc1-teku:
-    image: consensys/teku:${TEKU_VERSION:-24.2.0}
+    image: consensys/teku:${TEKU_VERSION:-24.3.1}
     networks: [ network1 ]
     # network_mode: "host"
     depends_on: [ node1 ]
@@ -159,7 +159,7 @@ services:
       validator-client
       --beacon-node-api-endpoint=http://node1:3600
       --config-file "/opt/charon/teku/teku-config.yaml"
-      --Xblock-v3-enabled false
+      --Xblock-v3-enabled true
       --validators-external-signer-slashing-protection-enabled true
       --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
       --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
