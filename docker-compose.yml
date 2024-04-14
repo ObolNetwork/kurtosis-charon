@@ -282,7 +282,9 @@ services:
       - "9090:9090"
     networks: [ network1 ]
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheustmp.yml:/etc/prometheus/prometheus.yml
+    environment:
+      PROMETHEUS_REMOTE_WRITE_TOKEN: ${PROMETHEUS_REMOTE_WRITE_TOKEN}
 
   # grafana:
   #   image: grafana/grafana:${GRAFANA_VERSION:-9.5.3}
