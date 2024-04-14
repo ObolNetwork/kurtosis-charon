@@ -1,0 +1,40 @@
+name: Run Charon Cluster
+
+on:
+    workflow_dispatch:
+        inputs:
+            sha: 
+                type: string
+                required: true
+            relay: 
+                type: string
+                required: false
+    push:
+            branches:
+                    - main
+            paths:
+                    - templates/** 
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v4
+      
+            - name: Setup Kurtosis
+              run: |
+                echo "deb [trusted=yes] https://apt.fury.io/kurtosis-tech/ /" | sudo tee /etc/apt/sources.list.d/kurtosis.list
+                sudo apt update
+                sudo apt install kurtosis-cli
+                kurtosis analytics disable
+            
+            - name: Setup Docker Compose
+              run: |
+                sudo apt update
+                sudo apt install docker-compose
+            
+            - name: Run Cluster
+              run: make geth-lighthouse-charon-lighthouse
+              env:
+                PROMETHEUS_REMOTE_WRITE_TOKEN: '${{ secrets.PROMETHEUS_REMOTE_WRITE_TOKEN }}'
