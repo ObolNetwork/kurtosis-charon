@@ -14,7 +14,7 @@ participants:
     el_max_mem: 0
 # CL
     cl_type: nimbus
-    # cl_image: statusim/nimbus-eth2:multiarch-v24.2.2
+    cl_image: statusim/nimbus-eth2:multiarch-v24.3.0
     cl_log_level: ""
     cl_extra_env_vars: {}
     cl_extra_labels: {}
@@ -100,7 +100,7 @@ parallel_keystore_generation: false
 disable_peer_scoring: false
 grafana_additional_dashboards: []
 persistent: false
-mev_type: null
+mev_type: full
 mev_params:
   mev_relay_image: flashbots/mev-boost-relay
   mev_builder_image: ethpandaops/flashbots-builder:main
