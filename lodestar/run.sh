@@ -28,8 +28,8 @@ exec node /usr/app/packages/cli/bin/lodestar validator \
     --metrics.port=5065 \
     --beaconNodes="$BEACON_NODE_ADDRESS" \
     --builder="$BUILDER_API_ENABLED" \
-    --builder.selection="$BUILDER_SELECTION" \
     --paramsFile="/opt/lodestar/config.yaml" \
     --distributed \
-    --useProduceBlockV3=false
+    --useProduceBlockV3=true
+    # --builder.selection="$BUILDER_SELECTION" \
 

@@ -3,7 +3,7 @@ version: "3.8"
 x-node-base:
   # Pegged charon version (update this for each release).
   &node-base
-  image: ghcr.io/obolnetwork/charon:v0.19.2
+  image: obolnetwork/charon-local:latest
   restart: unless-stopped
   networks: [ network1 ]
   # network_mode: "host"
@@ -94,7 +94,7 @@ services:
   #  \ V / (_| | | | (_| | (_| | || (_) | |  \__ \
   #   \_/ \__,_|_|_|\__,_|\__,_|\__\___/|_|  |___/
   vc0-lighthouse:
-    image: sigp/lighthouse:${LIGHTHOUSE_VERSION:-v5.1.0}
+    image: sigp/lighthouse:${LIGHTHOUSE_VERSION:-v5.1.3}
     # image: 113746/lighthouse:distributed
     entrypoint: /opt/lighthouse/run.sh
     networks: [ network1 ]
@@ -112,7 +112,7 @@ services:
       - ./testnet/network-configs:/opt/lighthouse/network-configs
   
   vc1-lighthouse:
-    image: sigp/lighthouse:${LIGHTHOUSE_VERSION:-v5.1.0}
+    image: sigp/lighthouse:${LIGHTHOUSE_VERSION:-v5.1.3}
     # image: 113746/lighthouse:distributed
     entrypoint: /opt/lighthouse/run.sh
     networks: [ network1 ]
@@ -130,7 +130,7 @@ services:
       - ./testnet/network-configs:/opt/lighthouse/network-configs
 
   vc0-teku:
-    image: consensys/teku:${TEKU_VERSION:-24.2.0}
+    image: consensys/teku:${TEKU_VERSION:-24.3.1}
     networks: [ network1 ]
     # network_mode: "host"
     depends_on: [ node0 ]
@@ -139,7 +139,7 @@ services:
       validator-client
       --beacon-node-api-endpoint="http://node0:3600"
       --config-file "/opt/charon/teku/teku-config.yaml"
-      --Xblock-v3-enabled false
+      --Xblock-v3-enabled true
       --validators-external-signer-slashing-protection-enabled true
       --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
       --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
@@ -150,7 +150,7 @@ services:
       - ./testnet/network-configs/config.yaml:/opt/teku/config.yaml
 
   vc1-teku:
-    image: consensys/teku:${TEKU_VERSION:-24.2.0}
+    image: consensys/teku:${TEKU_VERSION:-24.3.1}
     networks: [ network1 ]
     # network_mode: "host"
     depends_on: [ node1 ]
@@ -159,7 +159,7 @@ services:
       validator-client
       --beacon-node-api-endpoint=http://node1:3600
       --config-file "/opt/charon/teku/teku-config.yaml"
-      --Xblock-v3-enabled false
+      --Xblock-v3-enabled true
       --validators-external-signer-slashing-protection-enabled true
       --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
       --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
@@ -282,7 +282,9 @@ services:
       - "9090:9090"
     networks: [ network1 ]
     volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheustmp.yml:/etc/prometheus/prometheus.yml
+    environment:
+      PROMETHEUS_REMOTE_WRITE_TOKEN: ${PROMETHEUS_REMOTE_WRITE_TOKEN}
 
   # grafana:
   #   image: grafana/grafana:${GRAFANA_VERSION:-9.5.3}

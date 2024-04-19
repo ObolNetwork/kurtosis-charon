@@ -20,3 +20,4 @@ nimbus/node*/
 planprint
 charon-keys/
 testnet/
+prometheus/prometheustmp.yml
