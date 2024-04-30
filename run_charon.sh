@@ -135,7 +135,7 @@ echo "First keystore directory: $first_keystore_dir"
 # fi
 
 # Find all directories in 'keystore-keys/keys'
-keystore_directories="keystore/node-0-keystores/keys/*"
+keystore_directories="keystore/keys/*"
 
 # Iterate over each directory
 
@@ -156,8 +156,8 @@ for keystore_dir in $keystore_directories; do
         dir_name=$(basename "$keystore_dir")
 
         # Check if a file with the same name exists in 'keystore-secrets' and copy it to 'charon-keys' with an indexed name
-        if [ -f "keystore/node-0-keystores/secrets/$dir_name" ]; then
-            cp "keystore/node-0-keystores/secrets/$dir_name" "$charon_dir/keystore-${index}.txt"
+        if [ -f "keystore/secrets/$dir_name" ]; then
+            cp "keystore/secrets/$dir_name" "$charon_dir/keystore-${index}.txt"
             echo "Copied '$dir_name' from 'keystore-secrets' to 'charon-keys' as 'keystore-${index}.txt'"
         else
             echo "No matching file found in 'keystore-secrets' for '$dir_name'."
