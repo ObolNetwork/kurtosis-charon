@@ -34,60 +34,61 @@ geth-prysm-charon-prysm: geth-prysm charon run-charon-prysm
 geth-lighthouse:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_lighthouse.yaml > planprint
-	@echo "Waiting for 60 seconds..."
-	@sleep 60
+	@echo "Waiting for 5 seconds..."
+	@sleep 5
 
 geth-nimbus:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_nimbus.yaml > planprint
-	@echo "Waiting for 60 seconds..."
-	@sleep 60
+	@echo "Waiting for 5 seconds..."
+	@sleep 5
 
 geth-lodestar:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_lodestar.yaml > planprint
-	@echo "Waiting for 60 seconds..."
-	@sleep 60
+	@echo "Waiting for 5 seconds..."
+	@sleep 5
 
 geth-prysm:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_prysm.yaml > planprint
-	@echo "Waiting for 60 seconds..."
-	@sleep 60
+	@echo "Waiting for 5 seconds..."
+	@sleep 5
 
 geth-teku:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_teku.yaml > planprint
-	@echo "Waiting for 60 seconds..."
-	@sleep 60
+	@echo "Waiting for 5 seconds..."
+	@sleep 5
 
 charon:
 	./run_charon.sh
 	./promtoken.sh
 
 run-charon-lighthouse:
-	docker compose up node0 node1 vc0-lighthouse vc1-lighthouse prometheus -d
+	docker compose up node0 node1 node2 vc0-lighthouse vc1-lighthouse vc2-lighthouse prometheus -d
 
 run-charon-nimbus:
-	docker compose up node0 node1 vc0-nimbus vc1-nimbus prometheus -d
+	docker compose up node0 node1 node2 vc0-nimbus vc1-nimbus vc2-nimbus prometheus -d
 
 run-charon-lodestar:
-	docker compose up node0 node1 vc0-lodestar vc1-lodestar prometheus -d
+	docker compose up node0 node1 node2 vc0-lodestar vc1-lodestar vc2-lodestar prometheus -d
 
 run-charon-prysm:
-	docker compose up node0 node1 vc0-prysm vc1-prysm prometheus -d
+	docker compose up node0 node1 node2 vc0-prysm vc1-prysm vc2-prysm prometheus -d
 
 run-charon-teku:
-	docker compose up node0 node1 vc0-teku vc1-teku prometheus -d
+	docker compose up node0 node1 node2 vc0-teku vc1-teku vc2-teku prometheus -d
 
 clean:
-	kurtosis enclave stop local-eth-testnet
-	kurtosis enclave rm local-eth-testnet
+	-kurtosis enclave stop local-eth-testnet
+	-kurtosis enclave rm local-eth-testnet
+	-docker compose down
 	rm -rf node*
 	rm -f planprint
 	rm -rf keystore
 	rm -rf testnet
 	rm -rf charon-keystore
+	rm -rf charon-keys
 	rm -rf .charon
 	rm -rf data
-	docker compose down
