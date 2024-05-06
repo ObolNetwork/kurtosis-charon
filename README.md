@@ -4,6 +4,10 @@
 Install kurtosis-cli by following the instructions [here](https://docs.kurtosis.com/install).
 Ensure you have docker installed on your machine.
 
+MAKE SURE `kurtosis-cli` IS THE LATEST VERSION.
+
+```shell
+
 ## TL;DR
 
 ```shell
@@ -63,4 +67,5 @@ kurtosis clean
 
 ## Note
 
-The docker compose and the run_charon.sh use charon v0.19.2. Change to other versions based on your testing needs.
+The docker compose and the `run_charon.sh` use `obolnetwork/charon-local:latest` (local build). 
+Change to other versions in those two places depending on your testing needs.
