@@ -34,32 +34,32 @@ geth-prysm-charon-prysm: geth-prysm charon run-charon-prysm
 geth-lighthouse:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_lighthouse.yaml > planprint
-	@echo "Waiting for 5 seconds..."
-	@sleep 5
+	@echo "Waiting for 10 seconds..."
+	@sleep 10
 
 geth-nimbus:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_nimbus.yaml > planprint
-	@echo "Waiting for 5 seconds..."
-	@sleep 5
+	@echo "Waiting for 10 seconds..."
+	@sleep 10
 
 geth-lodestar:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_lodestar.yaml > planprint
-	@echo "Waiting for 5 seconds..."
-	@sleep 5
+	@echo "Waiting for 10 seconds..."
+	@sleep 10
 
 geth-prysm:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_prysm.yaml > planprint
-	@echo "Waiting for 5 seconds..."
-	@sleep 5
+	@echo "Waiting for 60 seconds... don't skip the wait"
+	@sleep 60
 
 geth-teku:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_teku.yaml > planprint
-	@echo "Waiting for 5 seconds..."
-	@sleep 5
+	@echo "Waiting for 60 seconds... don't skip the wait"
+	@sleep 60
 
 charon:
 	./run_charon.sh
@@ -81,9 +81,9 @@ run-charon-teku:
 	docker compose up node0 node1 node2 vc0-teku vc1-teku vc2-teku prometheus -d
 
 clean:
+	-docker compose down
 	-kurtosis enclave stop local-eth-testnet
 	-kurtosis enclave rm local-eth-testnet
-	-docker compose down
 	rm -rf node*
 	rm -f planprint
 	rm -rf keystore
