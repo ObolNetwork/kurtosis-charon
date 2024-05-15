@@ -42,4 +42,5 @@ exec /home/user/nimbus_validator_client \
   --doppelganger-detection=false \
   --metrics \
   --metrics-address=0.0.0.0 \
-  --payload-builder=true
+  --payload-builder=true \
+  --distributed
