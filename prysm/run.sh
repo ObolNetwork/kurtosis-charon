@@ -25,7 +25,6 @@ for f in /home/charon/validator_keys/keystore-*.json; do
 
     # Import keystore with password.
     /validator accounts import \
-        --prater \
         --accept-terms-of-use=true \
         --wallet-dir="$WALLET_DIR" \
         --keys-dir="${tmpkeys}" \
@@ -46,7 +45,6 @@ echo "Imported all keys"
 # Now run prysm VC
 /validator --wallet-dir="$WALLET_DIR" \
     --accept-terms-of-use=true \
-    --prater \
     --datadir="/data/vc" \
     --wallet-password-file="/wallet-password.txt" \
     --enable-beacon-rest-api \
