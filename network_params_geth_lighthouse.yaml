@@ -42,7 +42,7 @@ participants:
 # participant specific
     node_selectors: {}
     tolerations: []
-    count: 2
+    count: 3
     snooper_enabled: false
     ethereum_metrics_exporter_enabled: false
     xatu_sentry_enabled: false
@@ -57,7 +57,7 @@ network_params:
   network_id: "3151908"
   deposit_contract_address: "0x4242424242424242424242424242424242424242"
   seconds_per_slot: 12
-  num_validator_keys_per_node: 64
+  num_validator_keys_per_node: 600
   preregistered_validator_keys_mnemonic:
     "giant issue aisle success illegal bike spike
     question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy
@@ -73,8 +73,6 @@ network_params:
   electra_fork_epoch: 500
   network_sync_base_url: https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/
 additional_services:
-  - tx_spammer
-  - blob_spammer
   - el_forkmon
   - beacon_metrics_gazer
   - dora
