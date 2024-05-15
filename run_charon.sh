@@ -17,6 +17,46 @@ find_first_directory() {
     done
 }
 
+extract_bn_ip() {
+    uuid=$1
+    kurtosis_inspect_output=$2
+    names=$3
+    local -n ret=$4 
+    ret=()
+
+    for beaconClient in ${names[@]}; do
+
+    # Extract the --enr-address value from the kurtosis service inspect command
+    if [ -n "$uuid" ]; then
+        kurtosis_inspect_output=$(kurtosis service inspect "$uuid" "$beaconClient")
+        echo $kurtosis_inspect_output
+        # if $beaconClient contains "lighthouse" then
+        if [[ $beaconClient == *"lighthouse"* ]]; then
+            enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr-address=/ {print $2}')
+            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}')
+        elif [[ $beaconClient == *"teku"* ]]; then
+            enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-advertised-ip=/ {print $2}')
+            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-api-port=/ {print $2}')
+        elif [[ $beaconClient == *"nimbus"* ]]; then
+            enr_address=$(echo "$kurtosis_inspect_output" | awk -F: '/--nat=extip:/ {print $2}')
+            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-port=/ {print $2}')
+        elif [[ $beaconClient == *"prysm"* ]]; then
+            enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-host-ip=/ {print $2}')
+            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--grpc-gateway-port=/ {print $2}')
+        elif [[ $beaconClient == *"lodestar"* ]]; then
+            enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr.ip=/ {print $2}')
+            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest.port=/ {print $2}')
+        fi
+        echo "Beacon node address found: $enr_address:$enr_address_port"
+        ret+=($(echo "$enr_address:$enr_address_port"))
+    else
+        echo "UUID not found."
+    fi
+
+    done
+    
+}
+
 # Delete the 'keystore-keys' folder if it exists
 # delete_directory_if_exists "keystore"
 # delete_directory_if_exists "charon_keys"
@@ -68,6 +108,8 @@ done < "planprint"
 # Use jq to extract the value of validator_keystore_files_artifact_uuid
 uuidValidator=$(echo "$json_content" | jq -r '.all_participants[0].cl_context.validator_keystore_files_artifact_uuid')
 beaconClient=$(echo "$json_content" | jq -r '.all_participants[0].cl_context.beacon_service_name')
+
+beaconClients=$(echo "$json_content" | jq -r '.all_participants[].cl_context.beacon_service_name')
 
 if [ -n "$uuid" ]; then
     # Run the kurtosis port print command with the extracted UUID and save the output to a variable
@@ -168,31 +210,8 @@ for keystore_dir in $keystore_directories; do
     fi
 done
 
-# Extract the --enr-address value from the kurtosis service inspect command
-if [ -n "$uuid" ]; then
-    kurtosis_inspect_output=$(kurtosis service inspect "$uuid" "$beaconClient")
-    echo $kurtosis_inspect_output
-    # if $beaconClient contains "lighthouse" then
-    if [[ $beaconClient == *"lighthouse"* ]]; then
-        enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr-address=/ {print $2}')
-        enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}')
-    elif [[ $beaconClient == *"teku"* ]]; then
-        enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-advertised-ip=/ {print $2}')
-        enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-api-port=/ {print $2}')
-    elif [[ $beaconClient == *"nimbus"* ]]; then
-        enr_address=$(echo "$kurtosis_inspect_output" | awk -F: '/--nat=extip:/ {print $2}')
-        enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-port=/ {print $2}')
-    elif [[ $beaconClient == *"prysm"* ]]; then
-        enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-host-ip=/ {print $2}')
-        enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--grpc-gateway-port=/ {print $2}')
-    elif [[ $beaconClient == *"lodestar"* ]]; then
-        enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr.ip=/ {print $2}')
-        enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest.port=/ {print $2}')
-    fi
-    echo "ENR Address: $enr_address:$enr_address_port"
-else
-    echo "UUID not found."
-fi
+local bnips
+extract_bn_ip "$uuid" "$kurtosis_inspect_output" "$beaconClients" bnips
 
 # Remove any existing node* folders
 rm -rf node*
@@ -207,9 +226,12 @@ if [ -n "$genesis_time" ] && [ -n "$enr_address" ]; then
         echo "Removed existing CHARON_BEACON_NODE_ENDPOINTS entry from .env file"
     fi
     # Add the entry to the .env file
-    echo "CHARON_BEACON_NODE_ENDPOINTS=http://$enr_address:$enr_address_port" >> ./.env
     echo "TESTNET_GENESIS_TIME_STAMP=$genesis_time" >> ./.env
     echo "BUILDER_API_ENABLED=true" >> ./.env
+
+    for i in "${!bnips[@]}"; do
+        echo "BN_$i=${bnips[$i]}" >> ./.env
+    done
     # Run the docker command with the extracted genesis_time
     docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" obolnetwork/charon-local:latest create cluster --fee-recipient-addresses="0x8943545177806ED17B9F23F0a21ee5948eCaa776" --nodes=3 --withdrawal-addresses="0xBc7c960C1097ef1Af0FD32407701465f3c03e407" --name=test --split-existing-keys --split-keys-dir=charon-keys --testnet-chain-id=3151908 --testnet-fork-version="0x10000038" --testnet-genesis-timestamp="$genesis_time" --testnet-name=kurtosis-testnet
 else
@@ -223,11 +245,15 @@ echo "Network Name: $network_name"
 # Check if a network name was found
 if [ -n "$network_name" ]; then
     echo "Found network: $network_name"
-    # Add the network name to the .env file
+    # Add the network name to the .env file    
     echo "NETWORK_NAME=$network_name" >> ./.env
 else
     echo "Network starting with 'kt-' not found."
 fi
+
+# Find first VC and kill it
+echo Killing first VC that was started by Kurtosis
+docker kill $(docker container ls -f "NAME=vc-1-*" --format '{{.Names}}')
 
 mkdir -p ./.charon/cluster
 cp -r node* ./.charon/cluster
