@@ -2,10 +2,10 @@
 
 ## Overview
 
-This project leverages [kurtosis](https://docs.kurtosis.com) to run a local setup of ethereum and beacon chains with DVT.
+This project leverages [kurtosis](https://docs.kurtosis.com) to run a local setup of ethereum and beacon chains with DV.
 It does not connect to real beacon chains and instead it creates a preconfigured local environment, similar to [Ganache](https://archive.trufflesuite.com/ganache/).
 Once started, you will have several instances of execution clients, consensus clients, charon and validator clients running altogether.
-What's important to us: kurtosis takes care of configuring and activating validator keys, we only need to import the keys to run DVT.
+What's important to us: kurtosis takes care of configuring and activating validator keys, we only need to import the keys to run DV.
 
 Kurtosis supports all of the existing vendors: lighthouse, nimbus, prysm, teku and lodestar for both BN and VC roles.
 We only need to specify the desired combination of BN and VC. In all cases it uses `geth` for EL.
@@ -58,7 +58,7 @@ After executing this, in docker you will see bunch of containers running (assumi
 * VC containers: vc-1-teku-geth...vc-3-teku-geth
 
 By default it is running 3 instances of each type. You can change the number of instances: `count: 3` in .yaml files.
-Now you have a local setup of ethereum and beacon chains running and progressing with normal (non-DVT) validators.
+Now you have a local setup of ethereum and beacon chains running and progressing with normal (non-DV) validators.
 
 5. Create charon solo cluster configuration by running:
 
@@ -69,13 +69,13 @@ make charon
 This script will create a solo cluster using validator keys pulled from the first VC instance `vc-1-teku-geth`.
 It will also create the `.env` file with the necessary environment variables for the future docker compose run.
 Because it takes the keys from the first VC instance, at the end of the script it kills that instance to prevent conflicts.
-Now you are ready to run the DVT.
+Now you are ready to run the DV.
 
 6. Use your prometheus write token and export `PROMETHEUS_REMOTE_WRITE_TOKEN`.
 
-This will make your DVT pushing metrics (not logs) to Obol Labs' Grafana.
+This will make your DV pushing metrics (not logs) to Obol Labs' Grafana.
 
-7. Run the DVT by running:
+7. Run the DV by running:
 
 ```shell
 # Pick one of these commands
@@ -89,11 +89,11 @@ make run-charon-lodestar
 This time, it runs `docker-compose.yml` with the charon configuration and the selected validator clients.
 Each charon instance will connect to its own BN instance (see `BN_0`...`BN_2` exported in `.env` file). This assures high BN score.
 Also, each charon instance will have its own VC instance of the selected type (vendor).
-This way we create a complete solo DVT cluster.
+This way we create a complete solo DV cluster.
 
 8. Monitoring
 
-If everything runs fine, you will see the DVT running and pushing metrics to the Grafana:
+If everything runs fine, you will see the DV running and pushing metrics to the Grafana:
 https://grafana.monitoring.gcp.obol.tech/d/b962e704-2e37-48a4-82c0-b15d7661e8a6/charon-overview-v3-testnet-updates?orgId=1&var-cluster_network=testnet
 
 > Note that this is the special dashboard designed to monitor "testnet", don't forget to switch to this "Cluster Network". Then select the "Cluster Hash" matching your solo cluster hash found in `.charon/node0/cluster_lock.json`.
@@ -113,7 +113,7 @@ In docker you will notice three kurtosis containers running - that's normal, the
 
 ### Validators
 
-We configured this project to run 600 validators per node (each "node" is EL+CL+DVT). Therefore, for 3 nodes, you will have 1800 validators in total in this beacon chain. This large amount is necessary to fulfill beachon chain requirements about committees. For us it is good to test DVT with that large number of validators, therefore do not change this.
+We configured this project to run 600 validators per node (each "node" is EL+CL+DV). Therefore, for 3 nodes, you will have 1800 validators in total in this beacon chain. This large amount is necessary to fulfill beachon chain requirements about committees. For us it is good to test DV with that large number of validators, therefore do not change this.
 
 ### The Long Delay
 
@@ -138,4 +138,4 @@ Once you have the full stack up and running, you will be watching for logs produ
 * VC instances logs do not contain any critical errors.
 * In Grafana watch for the well-known health conditions, such as progressing Duties, BN errors, VC errors, consensus rounds, timeouts, etc.
 
-If, after at least two epochs you did not observe any critical events, you can consider the DVT is executed *successfully*.
+If, after at least two epochs you did not observe any critical events, you can consider the DV is executed *successfully*.
