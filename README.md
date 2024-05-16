@@ -9,6 +9,7 @@ What's important to us: kurtosis takes care of configuring and activating valida
 
 Kurtosis supports all of the existing vendors: lighthouse, nimbus, prysm, teku and lodestar for both BN and VC roles.
 We only need to specify the desired combination of BN and VC. In all cases it uses `geth` for EL.
+Note that at the time of writing, not every combination of BN and VC [is supported](https://github.com/kurtosis-tech/ethereum-package?tab=readme-ov-file#beacon-node--validator-client-compatibility).
 
 ## Pre-requisites
 
@@ -49,6 +50,7 @@ make geth-prysm
 ```
 
 > Note: this command often fails if you have leftovers from the previous run. In that case, run `make clean` and try again.
+Also, sometimes docker network-related errors can only be fixed with a complete docker daemon restart.
 
 After executing this, in docker you will see bunch of containers running (assuming Teku is chosen):
 * EL containers: el-1-geth-teku...el-3-geth-teku
