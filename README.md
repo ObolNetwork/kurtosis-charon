@@ -21,7 +21,7 @@ This project updates frequently, make sure to update it to the latest version be
 On MacOS, simply use `brew`:
     
 ```shell
-brew install kurtosis-cli
+brew install kurtosis-tech/tap/kurtosis-cli 
 ```
 
 ## Usage
