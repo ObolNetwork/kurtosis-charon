@@ -22,7 +22,10 @@ On MacOS, simply use `brew`:
     
 ```shell
 brew install kurtosis-cli
+brew install jq
 ```
+
+> Note: `jq` is used in the scripts to parse JSON files.
 
 ## Usage
 
@@ -60,7 +63,11 @@ After executing this, in docker you will see bunch of containers running (assumi
 By default it is running 3 instances of each type. You can change the number of instances: `count: 3` in .yaml files.
 Now you have a local setup of ethereum and beacon chains running and progressing with normal (non-DV) validators.
 
-5. Create charon solo cluster configuration by running:
+5. Use your prometheus write token and export `PROMETHEUS_REMOTE_WRITE_TOKEN`.
+
+This will make your DV pushing metrics (not logs) to Obol Labs' Grafana.
+
+6. Create charon solo cluster configuration by running:
 
 ```shell
 make charon
@@ -70,10 +77,6 @@ This script will create a solo cluster using validator keys pulled from the firs
 It will also create the `.env` file with the necessary environment variables for the future docker compose run.
 Because it takes the keys from the first VC instance, at the end of the script it kills that instance to prevent conflicts.
 Now you are ready to run the DV.
-
-6. Use your prometheus write token and export `PROMETHEUS_REMOTE_WRITE_TOKEN`.
-
-This will make your DV pushing metrics (not logs) to Obol Labs' Grafana.
 
 7. Run the DV by running:
 
@@ -96,7 +99,7 @@ This way we create a complete solo DV cluster.
 If everything runs fine, you will see the DV running and pushing metrics to the Grafana:
 https://grafana.monitoring.gcp.obol.tech/d/b962e704-2e37-48a4-82c0-b15d7661e8a6/charon-overview-v3-testnet-updates?orgId=1&var-cluster_network=testnet
 
-> Note that this is the special dashboard designed to monitor "testnet", don't forget to switch to this "Cluster Network". Then select the "Cluster Hash" matching your solo cluster hash found in `.charon/node0/cluster_lock.json`.
+> Note that this is the special dashboard designed to monitor "testnet", don't forget to switch to this "Cluster Network". Then select the "Cluster Hash" matching your solo cluster hash found in `.charon/cluster/node0/cluster-lock.json`.
 
 Allow at least one epoch to pass before you make any conclusions. See *Notes* below for the *Definition of Success*.
 
