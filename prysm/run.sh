@@ -12,7 +12,7 @@ mkdir $WALLET_DIR
 # 2. Run the validator client.
 WALLET_PASSWORD="prysm-validator-secret"
 echo $WALLET_PASSWORD > /wallet-password.txt
-/validator wallet create --prater --accept-terms-of-use --wallet-password-file=wallet-password.txt --keymanager-kind=direct --wallet-dir="$WALLET_DIR"
+/validator wallet create --accept-terms-of-use --wallet-password-file=wallet-password.txt --keymanager-kind=direct --wallet-dir="$WALLET_DIR"
 
 tmpkeys="/home/validator_keys/tmpkeys"
 mkdir -p ${tmpkeys}
