@@ -249,7 +249,7 @@ services:
       - ./data/nimbus/vc2:/home/user/data
 
   vc0-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.17.0}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.18.1}
     depends_on: [node0]
     entrypoint: /opt/lodestar/run.sh
     networks: [ network1 ]
@@ -265,7 +265,7 @@ services:
     restart: unless-stopped
 
   vc1-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.17.0}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.18.1}
     depends_on: [node1]
     entrypoint: /opt/lodestar/run.sh
     networks: [ network1 ]
@@ -282,7 +282,7 @@ services:
     restart: unless-stopped
 
   vc2-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.17.0}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.18.1}
     depends_on: [node2]
     entrypoint: /opt/lodestar/run.sh
     networks: [ network1 ]

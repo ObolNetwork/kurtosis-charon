@@ -14,7 +14,7 @@ participants:
     el_max_mem: 0
 # CL
     cl_type: lodestar
-    cl_image: chainsafe/lodestar:v1.17.0
+    cl_image: chainsafe/lodestar:v1.18.1
     cl_log_level: ""
     cl_extra_env_vars: {}
     cl_extra_labels: {}
@@ -28,7 +28,7 @@ participants:
     use_separate_vc: true
 # Validator
     # vc_type: lodestar
-    # vc_image: chainsafe/lodestar:v1.17.0
+    # vc_image: chainsafe/lodestar:v1.18.1
     # vc_log_level: ""
     # vc_extra_env_vars: {}
     # vc_extra_labels: {}
