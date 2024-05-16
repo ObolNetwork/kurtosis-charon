@@ -36,7 +36,7 @@ services:
       CHARON_VALIDATOR_API_ADDRESS: ${CHARON_VALIDATOR_API_ADDRESS:-0.0.0.0:3600}
       CHARON_P2P_TCP_ADDRESS: ${CHARON_P2P_TCP_ADDRESS:-0.0.0.0:3610}
       CHARON_MONITORING_ADDRESS: ${CHARON_MONITORING_ADDRESS:-0.0.0.0:3620}
-      CHARON_BEACON_NODE_ENDPOINTS: ${CHARON_BEACON_NODE_ENDPOINTS:-http://172.16.4.9:4000}
+      CHARON_BEACON_NODE_ENDPOINTS: ${BN_0:-http://172.16.4.9:4000}
     # expose:
     #   - 3600
     # ports:
@@ -53,7 +53,7 @@ services:
       CHARON_VALIDATOR_API_ADDRESS: ${CHARON_VALIDATOR_API_ADDRESS:-0.0.0.0:3600}
       CHARON_P2P_TCP_ADDRESS: ${CHARON_P2P_TCP_ADDRESS:-0.0.0.0:3610}
       CHARON_MONITORING_ADDRESS: ${CHARON_MONITORING_ADDRESS:-0.0.0.0:3620}
-      CHARON_BEACON_NODE_ENDPOINTS: ${CHARON_BEACON_NODE_ENDPOINTS:-http://172.16.4.9:4000}
+      CHARON_BEACON_NODE_ENDPOINTS: ${BN_1:-http://172.16.4.9:4000}
     # expose:
     #   - 3600
     # ports:
@@ -70,7 +70,7 @@ services:
       CHARON_VALIDATOR_API_ADDRESS: ${CHARON_VALIDATOR_API_ADDRESS:-0.0.0.0:3600}
       CHARON_P2P_TCP_ADDRESS: ${CHARON_P2P_TCP_ADDRESS:-0.0.0.0:3610}
       CHARON_MONITORING_ADDRESS: ${CHARON_MONITORING_ADDRESS:-0.0.0.0:3620}
-      CHARON_BEACON_NODE_ENDPOINTS: ${CHARON_BEACON_NODE_ENDPOINTS:-http://172.16.4.9:4000}
+      CHARON_BEACON_NODE_ENDPOINTS: ${BN_2:-http://172.16.4.9:4000}
     # expose:
     #   - 3600
     # ports:
@@ -222,7 +222,7 @@ services:
       NODE: node0
     volumes:
       - .charon/cluster/node0/validator_keys:/home/validator_keys
-      - ./nimbus:/home/user/data
+      - ./data/nimbus/vc0:/home/user/data
 
   vc1-nimbus:
     build: nimbus
@@ -234,7 +234,7 @@ services:
       NODE: node1
     volumes:
       - .charon/cluster/node1/validator_keys:/home/validator_keys
-      - ./nimbus:/home/user/data
+      - ./data/nimbus/vc1:/home/user/data
 
   vc2-nimbus:
     build: nimbus
@@ -246,10 +246,10 @@ services:
       NODE: node2
     volumes:
       - .charon/cluster/node2/validator_keys:/home/validator_keys
-      - ./nimbus:/home/user/data
+      - ./data/nimbus/vc2:/home/user/data
 
   vc0-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.17.0}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.18.1}
     depends_on: [node0]
     entrypoint: /opt/lodestar/run.sh
     networks: [ network1 ]
@@ -265,7 +265,7 @@ services:
     restart: unless-stopped
 
   vc1-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.17.0}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.18.1}
     depends_on: [node1]
     entrypoint: /opt/lodestar/run.sh
     networks: [ network1 ]
@@ -282,7 +282,7 @@ services:
     restart: unless-stopped
 
   vc2-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.17.0}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.18.1}
     depends_on: [node2]
     entrypoint: /opt/lodestar/run.sh
     networks: [ network1 ]
