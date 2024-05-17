@@ -226,6 +226,7 @@ services:
     volumes:
       - .charon/cluster/node0/validator_keys:/home/validator_keys
       - ./data/nimbus/vc0:/home/user/data
+      - ./nimbus/run.sh:/home/user/data/run.sh
 
   vc1-nimbus:
     build: nimbus
@@ -238,6 +239,7 @@ services:
     volumes:
       - .charon/cluster/node1/validator_keys:/home/validator_keys
       - ./data/nimbus/vc1:/home/user/data
+      - ./nimbus/run.sh:/home/user/data/run.sh
 
   vc2-nimbus:
     build: nimbus
@@ -250,6 +252,7 @@ services:
     volumes:
       - .charon/cluster/node2/validator_keys:/home/validator_keys
       - ./data/nimbus/vc2:/home/user/data
+      - ./nimbus/run.sh:/home/user/data/run.sh
 
   vc0-lodestar:
     image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.18.1}
