@@ -1,4 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+if ((BASH_VERSINFO[0] < 5))
+then
+  echo "ERROR: You need at least bash-5.0 to run this script."
+  exit 1
+fi
+
 # Function to check if a directory exists and delete it
 delete_directory_if_exists() {
     if [ -d "$1" ]; then
