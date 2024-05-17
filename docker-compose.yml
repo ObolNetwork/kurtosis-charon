@@ -27,6 +27,7 @@ services:
   #  \___|_| |_|\__,_|_|  \___/|_| |_|  \___|_|_|\___|_| |_|\__|___/
   node0:
     <<: *node-base
+    container_name: node0
     environment:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node0/charon-enr-private-key
@@ -44,6 +45,7 @@ services:
 
   node1:
     <<: *node-base
+    container_name: node1
     environment:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node1/charon-enr-private-key
@@ -61,6 +63,7 @@ services:
 
   node2:
     <<: *node-base
+    container_name: node2
     environment:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node2/charon-enr-private-key
