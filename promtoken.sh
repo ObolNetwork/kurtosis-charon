@@ -1,4 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+if ((BASH_VERSINFO[0] < 5))
+then
+  echo "ERROR: You need at least bash-5.0 to run this script."
+  exit 1
+fi
 
 # Check if PROMETHEUS_REMOTE_WRITE_TOKEN environment variable is set
 if [ -z "$PROMETHEUS_REMOTE_WRITE_TOKEN" ]; then

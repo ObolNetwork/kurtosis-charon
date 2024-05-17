@@ -18,14 +18,23 @@ You need to have docker installed on your machine, because everything is running
 Install `kurtosis-cli` by following the instructions [here](https://docs.kurtosis.com/install).
 This project updates frequently, make sure to update it to the latest version before you start.
 
-On MacOS, simply use `brew`:
+### MacOS
+
+On MacOS, use `brew` as following:
     
 ```shell
-brew install kurtosis-cli
+brew install kurtosis-tech/tap/kurtosis-cli
 brew install jq
+brew install bash
 ```
 
-> Note: `jq` is used in the scripts to parse JSON files.
+> Note: `jq` is used in the scripts to parse JSON files, and for `bash` this installs the latest version (5.x+) required by scripts.
+
+After installation, verify that this command prints the new version of `bash`:
+
+```shell
+/usr/bin/env bash --version # GNU bash, version 5.2.26(1)-release (aarch64-apple-darwin23.2.0)
+```
 
 ## Usage
 
@@ -133,7 +142,7 @@ Prysm 5.0.3 has some known issues:
 unless you create a custom build of Prysm with this fix: `pinebit/prysm-vc:latest`. This only applies to VC.
 * The known issues with memory manangement, we experienced OOM kills of Prysm BN instances soon after the start. This issue is already reported in their backlog.
 
-### Definition of Success
+### Acceptance Criteria
 
 Once you have the full stack up and running, you will be watching for logs produced by charon nodes and VC instance in docker. Also, you will be using the mentioned Grafana dashboard to see all the metrics pushed by your cluster.
 
@@ -141,4 +150,4 @@ Once you have the full stack up and running, you will be watching for logs produ
 * VC instances logs do not contain any critical errors.
 * In Grafana watch for the well-known health conditions, such as progressing Duties, BN errors, VC errors, consensus rounds, timeouts, etc.
 
-If, after at least two epochs you did not observe any critical events, you can consider the DV is executed *successfully*.
+If, after at least 15 minutes you do not observe any critical events, you can consider the DV is executed *successfully*.
