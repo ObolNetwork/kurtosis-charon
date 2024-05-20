@@ -314,7 +314,7 @@ services:
       BEACON_NODE_ADDRESS: "http://node0:3600"
       # ETH2_NETWORK: ${ETH2_NETWORK:-goerli}
     volumes:
-      - ./prysm:/home/prysm
+      - ./prysm/run.sh:/home/prysm/run.sh
       - .charon/cluster/node0/validator_keys:/home/charon/validator_keys
       - ./testnet/config.yaml:/home/data/config.yaml
 
@@ -328,7 +328,7 @@ services:
       BEACON_NODE_ADDRESS: "http://node1:3600"
       # ETH2_NETWORK: ${ETH2_NETWORK:-goerli}
     volumes:
-      - ./prysm:/home/prysm
+      - ./prysm/run.sh:/home/prysm/run.sh
       - .charon/cluster/node1/validator_keys:/home/charon/validator_keys
       - ./testnet/config.yaml:/home/data/config.yaml
   
@@ -342,7 +342,7 @@ services:
       BEACON_NODE_ADDRESS: "http://node2:3600"
       # ETH2_NETWORK: ${ETH2_NETWORK:-goerli}
     volumes:
-      - ./prysm:/home/prysm
+      - ./prysm/run.sh:/home/prysm/run.sh
       - .charon/cluster/node2/validator_keys:/home/charon/validator_keys
       - ./testnet/config.yaml:/home/data/config.yaml
 
