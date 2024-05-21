@@ -19,7 +19,7 @@ token=$PROMETHEUS_REMOTE_WRITE_TOKEN
 config=$(cat prometheus/prometheus.yml)
 
 # Replace the credentials value in the config with the token
-updated_config=$(echo "$config" | sed "s/credentials: \"\"/credentials: \"$token\"/")
+updated_config=$(echo "$config" | sed "s|credentials: \"\"|credentials: \"$token\"|")
 
 # Write the updated configuration back to the YAML file
 echo "$updated_config" > prometheus/prometheustmp.yml
