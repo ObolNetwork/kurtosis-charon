@@ -225,7 +225,8 @@ services:
       NODE: node0
     volumes:
       - .charon/cluster/node0/validator_keys:/home/validator_keys
-      - ./data/nimbus/vc0:/home/user/data
+      - ./data/nimbus/vc0:/home/user/data/node0
+      - ./nimbus/run.sh:/home/user/data/run.sh
 
   vc1-nimbus:
     build: nimbus
@@ -237,7 +238,8 @@ services:
       NODE: node1
     volumes:
       - .charon/cluster/node1/validator_keys:/home/validator_keys
-      - ./data/nimbus/vc1:/home/user/data
+      - ./data/nimbus/vc1:/home/user/data/node1
+      - ./nimbus/run.sh:/home/user/data/run.sh
 
   vc2-nimbus:
     build: nimbus
@@ -249,7 +251,8 @@ services:
       NODE: node2
     volumes:
       - .charon/cluster/node2/validator_keys:/home/validator_keys
-      - ./data/nimbus/vc2:/home/user/data
+      - ./data/nimbus/vc2:/home/user/data/node2
+      - ./nimbus/run.sh:/home/user/data/run.sh
 
   vc0-lodestar:
     image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.18.1}
@@ -311,7 +314,7 @@ services:
       BEACON_NODE_ADDRESS: "http://node0:3600"
       # ETH2_NETWORK: ${ETH2_NETWORK:-goerli}
     volumes:
-      - ./prysm:/home/prysm
+      - ./prysm/run.sh:/home/prysm/run.sh
       - .charon/cluster/node0/validator_keys:/home/charon/validator_keys
       - ./testnet/config.yaml:/home/data/config.yaml
 
@@ -325,7 +328,7 @@ services:
       BEACON_NODE_ADDRESS: "http://node1:3600"
       # ETH2_NETWORK: ${ETH2_NETWORK:-goerli}
     volumes:
-      - ./prysm:/home/prysm
+      - ./prysm/run.sh:/home/prysm/run.sh
       - .charon/cluster/node1/validator_keys:/home/charon/validator_keys
       - ./testnet/config.yaml:/home/data/config.yaml
   
@@ -339,7 +342,7 @@ services:
       BEACON_NODE_ADDRESS: "http://node2:3600"
       # ETH2_NETWORK: ${ETH2_NETWORK:-goerli}
     volumes:
-      - ./prysm:/home/prysm
+      - ./prysm/run.sh:/home/prysm/run.sh
       - .charon/cluster/node2/validator_keys:/home/charon/validator_keys
       - ./testnet/config.yaml:/home/data/config.yaml
 

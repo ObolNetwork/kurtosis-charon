@@ -62,6 +62,7 @@ geth-teku:
 	@sleep 60
 
 charon:
+	mkdir data
 	./run_charon.sh
 	./promtoken.sh
 
@@ -69,9 +70,11 @@ run-charon-lighthouse:
 	docker compose up node0 node1 node2 vc0-lighthouse vc1-lighthouse vc2-lighthouse prometheus -d
 
 run-charon-nimbus:
+	mkdir -p data/nimbus/vc{0,1,2}
 	docker compose up node0 node1 node2 vc0-nimbus vc1-nimbus vc2-nimbus prometheus -d
 
 run-charon-lodestar:
+	mkdir -p data/lodestar/vc{0,1,2}
 	docker compose up node0 node1 node2 vc0-lodestar vc1-lodestar vc2-lodestar prometheus -d
 
 run-charon-prysm:
