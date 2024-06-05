@@ -142,6 +142,10 @@ Prysm 5.0.3 has some known issues:
 unless you create a custom build of Prysm with this fix: `pinebit/prysm-vc:latest`. This only applies to VC.
 * The known issues with memory manangement, we experienced OOM kills of Prysm BN instances soon after the start. This issue is already reported in their backlog.
 
+### Nimbus BN
+
+Due to an issue in Nimbus (probably applicable to kurtosis only), when running as a beacon node it requires clients to use JSON request format, not SSZ. In Charon we added "json_requests" feature that must be enabled if you choose running Nimbus as BN. Before running Charon, update `docker-compose.yml` to include this argument: `--feature-set-enable=json_requests`.
+
 ### Acceptance Criteria
 
 Once you have the full stack up and running, you will be watching for logs produced by charon nodes and VC instance in docker. Also, you will be using the mentioned Grafana dashboard to see all the metrics pushed by your cluster.
@@ -149,5 +153,6 @@ Once you have the full stack up and running, you will be watching for logs produ
 * Charon logs do not contain any critical errors. Consensus rounds must succeed. All calls from VC and to BN are fulfilled with no errors.
 * VC instances logs do not contain any critical errors.
 * In Grafana watch for the well-known health conditions, such as progressing Duties, BN errors, VC errors, consensus rounds, timeouts, etc.
+* Make sure DV produces blocks and proposer duty is successful.
 
 If, after at least 15 minutes you do not observe any critical events, you can consider the DV is executed *successfully*.
