@@ -62,7 +62,7 @@ geth-teku:
 	@sleep 60
 
 charon:
-	mkdir data
+	mkdir -p data
 	./run_charon.sh
 	./promtoken.sh
 
