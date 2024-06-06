@@ -1,0 +1,30 @@
+{
+  "el": [
+    {
+      "docker_image": "test/testEL:latest",
+      "type": "geth"
+    }
+  ],
+  "bn": [
+    {
+      "docker_image": "test/testBNNimbus:latest",
+      "type": "prysm"
+    },
+    {
+      "docker_image": "test/testBNLodestar:latest",
+      "type": "lodestar"
+    }
+  ],
+  "cl": [
+    {
+      "docker_image": "test/testCLTeku:latest",
+      "type": "teku"
+    },
+    {
+      "docker_image": "test/testCLLighthouse:latest",
+      "type": "lighthouse"
+    }
+  ],
+  "validator_stacks_amount": 3,
+  "validators_per_node": 600
+}
