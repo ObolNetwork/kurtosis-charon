@@ -38,6 +38,8 @@ geth-lighthouse:
 	@sleep 10
 
 geth-nimbus:
+	@echo "WARNING: Nimbus BN requires Charon to enable feature json_requests"
+	@read -p "Press enter to continue"
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_nimbus.yaml > planprint
 	@echo "Waiting for 10 seconds..."
@@ -62,7 +64,7 @@ geth-teku:
 	@sleep 60
 
 charon:
-	mkdir data
+	mkdir -p data
 	./run_charon.sh
 	./promtoken.sh
 
