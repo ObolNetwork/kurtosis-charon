@@ -33,7 +33,7 @@ geth-prysm-charon-prysm: geth-prysm charon run-charon-prysm
 
 geth-lighthouse:
 	rm -f planprint
-	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_lighthouse.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_lighthouse.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
@@ -41,25 +41,25 @@ geth-nimbus:
 	@echo "WARNING: Nimbus BN requires Charon to enable feature json_requests"
 	@read -p "Press enter to continue"
 	rm -f planprint
-	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_nimbus.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_nimbus.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
 geth-lodestar:
 	rm -f planprint
-	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_lodestar.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_lodestar.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
 geth-prysm:
 	rm -f planprint
-	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_prysm.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_prysm.yaml > planprint
 	@echo "Waiting for 60 seconds... don't skip the wait"
 	@sleep 60
 
 geth-teku:
 	rm -f planprint
-	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_teku.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_teku.yaml > planprint
 	@echo "Waiting for 60 seconds... don't skip the wait"
 	@sleep 60
 
