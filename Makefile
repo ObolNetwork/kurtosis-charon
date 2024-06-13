@@ -85,6 +85,11 @@ run-charon-prysm:
 run-charon-teku:
 	docker compose up node0 node1 node2 vc0-teku vc1-teku vc2-teku prometheus -d
 
+exit-teku:
+	./teku/exit.sh 0
+	./teku/exit.sh 1
+	./teku/exit.sh 2
+
 clean:
 	-docker compose down
 	-kurtosis enclave stop local-eth-testnet
