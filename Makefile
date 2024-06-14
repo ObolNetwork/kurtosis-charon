@@ -90,6 +90,11 @@ exit-nimbus:
 	./nimbus/exit.sh 1
 	./nimbus/exit.sh 2
 
+exit-lodestar:
+	./lodestar/exit.sh 0
+	./lodestar/exit.sh 1
+	./lodestar/exit.sh 2
+
 exit-teku:
 	./teku/exit.sh 0
 	./teku/exit.sh 1
