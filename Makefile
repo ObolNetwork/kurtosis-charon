@@ -85,6 +85,11 @@ run-charon-prysm:
 run-charon-teku:
 	docker compose up node0 node1 node2 vc0-teku vc1-teku vc2-teku prometheus -d
 
+exit-lighthouse:
+	./lighthouse/exit.sh 0
+	./lighthouse/exit.sh 1
+	./lighthouse/exit.sh 2
+
 exit-nimbus:
 	./nimbus/exit.sh 0
 	./nimbus/exit.sh 1
