@@ -100,7 +100,7 @@ services:
   #  \ V / (_| | | | (_| | (_| | || (_) | |  \__ \
   #   \_/ \__,_|_|_|\__,_|\__,_|\__\___/|_|  |___/
   vc0-lighthouse:
-    image: sigp/lighthouse:${LIGHTHOUSE_VERSION:-v5.2.0}
+    image: sigp/lighthouse:${LIGHTHOUSE_VERSION:-v5.2.1}
     # image: 113746/lighthouse:distributed
     entrypoint: /opt/lighthouse/run.sh
     networks: [ network1 ]
@@ -118,7 +118,7 @@ services:
       - ./testnet:/opt/lighthouse/network-configs
   
   vc1-lighthouse:
-    image: sigp/lighthouse:${LIGHTHOUSE_VERSION:-v5.2.0}
+    image: sigp/lighthouse:${LIGHTHOUSE_VERSION:-v5.2.1}
     # image: 113746/lighthouse:distributed
     entrypoint: /opt/lighthouse/run.sh
     networks: [ network1 ]
@@ -136,7 +136,7 @@ services:
       - ./testnet:/opt/lighthouse/network-configs
 
   vc2-lighthouse:
-    image: sigp/lighthouse:${LIGHTHOUSE_VERSION:-v5.2.0}
+    image: sigp/lighthouse:${LIGHTHOUSE_VERSION:-v5.2.1}
     # image: 113746/lighthouse:distributed
     entrypoint: /opt/lighthouse/run.sh
     networks: [ network1 ]
@@ -154,7 +154,7 @@ services:
       - ./testnet:/opt/lighthouse/network-configs
 
   vc0-teku:
-    image: consensys/teku:${TEKU_VERSION:-24.4.0}
+    image: consensys/teku:${TEKU_VERSION:-24.6.1}
     networks: [ network1 ]
     # network_mode: "host"
     depends_on: [ node0 ]
@@ -175,7 +175,7 @@ services:
       - ./testnet/config.yaml:/opt/teku/config.yaml
 
   vc1-teku:
-    image: consensys/teku:${TEKU_VERSION:-24.4.0}
+    image: consensys/teku:${TEKU_VERSION:-24.6.1}
     networks: [ network1 ]
     # network_mode: "host"
     depends_on: [ node1 ]
@@ -196,7 +196,7 @@ services:
       - ./testnet/config.yaml:/opt/teku/config.yaml
 
   vc2-teku:
-    image: consensys/teku:${TEKU_VERSION:-24.4.0}
+    image: consensys/teku:${TEKU_VERSION:-24.6.1}
     networks: [ network1 ]
     # network_mode: "host"
     depends_on: [ node2 ]
@@ -256,7 +256,7 @@ services:
       - ./nimbus/run.sh:/home/user/data/run.sh
 
   vc0-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.18.1}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.19.0}
     depends_on: [node0]
     entrypoint: /opt/lodestar/run.sh
     networks: [ network1 ]
@@ -272,7 +272,7 @@ services:
     restart: unless-stopped
 
   vc1-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.18.1}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.19.0}
     depends_on: [node1]
     entrypoint: /opt/lodestar/run.sh
     networks: [ network1 ]
@@ -289,7 +289,7 @@ services:
     restart: unless-stopped
 
   vc2-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.18.1}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.19.0}
     depends_on: [node2]
     entrypoint: /opt/lodestar/run.sh
     networks: [ network1 ]
