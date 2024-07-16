@@ -1,0 +1,13 @@
+beacon-node-address:
+accountmanager:
+  wallet:
+    locations:
+      - /opt/charon/vouch_base_dir
+    accounts:
+      - kurtosis_wallet
+    passphrases:
+blockrelay:
+  fallback-fee-recipient: '0x0000000000000000000000000000000000000001'
+metrics:
+  prometheus:
+    listen-address: '127.0.0.1:12345'
