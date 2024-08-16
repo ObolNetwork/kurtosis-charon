@@ -14,7 +14,7 @@ participants:
     el_max_mem: 0
 # CL
     cl_type: teku
-    cl_image: consensys/teku:24.6.1
+    cl_image: consensys/teku:24.8.0
     cl_log_level: ""
     cl_extra_env_vars: {}
     cl_extra_labels: {}
