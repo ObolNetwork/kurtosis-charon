@@ -33,7 +33,7 @@ geth-prysm-charon-prysm: geth-prysm charon run-charon-prysm
 
 geth-lighthouse:
 	rm -f planprint
-	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_lighthouse.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_lighthouse.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
@@ -41,25 +41,25 @@ geth-nimbus:
 	@echo "WARNING: Nimbus BN requires Charon to enable feature json_requests"
 	@read -p "Press enter to continue"
 	rm -f planprint
-	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_nimbus.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_nimbus.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
 geth-lodestar:
 	rm -f planprint
-	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_lodestar.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_lodestar.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
 geth-prysm:
 	rm -f planprint
-	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_prysm.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_prysm.yaml > planprint
 	@echo "Waiting for 60 seconds... don't skip the wait"
 	@sleep 60
 
 geth-teku:
 	rm -f planprint
-	kurtosis run --enclave local-eth-testnet github.com/kurtosis-tech/ethereum-package --args-file ./network_params_geth_teku.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_teku.yaml > planprint
 	@echo "Waiting for 60 seconds... don't skip the wait"
 	@sleep 60
 
@@ -76,7 +76,7 @@ run-charon-nimbus:
 	docker compose up node0 node1 node2 vc0-nimbus vc1-nimbus vc2-nimbus prometheus -d
 
 run-charon-lodestar:
-	mkdir -p data/lodestar/vc{0,1,2}
+	mkdir -p data/lodestar/vc{0,1,2}/{caches,keystores,validator-db}
 	docker compose up node0 node1 node2 vc0-lodestar vc1-lodestar vc2-lodestar prometheus -d
 
 run-charon-prysm:
@@ -84,6 +84,26 @@ run-charon-prysm:
 
 run-charon-teku:
 	docker compose up node0 node1 node2 vc0-teku vc1-teku vc2-teku prometheus -d
+
+exit-lighthouse:
+	./lighthouse/exit.sh 0
+	./lighthouse/exit.sh 1
+	./lighthouse/exit.sh 2
+
+exit-nimbus:
+	./nimbus/exit.sh 0
+	./nimbus/exit.sh 1
+	./nimbus/exit.sh 2
+
+exit-lodestar:
+	./lodestar/exit.sh 0
+	./lodestar/exit.sh 1
+	./lodestar/exit.sh 2
+
+exit-teku:
+	./teku/exit.sh 0
+	./teku/exit.sh 1
+	./teku/exit.sh 2
 
 clean:
 	-docker compose down

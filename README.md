@@ -9,7 +9,7 @@ What's important to us: kurtosis takes care of configuring and activating valida
 
 Kurtosis supports all of the existing vendors: lighthouse, nimbus, prysm, teku and lodestar for both BN and VC roles.
 We only need to specify the desired combination of BN and VC. In all cases it uses `geth` for EL.
-Note that at the time of writing, not every combination of BN and VC [is supported](https://github.com/kurtosis-tech/ethereum-package?tab=readme-ov-file#beacon-node--validator-client-compatibility).
+Note that at the time of writing, not every combination of BN and VC [is supported](https://github.com/ethpandaops/ethereum-package?tab=readme-ov-file#beacon-node--validator-client-compatibility).
 
 ## Pre-requisites
 
@@ -21,7 +21,7 @@ This project updates frequently, make sure to update it to the latest version be
 ### MacOS
 
 On MacOS, use `brew` as following:
-    
+
 ```shell
 brew install kurtosis-tech/tap/kurtosis-cli
 brew install jq
@@ -119,7 +119,7 @@ make clean
 ```
 
 This command will stop everything in docker and properly clean up the environment. Charon cluster files and all kurtosis intermediate files will be deleted.
-In docker you will notice three kurtosis containers running - that's normal, they are used to manage the setup. It's safe to stop/kill them, because kurtosis will recreate them each time you run any kurtosis command. 
+In docker you will notice three kurtosis containers running - that's normal, they are used to manage the setup. It's safe to stop/kill them, because kurtosis will recreate them each time you run any kurtosis command.
 
 ## Notes
 
@@ -134,13 +134,6 @@ When you run `make geth-teku` or other commands (step 4 in above), you will noti
 ### System resources
 
 A typical stack that runs everything in docker occupies 3-4 GB of RAM in according with docker stats (on MacOS, involving Rosetta in some cases) and moderate CPU usage.
-
-### Prysm 5.0.3
-
-Prysm 5.0.3 has some known issues:
-* The known bug that is [fixed](https://github.com/prysmaticlabs/prysm/pull/13995) and will be released in the next version of Prysm. Until then, you will see some duties failing, 
-unless you create a custom build of Prysm with this fix: `pinebit/prysm-vc:latest`. This only applies to VC.
-* The known issues with memory manangement, we experienced OOM kills of Prysm BN instances soon after the start. This issue is already reported in their backlog.
 
 ### Nimbus BN
 

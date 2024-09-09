@@ -14,7 +14,7 @@ participants:
     el_max_mem: 0
 # CL
     cl_type: lodestar
-    cl_image: chainsafe/lodestar:v1.18.1
+    cl_image: chainsafe/lodestar:v1.20.2
     cl_log_level: ""
     cl_extra_env_vars: {}
     cl_extra_labels: {}
@@ -28,7 +28,7 @@ participants:
     use_separate_vc: true
 # Validator
     # vc_type: lodestar
-    # vc_image: chainsafe/lodestar:v1.18.1
+    # vc_image: chainsafe/lodestar:v1.19.0
     # vc_log_level: ""
     # vc_extra_env_vars: {}
     # vc_extra_labels: {}
@@ -64,11 +64,11 @@ network_params:
     very lucky have athlete"
   preregistered_validator_count: 0
   genesis_delay: 20
-  max_churn: 8
+  # max_churn: 8
   ejection_balance: 16000000000
   eth1_follow_distance: 2048
   min_validator_withdrawability_delay: 256
-  shard_committee_period: 256
+  shard_committee_period: 1
   deneb_fork_epoch: 0
   electra_fork_epoch: 500
   network_sync_base_url: https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/

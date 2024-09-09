@@ -1,6 +1,6 @@
-FROM statusim/nimbus-eth2:multiarch-v24.5.1 as nimbusbn
+FROM statusim/nimbus-eth2:multiarch-v24.7.0 as nimbusbn
 
-FROM statusim/nimbus-validator-client:multiarch-v24.5.1
+FROM statusim/nimbus-validator-client:multiarch-v24.7.0
 
 COPY --from=nimbusbn /home/user/nimbus_beacon_node /home/user/nimbus_beacon_node
 
