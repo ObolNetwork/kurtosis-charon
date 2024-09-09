@@ -76,7 +76,7 @@ run-charon-nimbus:
 	docker compose up node0 node1 node2 vc0-nimbus vc1-nimbus vc2-nimbus prometheus -d
 
 run-charon-lodestar:
-	mkdir -p data/lodestar/vc{0,1,2}
+	mkdir -p data/lodestar/vc{0,1,2}/{caches,keystores,validator-db}
 	docker compose up node0 node1 node2 vc0-lodestar vc1-lodestar vc2-lodestar prometheus -d
 
 run-charon-prysm:
