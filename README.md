@@ -135,13 +135,6 @@ When you run `make geth-teku` or other commands (step 4 in above), you will noti
 
 A typical stack that runs everything in docker occupies 3-4 GB of RAM in according with docker stats (on MacOS, involving Rosetta in some cases) and moderate CPU usage.
 
-### Prysm 5.0.3
-
-Prysm 5.0.3 has some known issues:
-* The known bug that is [fixed](https://github.com/prysmaticlabs/prysm/pull/13995) and will be released in the next version of Prysm. Until then, you will see some duties failing,
-unless you create a custom build of Prysm with this fix: `pinebit/prysm-vc:latest`. This only applies to VC.
-* The known issues with memory manangement, we experienced OOM kills of Prysm BN instances soon after the start. This issue is already reported in their backlog.
-
 ### Nimbus BN
 
 Due to an issue in Nimbus (probably applicable to kurtosis only), when running as a beacon node it requires clients to use JSON request format, not SSZ. In Charon we added "json_requests" feature that must be enabled if you choose running Nimbus as BN. Before running Charon, update `docker-compose.yml` to include this argument: `--feature-set-enable=json_requests`.
