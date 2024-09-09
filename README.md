@@ -125,7 +125,7 @@ In docker you will notice three kurtosis containers running - that's normal, the
 
 ### Validators
 
-We configured this project to run 600 validators per node (each "node" is EL+CL+DV). Therefore, for 3 nodes, you will have 1800 validators in total in this beacon chain. This large amount is necessary to fulfill beachon chain requirements about committees. For us it is good to test DV with that large number of validators, therefore do not change this.
+We configured this project to run 256 validators per node (each "node" is EL+CL+DV). Therefore, for 3 nodes, you will have 768 validators in total in this beacon chain. This large amount is necessary to fulfill beachon chain requirements about committees. For us it is good to test DV with that large number of validators, therefore do not change this.
 
 ### The Long Delay
 
