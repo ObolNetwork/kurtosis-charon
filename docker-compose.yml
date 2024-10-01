@@ -349,16 +349,45 @@ services:
 
   vc0-vouch:
     image: attestant/vouch:1.8.1
+    platform: linux/amd64
     networks: [ network1 ]
-    # depends_on: [ node0 ]
+    depends_on: [ node0 ]
     restart: unless-stopped
     entrypoint: /opt/charon/vouch/run.sh
     environment:
-      # BEACON_NODE_ADDRESS: http://node0:3600
-      BEACON_NODE_ADDRESS: ${BN_0:-http://172.16.4.9:4000}
+      BEACON_NODE_ADDRESS: http://node0:3600
+      # BEACON_NODE_ADDRESS: ${BN_0:-http://172.16.4.9:4000}
     volumes:
       - .charon/cluster/node0/validator_keys:/opt/charon/validator_keys
       - ./vouch:/opt/charon/vouch
+
+  vc1-vouch:
+    image: attestant/vouch:1.8.1
+    platform: linux/amd64
+    networks: [ network1 ]
+    depends_on: [ node1 ]
+    restart: unless-stopped
+    entrypoint: /opt/charon/vouch/run.sh
+    environment:
+      BEACON_NODE_ADDRESS: http://node1:3600
+      # BEACON_NODE_ADDRESS: ${BN_0:-http://172.16.4.9:4000}
+    volumes:
+      - .charon/cluster/node1/validator_keys:/opt/charon/validator_keys
+      - ./vouch:/opt/charon/vouch      
+
+  vc2-vouch:
+    image: attestant/vouch:1.8.1
+    platform: linux/amd64
+    networks: [ network1 ]
+    depends_on: [ node2 ]
+    restart: unless-stopped
+    entrypoint: /opt/charon/vouch/run.sh
+    environment:
+      BEACON_NODE_ADDRESS: http://node2:3600
+      # BEACON_NODE_ADDRESS: ${BN_0:-http://172.16.4.9:4000}
+    volumes:
+      - .charon/cluster/node2/validator_keys:/opt/charon/validator_keys
+      - ./vouch:/opt/charon/vouch  
 
     # vc0-teku-exit:
   #   image: consensys/teku:${TEKU_VERSION:-ethpandaops/teku:master}

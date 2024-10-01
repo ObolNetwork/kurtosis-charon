@@ -14,7 +14,7 @@ participants:
     el_max_mem: 0
 # CL
     cl_type: lodestar
-    cl_image: chainsafe/lodestar:v1.19.0
+    cl_image: chainsafe/lodestar:v1.20.2
     cl_log_level: ""
     cl_extra_env_vars: {}
     cl_extra_labels: {}
@@ -64,7 +64,7 @@ network_params:
     very lucky have athlete"
   preregistered_validator_count: 0
   genesis_delay: 20
-  max_churn: 8
+  # max_churn: 8
   ejection_balance: 16000000000
   eth1_follow_distance: 2048
   min_validator_withdrawability_delay: 256
@@ -96,7 +96,7 @@ snooper_enabled: false
 ethereum_metrics_exporter_enabled: false
 parallel_keystore_generation: false
 disable_peer_scoring: false
-grafana_additional_dashboards: []
+# grafana_additional_dashboards: []
 persistent: false
 mev_type: mock
 mev_params:
