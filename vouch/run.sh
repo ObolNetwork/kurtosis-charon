@@ -44,7 +44,7 @@ done
 
 # Add BN address
 echo $BEACON_NODE_ADDRESS
-sed -i "s|beacon-node-address:|beacon-node-address: $BEACON_NODE_ADDRESS|" /opt/charon/vouch_base_dir/vouch.yml
+sed -i "s|beacon-node-address:|beacon-node-address: '$BEACON_NODE_ADDRESS'|" /opt/charon/vouch_base_dir/vouch.yml
 
 # Run vouch
-/app/vouch --base-dir="/opt/charon/vouch_base_dir" --log-level=debug
+/app/vouch --base-dir="/opt/charon/vouch_base_dir"

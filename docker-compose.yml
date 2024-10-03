@@ -1,7 +1,7 @@
 x-node-base:
   # Pegged charon version (update this for each release).
   &node-base
-  image: obolnetwork/charon-local:latest
+  image: obolnetwork/charon:v1.1.1
   restart: unless-stopped
   networks: [ network1 ]
   # network_mode: "host"
@@ -348,7 +348,7 @@ services:
       - ./testnet/config.yaml:/home/data/config.yaml
 
   vc0-vouch:
-    image: attestant/vouch:1.8.1
+    image: attestant/vouch:1.9.0
     platform: linux/amd64
     networks: [ network1 ]
     depends_on: [ node0 ]
@@ -362,7 +362,7 @@ services:
       - ./vouch:/opt/charon/vouch
 
   vc1-vouch:
-    image: attestant/vouch:1.8.1
+    image: attestant/vouch:1.9.0
     platform: linux/amd64
     networks: [ network1 ]
     depends_on: [ node1 ]
@@ -376,7 +376,7 @@ services:
       - ./vouch:/opt/charon/vouch      
 
   vc2-vouch:
-    image: attestant/vouch:1.8.1
+    image: attestant/vouch:1.9.0
     platform: linux/amd64
     networks: [ network1 ]
     depends_on: [ node2 ]
