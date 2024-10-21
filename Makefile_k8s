@@ -69,6 +69,9 @@ charon:
 	./promtoken.sh
 
 run-charon-lighthouse:
+	kubectl port-forward cl-1-lighthouse-geth 14000:4000 -n kt-kurtosis-geth-lighthouse > /dev/null 2>&1 &
+	kubectl port-forward cl-2-lighthouse-geth 24000:4000 -n kt-kurtosis-geth-lighthouse > /dev/null 2>&1 &
+	kubectl port-forward cl-3-lighthouse-geth 34000:4000 -n kt-kurtosis-geth-lighthouse > /dev/null 2>&1 &
 	docker compose up node0 node1 node2 vc0-lighthouse vc1-lighthouse vc2-lighthouse prometheus -d
 
 run-charon-nimbus:
@@ -80,7 +83,7 @@ run-charon-lodestar:
 	docker compose up node0 node1 node2 vc0-lodestar vc1-lodestar vc2-lodestar prometheus -d
 
 run-charon-prysm:
-	docker compose up node0 node1 node2 vc0-prysm vc1-prysm vc2-prysm prometheus --build -d
+	docker compose up node0 node1 node2 vc0-prysm vc1-prysm vc2-prysm prometheus -d
 
 run-charon-teku:
 	docker compose up node0 node1 node2 vc0-teku vc1-teku vc2-teku prometheus -d
