@@ -8,14 +8,14 @@ fi
 
 if [ "$1" = "" ]
 then
-  echo "Usage: $0 <cluster name to be deployed>"
+  echo "Cluster name is missing!!! Please provide cluster name. Example: ./run_charon_k8s.sh <cluster-name>"
   exit
 fi
 
 CLUSTER_NAME=$1
 CL_NAME=$(echo $CLUSTER_NAME | cut -d'-' -f3)
 
-# Function to check if a directory exists and delete it
+# Function to check if a cluster directory exists and delete it
 delete_directory_if_exists() {
     if [ -d "$1" ]; then
         rm -r "$1"
@@ -176,8 +176,6 @@ echo "First keystore directory: $first_keystore_dir"
 
 # Find all directories in 'keystore-keys/keys'
 keystore_directories="keystore/keys/*"
-
-# Iterate over each directory
 
 # Counter to track the index
 index=1
