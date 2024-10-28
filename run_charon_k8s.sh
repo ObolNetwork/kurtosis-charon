@@ -239,20 +239,22 @@ echo "NETWORK_NAME=${CLUSTER_NAME}" >> ./.env
 cp Makefile_k8s ./${CLUSTER_NAME}/Makefile
 cp -r node* ./${CLUSTER_NAME}/.charon/cluster
 cp .env ./${CLUSTER_NAME}/.env
-if [ "$CL_NAME" == "lighthouse" ]; then
+#if [ "$CL_NAME" == "lighthouse" ]; then
     cp -r lighthouse ./${CLUSTER_NAME}/lighthouse
-fi
-if [ "$CL_NAME" == "teku" ]; then
+#fi
+#if [ "$CL_NAME" == "teku" ]; then
     cp -r teku ./${CLUSTER_NAME}/teku
-fi
-if [ "$CL_NAME" == "prysm" ]; then
+#fi
+#if [ "$CL_NAME" == "prysm" ]; then
     cp -r prysm ./${CLUSTER_NAME}/prysm
-fi
-if [ "$CL_NAME" == "nimbus" ]; then
+#fi
+#if [ "$CL_NAME" == "nimbus" ]; then
     cp -r nimbus ./${CLUSTER_NAME}/nimbus
-fi
+#fi
+    cp -r lodestar ./${CLUSTER_NAME}/lodestar
 cp -r prometheus ./${CLUSTER_NAME}/prometheus
 cp docker-compose-k8.yml ./${CLUSTER_NAME}/docker-compose.yml
+cp "planprint-${CLUSTER_NAME}" ./${CLUSTER_NAME}/
 rm -rf node*
 rm -rf keystore*
 rm -rf charon-keys
@@ -260,6 +262,6 @@ rm .env
 
 
 # Find first VC and kill it
-echo Killing first VC that was started by Kurtosis
-kubectl get pods -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs kubectl delete pod -n kt-${CLUSTER_NAME}
-kubectl get services -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs kubectl delete service -n kt-${CLUSTER_NAME}
+#echo Killing first VC that was started by Kurtosis
+#kubectl get pods -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs kubectl delete pod -n kt-${CLUSTER_NAME}
+#kubectl get services -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs kubectl delete service -n kt-${CLUSTER_NAME}
