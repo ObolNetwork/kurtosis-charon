@@ -82,6 +82,9 @@ run-charon-nimbus:
 	docker compose up node0 node1 node2 vc0-nimbus vc1-nimbus vc2-nimbus prometheus -d
 
 run-charon-lodestar:
+	kubectl port-forward cl-1-lodestar-geth 14000:4000 -n kt-kurtosis-geth-lodestar > /dev/null 2>&1 &
+	kubectl port-forward cl-2-lodestar-geth 24000:4000 -n kt-kurtosis-geth-lodestar > /dev/null 2>&1 &
+	kubectl port-forward cl-3-lodestar-geth 34000:4000 -n kt-kurtosis-geth-lodestar > /dev/null 2>&1 &
 	mkdir -p data/lodestar/vc{0,1,2}/{caches,keystores,validator-db}
 	docker compose up node0 node1 node2 vc0-lodestar vc1-lodestar vc2-lodestar prometheus -d
 
