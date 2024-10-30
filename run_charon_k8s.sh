@@ -49,19 +49,19 @@ extract_bn_ip() {
         # if $beaconClient contains "lighthouse" then
         if [[ $beaconClient == *"lighthouse"* ]]; then
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr-address=/ {print $2}')
-            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}')
+            enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}') + 1 ))
         elif [[ $beaconClient == *"teku"* ]]; then
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-advertised-ip=/ {print $2}')
             enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-api-port=/ {print $2}')
         elif [[ $beaconClient == *"nimbus"* ]]; then
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F: '/--nat=extip:/ {print $2}')
-            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-port=/ {print $2}')
+            enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}') + 3 ))
         elif [[ $beaconClient == *"prysm"* ]]; then
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-host-ip=/ {print $2}')
-            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--grpc-gateway-port=/ {print $2}')
+            enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}') + 4 ))
         elif [[ $beaconClient == *"lodestar"* ]]; then
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr.ip=/ {print $2}')
-            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest.port=/ {print $2}')
+            enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}') + 2 ))
         fi
         echo "Beacon node address found: $enr_address:$enr_address_port"
         ret+=($(echo "host.docker.internal:${idx}${enr_address_port}"))
