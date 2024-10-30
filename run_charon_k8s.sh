@@ -260,8 +260,18 @@ rm -rf keystore*
 rm -rf charon-keys
 rm .env
 
-
 # Find first VC and kill it
 #echo Killing first VC that was started by Kurtosis
 #kubectl get pods -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs kubectl delete pod -n kt-${CLUSTER_NAME}
 #kubectl get services -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs kubectl delete service -n kt-${CLUSTER_NAME}
+
+
+# Save the pods configuration to a YAML file
+kubectl get pod vc-1-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-1-geth-${CL_NAME}.yaml
+#kubectl get pod vc-2-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-2-geth-${CL_NAME}.yaml
+#kubectl get pod vc-3-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-3-geth-${CL_NAME}.yaml
+
+# Delete k8s pods
+kubectl delete pod vc-1-geth-${CL_NAME} -n kt-${CLUSTER_NAME}
+#kubectl delete pod vc-2-geth-${CL_NAME} -n kt-${CLUSTER_NAME}
+#kubectl delete pod vc-3-geth-${CL_NAME} -n kt-${CLUSTER_NAME}
