@@ -254,14 +254,20 @@ cp .env ./${CLUSTER_NAME}/.env
     cp -r lodestar ./${CLUSTER_NAME}/lodestar
 cp -r prometheus ./${CLUSTER_NAME}/prometheus
 cp docker-compose-k8.yml ./${CLUSTER_NAME}/docker-compose.yml
-cp "planprint-${CLUSTER_NAME}" ./${CLUSTER_NAME}/
 rm -rf node*
 rm -rf keystore*
 rm -rf charon-keys
 rm .env
 
-
-# Find first VC and kill it
-#echo Killing first VC that was started by Kurtosis
-#kubectl get pods -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs kubectl delete pod -n kt-${CLUSTER_NAME}
-#kubectl get services -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs kubectl delete service -n kt-${CLUSTER_NAME}
+# Save the k8s VC pods configuration to a YAML file
+kubectl get pod vc-1-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-1-geth-${CL_NAME}.yaml && echo "Saving k8s VC pod config file: vc-1-geth-${CL_NAME}.yaml"
+kubectl get pod vc-2-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-2-geth-${CL_NAME}.yaml && echo "Saving k8s VC pod config file: vc-2-geth-${CL_NAME}.yaml"
+kubectl get pod vc-3-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-3-geth-${CL_NAME}.yaml && echo "Saving k8s VC pod config file: vc-3-geth-${CL_NAME}.yaml"
+# Save the k8s VC service configuration to a YAML file
+kubectl get service vc-1-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-1-geth-${CL_NAME}-service.yaml && echo "Saving k8s VC service config file: vc-1-geth-${CL_NAME}-service.yaml"
+kubectl get service vc-2-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-2-geth-${CL_NAME}-service.yaml && echo "Saving k8s VC service config file: vc-2-geth-${CL_NAME}-service.yaml"
+kubectl get service vc-3-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-3-geth-${CL_NAME}-service.yaml && echo "Saving k8s VC service config file: vc-3-geth-${CL_NAME}-service.yaml"
+# Delete all k8s VC pods.
+kubectl get pods -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs -I {} kubectl delete pod {} -n kt-${CLUSTER_NAME}
+# Delete all k8s VC services.
+kubectl get services -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs -I {} kubectl delete service {} -n kt-${CLUSTER_NAME}
