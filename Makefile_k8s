@@ -1,4 +1,4 @@
-.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku clean
+.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku run-k8s-pf-lighthouse run-k8s-pf-nimbus run-k8s-pf-lodestar run-k8s-pf-teku recreate-k8s-pods-lighthouse recreate-k8s-pods-nimbus recreate-k8s-pods-lodestar recreate-k8s-pods-teku clean
 
 # Define the composite step
 geth-lighthouse-charon-lighthouse: geth-lighthouse charon run-charon-lighthouse
@@ -76,6 +76,14 @@ run-k8s-pf-lighthouse:
 	kubectl port-forward cl-2-lighthouse-geth 24001:4000 -n kt-kurtosis-geth-lighthouse > /dev/null 2>&1 &
 	kubectl port-forward cl-3-lighthouse-geth 34001:4000 -n kt-kurtosis-geth-lighthouse > /dev/null 2>&1 &
 
+recreate-k8s-pods-lighthouse:
+	kubectl apply -f vc-1-geth-lighthouse.yaml -n kt-kurtosis-geth-lighthouse
+	kubectl apply -f vc-2-geth-lighthouse.yaml -n kt-kurtosis-geth-lighthouse
+	kubectl apply -f vc-3-geth-lighthouse.yaml -n kt-kurtosis-geth-lighthouse
+	kubectl apply -f vc-1-geth-lighthouse-service.yaml -n kt-kurtosis-geth-lighthouse
+    kubectl apply -f vc-2-geth-lighthouse-service.yaml -n kt-kurtosis-geth-lighthouse
+    kubectl apply -f vc-3-geth-lighthouse-service.yaml -n kt-kurtosis-geth-lighthouse
+
 run-charon-nimbus:
 	mkdir -p data/nimbus/vc{0,1,2}
 	docker compose up node0 node1 node2 vc0-nimbus vc1-nimbus vc2-nimbus prometheus -d
@@ -85,6 +93,14 @@ run-k8s-pf-nimbus:
 	kubectl port-forward cl-2-nimbus-geth 24003:4000 -n kt-kurtosis-geth-nimbus > /dev/null 2>&1 &
 	kubectl port-forward cl-3-nimbus-geth 34003:4000 -n kt-kurtosis-geth-nimbus > /dev/null 2>&1 &
 
+recreate-k8s-pods-nimbus:
+	kubectl apply -f vc-1-geth-nimbus.yaml -n kt-kurtosis-geth-nimbus
+	kubectl apply -f vc-2-geth-nimbus.yaml -n kt-kurtosis-geth-nimbus
+	kubectl apply -f vc-3-geth-nimbus.yaml -n kt-kurtosis-geth-nimbus
+	kubectl apply -f vc-1-geth-nimbus-service.yaml -n kt-kurtosis-geth-nimbus
+    kubectl apply -f vc-2-geth-nimbus-service.yaml -n kt-kurtosis-geth-nimbus
+    kubectl apply -f vc-3-geth-nimbus-service.yaml -n kt-kurtosis-geth-nimbus
+
 run-charon-lodestar:
 	mkdir -p data/lodestar/vc{0,1,2}/{caches,keystores,validator-db}
 	docker compose up node0 node1 node2 vc0-lodestar vc1-lodestar vc2-lodestar prometheus -d
@@ -93,6 +109,14 @@ run-k8s-pf-lodestar:
 	kubectl port-forward cl-1-lodestar-geth 14002:4000 -n kt-kurtosis-geth-lodestar > /dev/null 2>&1 &
 	kubectl port-forward cl-2-lodestar-geth 24002:4000 -n kt-kurtosis-geth-lodestar > /dev/null 2>&1 &
 	kubectl port-forward cl-3-lodestar-geth 34002:4000 -n kt-kurtosis-geth-lodestar > /dev/null 2>&1 &
+
+recreate-k8s-pods-lodestar:
+	kubectl apply -f vc-1-geth-lodestar.yaml -n kt-kurtosis-geth-lodestar
+	kubectl apply -f vc-2-geth-lodestar.yaml -n kt-kurtosis-geth-lodestar
+	kubectl apply -f vc-3-geth-lodestar.yaml -n kt-kurtosis-geth-lodestar
+	kubectl apply -f vc-1-geth-lodestar-service.yaml -n kt-kurtosis-geth-lodestar
+    kubectl apply -f vc-2-geth-lodestar-service.yaml -n kt-kurtosis-geth-lodestar
+    kubectl apply -f vc-3-geth-lodestar-service.yaml -n kt-kurtosis-geth-lodestar
 
 run-charon-prysm:
 	docker compose up node0 node1 node2 vc0-prysm vc1-prysm vc2-prysm prometheus -d
@@ -104,6 +128,14 @@ run-k8s-pf-teku:
 	kubectl port-forward cl-1-teku-geth 14000:4000 -n kt-kurtosis-geth-teku > /dev/null 2>&1 &
 	kubectl port-forward cl-2-teku-geth 24000:4000 -n kt-kurtosis-geth-teku > /dev/null 2>&1 &
 	kubectl port-forward cl-3-teku-geth 34000:4000 -n kt-kurtosis-geth-teku > /dev/null 2>&1 &
+
+recreate-k8s-pods-teku:
+	kubectl apply -f vc-1-geth-teku.yaml -n kt-kurtosis-geth-teku
+	kubectl apply -f vc-2-geth-teku.yaml -n kt-kurtosis-geth-teku
+	kubectl apply -f vc-3-geth-teku.yaml -n kt-kurtosis-geth-teku
+	kubectl apply -f vc-1-geth-teku-service.yaml -n kt-kurtosis-geth-teku
+	kubectl apply -f vc-2-geth-teku-service.yaml -n kt-kurtosis-geth-teku
+	kubectl apply -f vc-3-geth-teku-service.yaml -n kt-kurtosis-geth-teku
 
 exit-lighthouse:
 	./lighthouse/exit.sh 0
