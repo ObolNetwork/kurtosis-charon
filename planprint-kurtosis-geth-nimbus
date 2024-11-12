@@ -1,0 +1,866 @@
+[36mINFO[0m[2024-11-12T15:26:53+01:00] Engine running in Kubernetes cluster, to connect to the engine from outside the cluster run 'kurtosis gateway' to open a local gateway to the engine 
+[36mINFO[0m[2024-11-12T15:26:56+01:00] Creating a new enclave for Starlark to run inside... 
+[36mINFO[0m[2024-11-12T15:27:04+01:00] Enclave 'kurtosis-geth-nimbus' created successfully 
+[36mINFO[0m[2024-11-12T15:27:04+01:00] Kurtosis CLI is running in a non interactive terminal. Everything will work but progress information and the progress bar will not be displayed. 
+
+Container images used in this run:
+> ethpandaops/ethereum-genesis-generator:3.4.1 - locally cached
+> statusim/nimbus-validator-client:multiarch-v24.7.0 - locally cached
+> ethereum/client-go:latest - locally cached
+> prom/prometheus:latest - locally cached
+> grafana/grafana:latest-ubuntu - locally cached
+> ethpandaops/execution-monitor:master - locally cached
+> ethpandaops/beacon-metrics-gazer:master - locally cached
+> python:3.11-alpine - locally cached
+> statusim/nimbus-eth2:multiarch-v24.7.0 - locally cached
+> flashbots/mev-boost - locally cached
+> protolambda/eth2-val-tools:latest - locally cached
+> ethpandaops/mock-builder:latest - locally cached
+> ethpandaops/dora:master - locally cached
+> badouralix/curl-jq - locally cached
+
+Printing a message
+Sanity check passed
+
+Uploading file '/static_files/jwt/jwtsecret' to files artifact 'jwt_file'
+Files with artifact name 'jwt_file' uploaded with artifact UUID '43603d5f272246b1b45b3c144441e755'
+
+Uploading file '/static_files/keymanager/keymanager.txt' to files artifact 'keymanager_file'
+Files with artifact name 'keymanager_file' uploaded with artifact UUID '1f7b5601c5074ff4b124fc5e36ab0846'
+
+Printing a message
+Read the prometheus, grafana templates
+
+Printing a message
+Launching participant network with 3 participants and the following network params struct(additional_preloaded_contracts = {}, churn_limit_quotient = 65536, custody_requirement = 4, data_column_sidecar_subnet_count = 128, deneb_fork_epoch = 0, deposit_contract_address = "0x4242424242424242424242424242424242424242", devnet_repo = "ethpandaops", eip7594_fork_epoch = 100000002, eip7594_fork_version = "0x60000038", ejection_balance = 16000000000, electra_fork_epoch = 500, eth1_follow_distance = 2048, fulu_fork_epoch = 100000001, genesis_delay = 20, genesis_gaslimit = 30000000, max_blobs_per_block = 6, max_per_epoch_activation_churn_limit = 8, min_validator_withdrawability_delay = 256, network = "kurtosis", network_id = "3151908", network_sync_base_url = "https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/", num_validator_keys_per_node = 256, prefunded_accounts = {}, preregistered_validator_count = 0, preregistered_validator_keys_mnemonic = "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete", preset = "mainnet", samples_per_slot = 8, seconds_per_slot = 12, shard_committee_period = 1)
+
+Printing a message
+Generating cl validator key stores
+
+Adding service with name 'validator-key-generation-cl-validator-keystore' and image 'protolambda/eth2-val-tools:latest'
+Service 'validator-key-generation-cl-validator-keystore' added with service UUID 'e3848e50c426411aaa727d4314d30c6c'
+
+Generating keystores
+Command returned with exit code '0' with no output
+
+Verifying whether two values meet a certain condition '=='
+Verification succeeded. Value is '0'.
+
+Storing files from service 'validator-key-generation-cl-validator-keystore' at path '/node-0-keystores/' to files artifact with name '1-nimbus-geth-0-255-0'
+Files with artifact name '1-nimbus-geth-0-255-0' uploaded with artifact UUID '4d89142a714b439680d7e1f1f97ce96f'
+
+Storing files from service 'validator-key-generation-cl-validator-keystore' at path '/node-1-keystores/' to files artifact with name '2-nimbus-geth-256-511-0'
+Files with artifact name '2-nimbus-geth-256-511-0' uploaded with artifact UUID 'fa989c6925ff48efb734faf741b74cac'
+
+Storing files from service 'validator-key-generation-cl-validator-keystore' at path '/node-2-keystores/' to files artifact with name '3-nimbus-geth-512-767-0'
+Files with artifact name '3-nimbus-geth-512-767-0' uploaded with artifact UUID '4ac68f61c1f04d99a08af162a467febd'
+
+Storing prysm password in a file
+Command returned with exit code '0' with no output
+
+Verifying whether two values meet a certain condition '=='
+Verification succeeded. Value is '0'.
+
+Storing files from service 'validator-key-generation-cl-validator-keystore' at path '/tmp/prysm-password.txt' to files artifact with name 'prysm-password'
+Files with artifact name 'prysm-password' uploaded with artifact UUID 'defe45a936934c5c80da36ff4ddf00f1'
+
+Printing a message
+{
+	"per_node_keystores": [
+		{
+			"files_artifact_uuid": "1-nimbus-geth-0-255-0",
+			"nimbus_keys_relative_dirpath": "/nimbus-keys",
+			"prysm_relative_dirpath": "/prysm",
+			"raw_keys_relative_dirpath": "/keys",
+			"raw_root_dirpath": "",
+			"raw_secrets_relative_dirpath": "/secrets",
+			"teku_keys_relative_dirpath": "/teku-keys",
+			"teku_secrets_relative_dirpath": "/teku-secrets"
+		},
+		{
+			"files_artifact_uuid": "2-nimbus-geth-256-511-0",
+			"nimbus_keys_relative_dirpath": "/nimbus-keys",
+			"prysm_relative_dirpath": "/prysm",
+			"raw_keys_relative_dirpath": "/keys",
+			"raw_root_dirpath": "",
+			"raw_secrets_relative_dirpath": "/secrets",
+			"teku_keys_relative_dirpath": "/teku-keys",
+			"teku_secrets_relative_dirpath": "/teku-secrets"
+		},
+		{
+			"files_artifact_uuid": "3-nimbus-geth-512-767-0",
+			"nimbus_keys_relative_dirpath": "/nimbus-keys",
+			"prysm_relative_dirpath": "/prysm",
+			"raw_keys_relative_dirpath": "/keys",
+			"raw_root_dirpath": "",
+			"raw_secrets_relative_dirpath": "/secrets",
+			"teku_keys_relative_dirpath": "/teku-keys",
+			"teku_secrets_relative_dirpath": "/teku-secrets"
+		}
+	],
+	"prysm_password_artifact_uuid": "prysm-password",
+	"prysm_password_relative_filepath": "prysm-password.txt"
+}
+
+Getting final genesis timestamp
+Command returned with exit code '0' and the following output: 1731421730
+
+Printing a message
+Generating EL CL data
+
+Rendering a template to a files artifact with name 'genesis-el-cl-env-file'
+Templates artifact name 'genesis-el-cl-env-file' rendered with artifact UUID '1acd872dc34844fcaf846c34ae011f77'
+
+Creating genesis
+Command returned with exit code '0' and the following output:
+--------------------
++ '[' -f /data/metadata/genesis.json ']'
+++ mktemp -d -t ci-XXXXXXXXXX
++ tmp_dir=/tmp/ci-SUnutQIyfJ
++ mkdir -p /data/metadata
++ python3 /apps/el-gen/envsubst.py
++ python3 /apps/el-gen/genesis_geth.py /tmp/ci-SUnutQIyfJ/genesis-config.yaml
++ python3 /apps/el-gen/genesis_chainspec.py /tmp/ci-SUnutQIyfJ/genesis-config.yaml
++ python3 /apps/el-gen/genesis_besu.py /tmp/ci-SUnutQIyfJ/genesis-config.yaml
++ gen_cl_config
++ . /apps/el-gen/.venv/bin/activate
+++ deactivate nondestructive
+++ '[' -n /root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ']'
+++ PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export PATH
+++ unset _OLD_VIRTUAL_PATH
+++ '[' -n '' ']'
+++ '[' -n /bin/bash -o -n '' ']'
+++ hash -r
+++ '[' -n '' ']'
+++ unset VIRTUAL_ENV
+++ unset VIRTUAL_ENV_PROMPT
+++ '[' '!' nondestructive = nondestructive ']'
+++ VIRTUAL_ENV=/apps/el-gen/.venv
+++ export VIRTUAL_ENV
+++ _OLD_VIRTUAL_PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/apps/el-gen/.venv/bin:/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export PATH
+++ '[' -n '' ']'
+++ '[' -z '' ']'
+++ _OLD_VIRTUAL_PS1='(.venv) '
+++ PS1='(.venv) (.venv) '
+++ export PS1
+++ VIRTUAL_ENV_PROMPT='(.venv) '
+++ export VIRTUAL_ENV_PROMPT
+++ '[' -n /bin/bash -o -n '' ']'
+++ hash -r
++ set -x
++ '[' -f /data/metadata/genesis.ssz ']'
+++ mktemp -d -t ci-XXXXXXXXXX
++ tmp_dir=/tmp/ci-ooH4LGNF9p
++ mkdir -p /data/metadata
++ mkdir -p /data/parsed
+++ date -u -d @1731421730 '+%Y-%b-%d %I:%M:%S %p %Z'
++ HUMAN_READABLE_TIMESTAMP='2024-Nov-12 02:28:50 PM UTC'
++ COMMENT='# 2024-Nov-12 02:28:50 PM UTC'
++ envsubst
++ sed -i 's/#HUMAN_TIME_PLACEHOLDER/# 2024-Nov-12 02:28:50 PM UTC/' /data/metadata/config.yaml
++ envsubst
++ [[ mainnet == \m\i\n\i\m\a\l ]]
++ cp /tmp/ci-ooH4LGNF9p/mnemonics.yaml /data/metadata/mnemonics.yaml
++ grep DEPOSIT_CONTRACT_ADDRESS /data/metadata/config.yaml
++ cut -d ' ' -f2
++ echo 0
++ echo
++ envsubst
++ genesis_args=(deneb --config /data/metadata/config.yaml --mnemonics $tmp_dir/mnemonics.yaml --tranches-dir /data/metadata/tranches --state-output /data/metadata/genesis.ssz --preset-phase0 $PRESET_BASE --preset-altair $PRESET_BASE --preset-bellatrix $PRESET_BASE --preset-capella $PRESET_BASE --preset-deneb $PRESET_BASE)
++ [[ 0x00 == \0\x\0\1 ]]
++ [[ '' != '' ]]
++ [[ '' != '' ]]
++ genesis_args+=(--eth1-config /data/metadata/genesis.json)
++ '[' -z '' ']'
++ zcli_args=(pretty deneb BeaconState --preset-phase0 $PRESET_BASE --preset-altair $PRESET_BASE --preset-bellatrix $PRESET_BASE --preset-capella $PRESET_BASE --preset-deneb $PRESET_BASE /data/metadata/genesis.ssz)
++ /usr/local/bin/eth2-testnet-genesis deneb --config /data/metadata/config.yaml --mnemonics /tmp/ci-ooH4LGNF9p/mnemonics.yaml --tranches-dir /data/metadata/tranches --state-output /data/metadata/genesis.ssz --preset-phase0 mainnet --preset-altair mainnet --preset-bellatrix mainnet --preset-capella mainnet --preset-deneb mainnet --eth1-config /data/metadata/genesis.json
+zrnt version: v0.32.3
+Using CL MIN_GENESIS_TIME for genesis timestamp
+processing mnemonic 0, for 768 validators
+...validator 100/768
+...validator 200/768
+...validator 300/768
+...validator 400/768
+...validator 500/768
+...validator 600/768
+...validator 700/768
+Writing pubkeys list file...
+generated 768 validators from mnemonic yaml (/tmp/ci-ooH4LGNF9p/mnemonics.yaml)
+eth2 genesis at 1731421730 + 0 = 1731421730  (2024-11-12 14:28:50 +0000 UTC)
+done preparing state, serializing SSZ now...
+done!
++ /usr/local/bin/zcli pretty deneb BeaconState --preset-phase0 mainnet --preset-altair mainnet --preset-bellatrix mainnet --preset-capella mainnet --preset-deneb mainnet /data/metadata/genesis.ssz
++ echo 'Genesis args: deneb' --config /data/metadata/config.yaml --mnemonics /tmp/ci-ooH4LGNF9p/mnemonics.yaml --tranches-dir /data/metadata/tranches --state-output /data/metadata/genesis.ssz --preset-phase0 mainnet --preset-altair mainnet --preset-bellatrix mainnet --preset-capella mainnet --preset-deneb mainnet --eth1-config /data/metadata/genesis.json
+Genesis args: deneb --config /data/metadata/config.yaml --mnemonics /tmp/ci-ooH4LGNF9p/mnemonics.yaml --tranches-dir /data/metadata/tranches --state-output /data/metadata/genesis.ssz --preset-phase0 mainnet --preset-altair mainnet --preset-bellatrix mainnet --preset-capella mainnet --preset-deneb mainnet --eth1-config /data/metadata/genesis.json
+++ jq -r .latest_execution_payload_header.block_number /data/parsed/parsedConsensusGenesis.json
++ echo 'Genesis block number: 0'
+Genesis block number: 0
+++ jq -r .latest_execution_payload_header.block_hash /data/parsed/parsedConsensusGenesis.json
++ echo 'Genesis block hash: 0x408daa81694c65fce9fed4835d4cdeb1a39325e7ab3365090f381c213018be29'
+Genesis block hash: 0x408daa81694c65fce9fed4835d4cdeb1a39325e7ab3365090f381c213018be29
++ jq -r .eth1_data.block_hash /data/parsed/parsedConsensusGenesis.json
++ tr -d '\n'
++ jq -r .genesis_validators_root /data/parsed/parsedConsensusGenesis.json
++ tr -d '\n'
++ gen_shared_files
++ . /apps/el-gen/.venv/bin/activate
+++ deactivate nondestructive
+++ '[' -n /root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ']'
+++ PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export PATH
+++ unset _OLD_VIRTUAL_PATH
+++ '[' -n '' ']'
+++ '[' -n /bin/bash -o -n '' ']'
+++ hash -r
+++ '[' -n '(.venv) ' ']'
+++ PS1='(.venv) '
+++ export PS1
+++ unset _OLD_VIRTUAL_PS1
+++ unset VIRTUAL_ENV
+++ unset VIRTUAL_ENV_PROMPT
+++ '[' '!' nondestructive = nondestructive ']'
+++ VIRTUAL_ENV=/apps/el-gen/.venv
+++ export VIRTUAL_ENV
+++ _OLD_VIRTUAL_PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/apps/el-gen/.venv/bin:/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export PATH
+++ '[' -n '' ']'
+++ '[' -z '' ']'
+++ _OLD_VIRTUAL_PS1='(.venv) '
+++ PS1='(.venv) (.venv) '
+++ export PS1
+++ VIRTUAL_ENV_PROMPT='(.venv) '
+++ export VIRTUAL_ENV_PROMPT
+++ '[' -n /bin/bash -o -n '' ']'
+++ hash -r
++ set -x
++ mkdir -p /data/metadata
++ '[' -f /data/jwt/jwtsecret ']'
++ mkdir -p /data/jwt
+++ openssl rand -hex 32
+++ tr -d '\n'
++ echo -n 0x676e6a67d1b20cb88a9d498ab279b76a5a47bea3d520de0494dc14f3f783db06
++ '[' -f /data/metadata/genesis.json ']'
+++ cat /data/metadata/genesis.json
+++ jq -r '.config.terminalTotalDifficulty | tostring'
++ terminalTotalDifficulty=0
++ sed -i 's/TERMINAL_TOTAL_DIFFICULTY:.*/TERMINAL_TOTAL_DIFFICULTY: 0/' /data/metadata/config.yaml
++ '[' false = true ']'
+
+--------------------
+
+Reading genesis validators root
+Command returned with exit code '0' and the following output: 0x9b676088274f5b6fa4f8502332052b776f78df22be22bdfd820523678034aed8
+
+Reading prague time from genesis
+Command returned with exit code '0' and the following output: 1731613730
+
+Adding service with name 'el-1-geth-nimbus' and image 'ethereum/client-go:latest'
+Service 'el-1-geth-nimbus' added with service UUID '0eeac87fede642049933e426237c05fb'
+
+Waiting for at most '15m0s' for service 'el-1-geth-nimbus' to reach a certain state
+Wait took 1 tries (29.279663ms in total). Assertion passed with following:
+Request had response code '200' and body "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"id\":\"00f870fa06b3d60fcc63d33f92868f28d7eaf5d7d3b93839fc49b4ae30c8bd80\",\"name\":\"Geth/v1.14.9-unstable-e9467eec-20240829/linux-amd64/go1.23.0\",\"enode\":\"enode://4fa34f43436f03bfd7ff86371f51269af0462cbd743c95523d541f7a235001d4f70119873a9a2bc9aba55e96022cb35418e56bdfe07db20fef24980db80158da@172.23.1.117:30303\",\"enr\":\"enr:-Ke4QIFeUoFKEpQqZFoavUYnW2OQydRvnOCW-0nhYhVfxubDS-aSN38s_i4IXjqvIYIG2wOAm_Ryl1a0mlASOCRHV6WGAZMgyMHRg2V0aMvKhPGP3pWEZzZUIoJpZIJ2NIJpcISsFwF1iXNlY3AyNTZrMaECT6NPQ0NvA7_X_4Y3H1EmmvBGLL10PJVSPVQfeiNQAdSEc25hcMCDdGNwgnZfg3VkcIJ2Xw\",\"ip\":\"172.23.1.117\",\"ports\":{\"discovery\":30303,\"listener\":30303},\"listenAddr\":\"[::]:30303\",\"protocols\":{\"eth\":{\"network\":3151908,\"difficulty\":1,\"genesis\":\"0x408daa81694c65fce9fed4835d4cdeb1a39325e7ab3365090f381c213018be29\",\"config\":{\"chainId\":3151908,\"homesteadBlock\":0,\"eip150Block\":0,\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"berlinBlock\":0,\"londonBlock\":0,\"mergeNetsplitBlock\":0,\"shanghaiTime\":0,\"cancunTime\":0,\"pragueTime\":1731613730,\"terminalTotalDifficulty\":0,\"terminalTotalDifficultyPassed\":true},\"head\":\"0x408daa81694c65fce9fed4835d4cdeb1a39325e7ab3365090f381c213018be29\"},\"snap\":{}}}}\n", with extracted fields:
+'extract.enr': "enr:-Ke4QIFeUoFKEpQqZFoavUYnW2OQydRvnOCW-0nhYhVfxubDS-aSN38s_i4IXjqvIYIG2wOAm_Ryl1a0mlASOCRHV6WGAZMgyMHRg2V0aMvKhPGP3pWEZzZUIoJpZIJ2NIJpcISsFwF1iXNlY3AyNTZrMaECT6NPQ0NvA7_X_4Y3H1EmmvBGLL10PJVSPVQfeiNQAdSEc25hcMCDdGNwgnZfg3VkcIJ2Xw"
+'extract.enode': "enode://4fa34f43436f03bfd7ff86371f51269af0462cbd743c95523d541f7a235001d4f70119873a9a2bc9aba55e96022cb35418e56bdfe07db20fef24980db80158da@172.23.1.117:30303"
+
+Adding service with name 'el-2-geth-nimbus' and image 'ethereum/client-go:latest'
+Service 'el-2-geth-nimbus' added with service UUID '7d449f16a9854c8d92fe4aa541736db2'
+
+Waiting for at most '15m0s' for service 'el-2-geth-nimbus' to reach a certain state
+Wait took 1 tries (103.21869ms in total). Assertion passed with following:
+Request had response code '200' and body "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"id\":\"e86b10bef53bf4908a5b508cbbb5d41be4bde17f99bd6bd37e34ab1bf8aefe11\",\"name\":\"Geth/v1.14.12-unstable-a5fe7353-20241021/linux-amd64/go1.23.2\",\"enode\":\"enode://e8b693de7bc815b965a4dfcbc91d4037eac30508708ce9cf44a45cda1d839ed4cf3e6e4d36c873ba25021f6021aff6447c0ddd7b1644bd38dfc6e46ff92563f7@172.23.209.59:30303\",\"enr\":\"enr:-Ke4QHtNpVxbJUUKT_FBRmjspdets0spwebk6rmni8nUEixCYnaH9XNn84j6BM5zuuqjfKD8ky0GKTJzWLz9zkWFZHaGAZMgyPUag2V0aMvKhPGP3pWEZzZUIoJpZIJ2NIJpcISsF9E7iXNlY3AyNTZrMaED6LaT3nvIFbllpN_LyR1AN-rDBQhwjOnPRKRc2h2DntSEc25hcMCDdGNwgnZfg3VkcIJ2Xw\",\"ip\":\"172.23.209.59\",\"ports\":{\"discovery\":30303,\"listener\":30303},\"listenAddr\":\"[::]:30303\",\"protocols\":{\"eth\":{\"network\":3151908,\"difficulty\":1,\"genesis\":\"0x408daa81694c65fce9fed4835d4cdeb1a39325e7ab3365090f381c213018be29\",\"config\":{\"chainId\":3151908,\"homesteadBlock\":0,\"eip150Block\":0,\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"berlinBlock\":0,\"londonBlock\":0,\"mergeNetsplitBlock\":0,\"shanghaiTime\":0,\"cancunTime\":0,\"pragueTime\":1731613730,\"terminalTotalDifficulty\":0,\"terminalTotalDifficultyPassed\":true,\"depositContractAddress\":\"0x4242424242424242424242424242424242424242\"},\"head\":\"0x408daa81694c65fce9fed4835d4cdeb1a39325e7ab3365090f381c213018be29\"},\"snap\":{}}}}\n", with extracted fields:
+'extract.enr': "enr:-Ke4QHtNpVxbJUUKT_FBRmjspdets0spwebk6rmni8nUEixCYnaH9XNn84j6BM5zuuqjfKD8ky0GKTJzWLz9zkWFZHaGAZMgyPUag2V0aMvKhPGP3pWEZzZUIoJpZIJ2NIJpcISsF9E7iXNlY3AyNTZrMaED6LaT3nvIFbllpN_LyR1AN-rDBQhwjOnPRKRc2h2DntSEc25hcMCDdGNwgnZfg3VkcIJ2Xw"
+'extract.enode': "enode://e8b693de7bc815b965a4dfcbc91d4037eac30508708ce9cf44a45cda1d839ed4cf3e6e4d36c873ba25021f6021aff6447c0ddd7b1644bd38dfc6e46ff92563f7@172.23.209.59:30303"
+
+Adding service with name 'el-3-geth-nimbus' and image 'ethereum/client-go:latest'
+Service 'el-3-geth-nimbus' added with service UUID '8eae3e9ad65e4b21aff8e42e97d1fc54'
+
+Waiting for at most '15m0s' for service 'el-3-geth-nimbus' to reach a certain state
+Wait took 1 tries (63.873671ms in total). Assertion passed with following:
+Request had response code '200' and body "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"id\":\"4a5d3e8737c1b8293563f6073f41d666c251459d00e3e6ed102a1932979e151e\",\"name\":\"Geth/v1.14.9-unstable-e9467eec-20240829/linux-amd64/go1.23.0\",\"enode\":\"enode://69d6d349a7f729993b7bd4642d2e753b4e100bc2e91d67a721a4642481e2ebe7ebe87a25556cd4652f01959869e86ed05451ae272c1a99867655952321eca892@172.23.93.122:30303\",\"enr\":\"enr:-Ke4QAK-nMXEUoQbgDWM1UrfmpUdxA2ppi0fmdq7zYCxespDMOACnWQ2QOC-9k-nN9GJF94pDHe1lYl--Aj77meBqcSGAZMgyPxRg2V0aMvKhPGP3pWEZzZUIoJpZIJ2NIJpcISsF116iXNlY3AyNTZrMaECadbTSaf3KZk7e9RkLS51O04QC8LpHWenIaRkJIHi6-eEc25hcMCDdGNwgnZfg3VkcIJ2Xw\",\"ip\":\"172.23.93.122\",\"ports\":{\"discovery\":30303,\"listener\":30303},\"listenAddr\":\"[::]:30303\",\"protocols\":{\"eth\":{\"network\":3151908,\"difficulty\":1,\"genesis\":\"0x408daa81694c65fce9fed4835d4cdeb1a39325e7ab3365090f381c213018be29\",\"config\":{\"chainId\":3151908,\"homesteadBlock\":0,\"eip150Block\":0,\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"berlinBlock\":0,\"londonBlock\":0,\"mergeNetsplitBlock\":0,\"shanghaiTime\":0,\"cancunTime\":0,\"pragueTime\":1731613730,\"terminalTotalDifficulty\":0,\"terminalTotalDifficultyPassed\":true},\"head\":\"0x408daa81694c65fce9fed4835d4cdeb1a39325e7ab3365090f381c213018be29\"},\"snap\":{}}}}\n", with extracted fields:
+'extract.enode': "enode://69d6d349a7f729993b7bd4642d2e753b4e100bc2e91d67a721a4642481e2ebe7ebe87a25556cd4652f01959869e86ed05451ae272c1a99867655952321eca892@172.23.93.122:30303"
+'extract.enr': "enr:-Ke4QAK-nMXEUoQbgDWM1UrfmpUdxA2ppi0fmdq7zYCxespDMOACnWQ2QOC-9k-nN9GJF94pDHe1lYl--Aj77meBqcSGAZMgyPxRg2V0aMvKhPGP3pWEZzZUIoJpZIJ2NIJpcISsF116iXNlY3AyNTZrMaECadbTSaf3KZk7e9RkLS51O04QC8LpHWenIaRkJIHi6-eEc25hcMCDdGNwgnZfg3VkcIJ2Xw"
+
+Printing a message
+Successfully added 3 EL participants
+
+Printing a message
+Launching CL network
+
+Adding service with name 'cl-1-nimbus-geth' and image 'statusim/nimbus-eth2:multiarch-v24.7.0'
+Service 'cl-1-nimbus-geth' added with service UUID '5a1efed4634f400390ca14898c2b2328'
+
+Running 'GET' request on service 'cl-1-nimbus-geth'
+Request had response code '200' and body "{\"data\":{\"peer_id\":\"16Uiu2HAkuqxL5F6kFMuYNyP9NvfZtR5Gu2c4R5oRqNNPQejNXBNi\",\"enr\":\"enr:-Ly4QH_psPcQquUYvHnyZfFLEehqdfTGr3z3u744J5is7RT1WpFe8ej2dKW5pgr_jqM0WCTM_GxdkQqleUy4jja9zjkDh2F0dG5ldHOI__________-EZXRoMpCz1qmNYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXLu-Jc2VjcDI1NmsxoQIGOG0RAV_14jBdcjJ2H1fFTiJv1T2B1ErwZFOs84u8U4hzeW5jbmV0cw-DdGNwgiMog3VkcIIjKA\",\"p2p_addresses\":[\"/ip4/172.23.46.239/tcp/9000/p2p/16Uiu2HAkuqxL5F6kFMuYNyP9NvfZtR5Gu2c4R5oRqNNPQejNXBNi\",\"/ip6/::1/tcp/9000/p2p/16Uiu2HAkuqxL5F6kFMuYNyP9NvfZtR5Gu2c4R5oRqNNPQejNXBNi\",\"/ip6/fe80::78a1:8ff:fe0e:7d9a/tcp/9000/p2p/16Uiu2HAkuqxL5F6kFMuYNyP9NvfZtR5Gu2c4R5oRqNNPQejNXBNi\",\"/ip4/127.0.0.1/tcp/9000/p2p/16Uiu2HAkuqxL5F6kFMuYNyP9NvfZtR5Gu2c4R5oRqNNPQejNXBNi\",\"/ip4/172.28.49.202/tcp/9000/p2p/16Uiu2HAkuqxL5F6kFMuYNyP9NvfZtR5Gu2c4R5oRqNNPQejNXBNi\"],\"discovery_addresses\":[\"/ip4/172.23.46.239/udp/9000/p2p/16Uiu2HAkuqxL5F6kFMuYNyP9NvfZtR5Gu2c4R5oRqNNPQejNXBNi\"],\"metadata\":{\"seq_number\":\"2\",\"syncnets\":\"0x0f\",\"attnets\":\"0xffffffffffffffff\"}}}", with extracted fields:
+'extract.enr': "enr:-Ly4QH_psPcQquUYvHnyZfFLEehqdfTGr3z3u744J5is7RT1WpFe8ej2dKW5pgr_jqM0WCTM_GxdkQqleUy4jja9zjkDh2F0dG5ldHOI__________-EZXRoMpCz1qmNYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXLu-Jc2VjcDI1NmsxoQIGOG0RAV_14jBdcjJ2H1fFTiJv1T2B1ErwZFOs84u8U4hzeW5jbmV0cw-DdGNwgiMog3VkcIIjKA"
+'extract.multiaddr': "/ip4/172.23.46.239/tcp/9000/p2p/16Uiu2HAkuqxL5F6kFMuYNyP9NvfZtR5Gu2c4R5oRqNNPQejNXBNi"
+'extract.peer_id': "16Uiu2HAkuqxL5F6kFMuYNyP9NvfZtR5Gu2c4R5oRqNNPQejNXBNi"
+
+Adding service with name 'cl-2-nimbus-geth' and image 'statusim/nimbus-eth2:multiarch-v24.7.0'
+Service 'cl-2-nimbus-geth' added with service UUID '0ce453fb97544e9c830ef388fade0668'
+
+Running 'GET' request on service 'cl-2-nimbus-geth'
+Request had response code '200' and body "{\"data\":{\"peer_id\":\"16Uiu2HAmByui7UV3HqLxTo4WgmRoJ7cS9BXJYLkdVB4YU47onaqT\",\"enr\":\"enr:-LK4QNY0Ce2XOtn--9NCaEeWplZgD11Iq5hRB77DZakamnnpWu3w8DS4n_KexwVNlXnt05qOwgJxVPemrU2sKRkVTeMBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpCz1qmNYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwX7saJc2VjcDI1NmsxoQL1_RnSD7RSknv6bkl412bUl0VUsFbdLlvxtB1hJR-ThoN0Y3CCIyiDdWRwgiMo\",\"p2p_addresses\":[\"/ip4/172.23.238.198/tcp/9000/p2p/16Uiu2HAmByui7UV3HqLxTo4WgmRoJ7cS9BXJYLkdVB4YU47onaqT\",\"/ip6/::1/tcp/9000/p2p/16Uiu2HAmByui7UV3HqLxTo4WgmRoJ7cS9BXJYLkdVB4YU47onaqT\",\"/ip6/fe80::88:4aff:fe45:2a2e/tcp/9000/p2p/16Uiu2HAmByui7UV3HqLxTo4WgmRoJ7cS9BXJYLkdVB4YU47onaqT\",\"/ip4/127.0.0.1/tcp/9000/p2p/16Uiu2HAmByui7UV3HqLxTo4WgmRoJ7cS9BXJYLkdVB4YU47onaqT\",\"/ip4/172.28.49.162/tcp/9000/p2p/16Uiu2HAmByui7UV3HqLxTo4WgmRoJ7cS9BXJYLkdVB4YU47onaqT\"],\"discovery_addresses\":[\"/ip4/172.23.238.198/udp/9000/p2p/16Uiu2HAmByui7UV3HqLxTo4WgmRoJ7cS9BXJYLkdVB4YU47onaqT\"],\"metadata\":{\"seq_number\":\"0\",\"syncnets\":\"0x00\",\"attnets\":\"0x0000000000000000\"}}}", with extracted fields:
+'extract.enr': "enr:-LK4QNY0Ce2XOtn--9NCaEeWplZgD11Iq5hRB77DZakamnnpWu3w8DS4n_KexwVNlXnt05qOwgJxVPemrU2sKRkVTeMBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpCz1qmNYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwX7saJc2VjcDI1NmsxoQL1_RnSD7RSknv6bkl412bUl0VUsFbdLlvxtB1hJR-ThoN0Y3CCIyiDdWRwgiMo"
+'extract.multiaddr': "/ip4/172.23.238.198/tcp/9000/p2p/16Uiu2HAmByui7UV3HqLxTo4WgmRoJ7cS9BXJYLkdVB4YU47onaqT"
+'extract.peer_id': "16Uiu2HAmByui7UV3HqLxTo4WgmRoJ7cS9BXJYLkdVB4YU47onaqT"
+
+Adding service with name 'cl-3-nimbus-geth' and image 'statusim/nimbus-eth2:multiarch-v24.7.0'
+Service 'cl-3-nimbus-geth' added with service UUID '308f6c1b1b2c48c6ae5a70c5e3543b0c'
+
+Running 'GET' request on service 'cl-3-nimbus-geth'
+Request had response code '200' and body "{\"data\":{\"peer_id\":\"16Uiu2HAmDFUWeYnnENizzLirhpwXxLMdLYGbBTb7k5gfvBHkoKWP\",\"enr\":\"enr:-LK4QGdpiyWJBtfmfcsDIfShYCXi8vWur9mEt2PSBLADQvolH1AYEjGJpQpv56Lp0lFsMWcpmiltkrqhGCmYwMijzIUBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpCz1qmNYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXHYSJc2VjcDI1NmsxoQMI1ZbzO2D8HtbEDjn5-AF2JKAuDs01wUwaW0D_klEBEIN0Y3CCIyiDdWRwgiMo\",\"p2p_addresses\":[\"/ip4/172.23.29.132/tcp/9000/p2p/16Uiu2HAmDFUWeYnnENizzLirhpwXxLMdLYGbBTb7k5gfvBHkoKWP\",\"/ip6/::1/tcp/9000/p2p/16Uiu2HAmDFUWeYnnENizzLirhpwXxLMdLYGbBTb7k5gfvBHkoKWP\",\"/ip6/fe80::f47d:5ff:fe6f:3eb7/tcp/9000/p2p/16Uiu2HAmDFUWeYnnENizzLirhpwXxLMdLYGbBTb7k5gfvBHkoKWP\",\"/ip4/127.0.0.1/tcp/9000/p2p/16Uiu2HAmDFUWeYnnENizzLirhpwXxLMdLYGbBTb7k5gfvBHkoKWP\",\"/ip4/172.27.107.170/tcp/9000/p2p/16Uiu2HAmDFUWeYnnENizzLirhpwXxLMdLYGbBTb7k5gfvBHkoKWP\"],\"discovery_addresses\":[\"/ip4/172.23.29.132/udp/9000/p2p/16Uiu2HAmDFUWeYnnENizzLirhpwXxLMdLYGbBTb7k5gfvBHkoKWP\"],\"metadata\":{\"seq_number\":\"0\",\"syncnets\":\"0x00\",\"attnets\":\"0x0000000000000000\"}}}", with extracted fields:
+'extract.enr': "enr:-LK4QGdpiyWJBtfmfcsDIfShYCXi8vWur9mEt2PSBLADQvolH1AYEjGJpQpv56Lp0lFsMWcpmiltkrqhGCmYwMijzIUBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpCz1qmNYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXHYSJc2VjcDI1NmsxoQMI1ZbzO2D8HtbEDjn5-AF2JKAuDs01wUwaW0D_klEBEIN0Y3CCIyiDdWRwgiMo"
+'extract.multiaddr': "/ip4/172.23.29.132/tcp/9000/p2p/16Uiu2HAmDFUWeYnnENizzLirhpwXxLMdLYGbBTb7k5gfvBHkoKWP"
+'extract.peer_id': "16Uiu2HAmDFUWeYnnENizzLirhpwXxLMdLYGbBTb7k5gfvBHkoKWP"
+
+Printing a message
+Successfully added 3 CL participants
+
+Printing a message
+Start adding validators for participant #1
+
+Printing a message
+Using separate validator client for participant #1
+
+Adding service with name 'vc-1-geth-nimbus' and image 'statusim/nimbus-validator-client:multiarch-v24.7.0'
+Service 'vc-1-geth-nimbus' added with service UUID '4f2be180b53b4d2b83352c371bc8dde1'
+
+Printing a message
+Successfully added 3 CL participants
+
+Printing a message
+Start adding validators for participant #2
+
+Printing a message
+Using separate validator client for participant #2
+
+Adding service with name 'vc-2-geth-nimbus' and image 'statusim/nimbus-validator-client:multiarch-v24.7.0'
+Service 'vc-2-geth-nimbus' added with service UUID '8be471f4ad9547b8a7a25457352d107b'
+
+Printing a message
+Successfully added 3 CL participants
+
+Printing a message
+Start adding validators for participant #3
+
+Printing a message
+Using separate validator client for participant #3
+
+Adding service with name 'vc-3-geth-nimbus' and image 'statusim/nimbus-validator-client:multiarch-v24.7.0'
+Service 'vc-3-geth-nimbus' added with service UUID 'b3e3111d3b484f638c94424367ad529d'
+
+Printing a message
+NODE JSON RPC URI: '172.23.1.117:8545'
+
+Rendering a template to a files artifact with name 'validator-ranges'
+Templates artifact name 'validator-ranges' rendered with artifact UUID 'da9c78a5f8804d6d886225eee3450615'
+
+Adding service with name 'mock-mev' and image 'ethpandaops/mock-builder:latest'
+Service 'mock-mev' added with service UUID 'fdd2639902b84d1d942513b1e72e9e49'
+
+Printing a message
+args_with_right_defaults.participants[index].validator_count 256
+
+Adding service with name 'mev-boost-1-nimbus-geth' and image 'flashbots/mev-boost'
+Service 'mev-boost-1-nimbus-geth' added with service UUID '2296006faf1741868f28e72f59cfdc88'
+
+Printing a message
+args_with_right_defaults.participants[index].validator_count 256
+
+Adding service with name 'mev-boost-2-nimbus-geth' and image 'flashbots/mev-boost'
+Service 'mev-boost-2-nimbus-geth' added with service UUID '21aaa68f3d8645e39ad31e2de26b6012'
+
+Printing a message
+args_with_right_defaults.participants[index].validator_count 256
+
+Adding service with name 'mev-boost-3-nimbus-geth' and image 'flashbots/mev-boost'
+Service 'mev-boost-3-nimbus-geth' added with service UUID 'c0b64646b1084c22a692b0d94d0e82cc'
+
+Printing a message
+Launching el forkmon
+
+Rendering a template to a files artifact with name 'el-forkmon-config'
+Templates artifact name 'el-forkmon-config' rendered with artifact UUID '99909aabd1a84a149fc1a99cacf95e44'
+
+Adding service with name 'el-forkmon' and image 'ethpandaops/execution-monitor:master'
+Service 'el-forkmon' added with service UUID '5f3473ad8c4a4119847c990a6dbd806b'
+
+Printing a message
+Successfully launched execution layer forkmon
+
+Printing a message
+Launching beacon metrics gazer
+
+Adding service with name 'beacon-metrics-gazer' and image 'ethpandaops/beacon-metrics-gazer:master'
+Service 'beacon-metrics-gazer' added with service UUID '416659b7f724474cbcf852a035c5b8b6'
+
+Printing a message
+Successfully launched beacon metrics gazer
+
+Printing a message
+Launching dora
+
+Rendering a template to a files artifact with name 'dora-config'
+Templates artifact name 'dora-config' rendered with artifact UUID 'd13435458c95477e8b6ac7eeb122eafa'
+
+Adding service with name 'dora' and image 'ethpandaops/dora:master'
+Service 'dora' added with service UUID 'fd0f4614de6b4c5f962de8359224dfe8'
+
+Printing a message
+Successfully launched dora
+
+Printing a message
+Launching prometheus...
+
+Rendering a template to a files artifact with name 'prometheus-config'
+Templates artifact name 'prometheus-config' rendered with artifact UUID '7270ec782c84474c8ac66442abe152d8'
+
+Adding service with name 'prometheus' and image 'prom/prometheus:latest'
+Service 'prometheus' added with service UUID '93fa4817f88148f7a3e9ac91c1484ba9'
+
+Printing a message
+Launching grafana...
+
+Rendering a template to a files artifact with name 'grafana-config'
+Templates artifact name 'grafana-config' rendered with artifact UUID '183f131ce3734705b29861b5d11dee2c'
+
+Uploading file '/static_files/grafana-config/dashboards' to files artifact 'grafana-dashboards'
+Files with artifact name 'grafana-dashboards' uploaded with artifact UUID 'fbc5c2e390004c998fcaf68703b06e48'
+
+Adding service with name 'grafana' and image 'grafana/grafana:latest-ubuntu'
+Service 'grafana' added with service UUID 'b89152b715074beca193f9f07e445086'
+
+Printing a message
+Successfully launched grafana
+
+Starlark code successfully run. Output was:
+{
+	"all_participants": [
+		{
+			"cl_context": {
+				"beacon_grpc_url": "",
+				"beacon_http_url": "http://172.23.46.239:4000",
+				"beacon_service_name": "cl-1-nimbus-geth",
+				"cl_nodes_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "cl-1-nimbus-geth",
+						"path": "/metrics",
+						"url": "172.23.46.239:8008"
+					}
+				],
+				"client_name": "nimbus",
+				"enr": "enr:-Ly4QH_psPcQquUYvHnyZfFLEehqdfTGr3z3u744J5is7RT1WpFe8ej2dKW5pgr_jqM0WCTM_GxdkQqleUy4jja9zjkDh2F0dG5ldHOI__________-EZXRoMpCz1qmNYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXLu-Jc2VjcDI1NmsxoQIGOG0RAV_14jBdcjJ2H1fFTiJv1T2B1ErwZFOs84u8U4hzeW5jbmV0cw-DdGNwgiMog3VkcIIjKA",
+				"http_port": 4000,
+				"ip_addr": "172.23.46.239",
+				"multiaddr": "/ip4/172.23.46.239/tcp/9000/p2p/16Uiu2HAkuqxL5F6kFMuYNyP9NvfZtR5Gu2c4R5oRqNNPQejNXBNi",
+				"peer_id": "16Uiu2HAkuqxL5F6kFMuYNyP9NvfZtR5Gu2c4R5oRqNNPQejNXBNi",
+				"snooper_enabled": false,
+				"snooper_engine_context": null,
+				"supernode": false,
+				"validator_keystore_files_artifact_uuid": "1-nimbus-geth-0-255-0"
+			},
+			"cl_type": "nimbus",
+			"el_context": {
+				"client_name": "geth",
+				"el_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "el-1-geth-nimbus",
+						"path": "/debug/metrics/prometheus",
+						"url": "172.23.1.117:9001"
+					}
+				],
+				"engine_rpc_port_num": 8551,
+				"enode": "enode://4fa34f43436f03bfd7ff86371f51269af0462cbd743c95523d541f7a235001d4f70119873a9a2bc9aba55e96022cb35418e56bdfe07db20fef24980db80158da@172.23.1.117:30303",
+				"enr": "enr:-Ke4QIFeUoFKEpQqZFoavUYnW2OQydRvnOCW-0nhYhVfxubDS-aSN38s_i4IXjqvIYIG2wOAm_Ryl1a0mlASOCRHV6WGAZMgyMHRg2V0aMvKhPGP3pWEZzZUIoJpZIJ2NIJpcISsFwF1iXNlY3AyNTZrMaECT6NPQ0NvA7_X_4Y3H1EmmvBGLL10PJVSPVQfeiNQAdSEc25hcMCDdGNwgnZfg3VkcIJ2Xw",
+				"ip_addr": "172.23.1.117",
+				"rpc_http_url": "http://172.23.1.117:8545",
+				"rpc_port_num": 8545,
+				"service_name": "el-1-geth-nimbus",
+				"ws_port_num": 8546,
+				"ws_url": "ws://172.23.1.117:8546"
+			},
+			"el_type": "geth",
+			"ethereum_metrics_exporter_context": null,
+			"remote_signer_context": null,
+			"remote_signer_type": "web3signer",
+			"snooper_beacon_context": null,
+			"snooper_engine_context": null,
+			"vc_context": {
+				"client_name": "nimbus",
+				"metrics_info": {
+					"config": {
+						"labels": {},
+						"scrape_interval": "15s"
+					},
+					"name": "vc-1-geth-nimbus",
+					"path": "/metrics",
+					"url": "172.23.232.225:8080"
+				},
+				"service_name": "vc-1-geth-nimbus"
+			},
+			"vc_type": "nimbus",
+			"xatu_sentry_context": null
+		},
+		{
+			"cl_context": {
+				"beacon_grpc_url": "",
+				"beacon_http_url": "http://172.23.238.198:4000",
+				"beacon_service_name": "cl-2-nimbus-geth",
+				"cl_nodes_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "cl-2-nimbus-geth",
+						"path": "/metrics",
+						"url": "172.23.238.198:8008"
+					}
+				],
+				"client_name": "nimbus",
+				"enr": "enr:-LK4QNY0Ce2XOtn--9NCaEeWplZgD11Iq5hRB77DZakamnnpWu3w8DS4n_KexwVNlXnt05qOwgJxVPemrU2sKRkVTeMBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpCz1qmNYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwX7saJc2VjcDI1NmsxoQL1_RnSD7RSknv6bkl412bUl0VUsFbdLlvxtB1hJR-ThoN0Y3CCIyiDdWRwgiMo",
+				"http_port": 4000,
+				"ip_addr": "172.23.238.198",
+				"multiaddr": "/ip4/172.23.238.198/tcp/9000/p2p/16Uiu2HAmByui7UV3HqLxTo4WgmRoJ7cS9BXJYLkdVB4YU47onaqT",
+				"peer_id": "16Uiu2HAmByui7UV3HqLxTo4WgmRoJ7cS9BXJYLkdVB4YU47onaqT",
+				"snooper_enabled": false,
+				"snooper_engine_context": null,
+				"supernode": false,
+				"validator_keystore_files_artifact_uuid": "2-nimbus-geth-256-511-0"
+			},
+			"cl_type": "nimbus",
+			"el_context": {
+				"client_name": "geth",
+				"el_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "el-2-geth-nimbus",
+						"path": "/debug/metrics/prometheus",
+						"url": "172.23.209.59:9001"
+					}
+				],
+				"engine_rpc_port_num": 8551,
+				"enode": "enode://e8b693de7bc815b965a4dfcbc91d4037eac30508708ce9cf44a45cda1d839ed4cf3e6e4d36c873ba25021f6021aff6447c0ddd7b1644bd38dfc6e46ff92563f7@172.23.209.59:30303",
+				"enr": "enr:-Ke4QHtNpVxbJUUKT_FBRmjspdets0spwebk6rmni8nUEixCYnaH9XNn84j6BM5zuuqjfKD8ky0GKTJzWLz9zkWFZHaGAZMgyPUag2V0aMvKhPGP3pWEZzZUIoJpZIJ2NIJpcISsF9E7iXNlY3AyNTZrMaED6LaT3nvIFbllpN_LyR1AN-rDBQhwjOnPRKRc2h2DntSEc25hcMCDdGNwgnZfg3VkcIJ2Xw",
+				"ip_addr": "172.23.209.59",
+				"rpc_http_url": "http://172.23.209.59:8545",
+				"rpc_port_num": 8545,
+				"service_name": "el-2-geth-nimbus",
+				"ws_port_num": 8546,
+				"ws_url": "ws://172.23.209.59:8546"
+			},
+			"el_type": "geth",
+			"ethereum_metrics_exporter_context": null,
+			"remote_signer_context": null,
+			"remote_signer_type": "web3signer",
+			"snooper_beacon_context": null,
+			"snooper_engine_context": null,
+			"vc_context": {
+				"client_name": "nimbus",
+				"metrics_info": {
+					"config": {
+						"labels": {},
+						"scrape_interval": "15s"
+					},
+					"name": "vc-2-geth-nimbus",
+					"path": "/metrics",
+					"url": "172.23.192.88:8080"
+				},
+				"service_name": "vc-2-geth-nimbus"
+			},
+			"vc_type": "nimbus",
+			"xatu_sentry_context": null
+		},
+		{
+			"cl_context": {
+				"beacon_grpc_url": "",
+				"beacon_http_url": "http://172.23.29.132:4000",
+				"beacon_service_name": "cl-3-nimbus-geth",
+				"cl_nodes_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "cl-3-nimbus-geth",
+						"path": "/metrics",
+						"url": "172.23.29.132:8008"
+					}
+				],
+				"client_name": "nimbus",
+				"enr": "enr:-LK4QGdpiyWJBtfmfcsDIfShYCXi8vWur9mEt2PSBLADQvolH1AYEjGJpQpv56Lp0lFsMWcpmiltkrqhGCmYwMijzIUBh2F0dG5ldHOIAAAAAAAAAACEZXRoMpCz1qmNYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXHYSJc2VjcDI1NmsxoQMI1ZbzO2D8HtbEDjn5-AF2JKAuDs01wUwaW0D_klEBEIN0Y3CCIyiDdWRwgiMo",
+				"http_port": 4000,
+				"ip_addr": "172.23.29.132",
+				"multiaddr": "/ip4/172.23.29.132/tcp/9000/p2p/16Uiu2HAmDFUWeYnnENizzLirhpwXxLMdLYGbBTb7k5gfvBHkoKWP",
+				"peer_id": "16Uiu2HAmDFUWeYnnENizzLirhpwXxLMdLYGbBTb7k5gfvBHkoKWP",
+				"snooper_enabled": false,
+				"snooper_engine_context": null,
+				"supernode": false,
+				"validator_keystore_files_artifact_uuid": "3-nimbus-geth-512-767-0"
+			},
+			"cl_type": "nimbus",
+			"el_context": {
+				"client_name": "geth",
+				"el_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "el-3-geth-nimbus",
+						"path": "/debug/metrics/prometheus",
+						"url": "172.23.93.122:9001"
+					}
+				],
+				"engine_rpc_port_num": 8551,
+				"enode": "enode://69d6d349a7f729993b7bd4642d2e753b4e100bc2e91d67a721a4642481e2ebe7ebe87a25556cd4652f01959869e86ed05451ae272c1a99867655952321eca892@172.23.93.122:30303",
+				"enr": "enr:-Ke4QAK-nMXEUoQbgDWM1UrfmpUdxA2ppi0fmdq7zYCxespDMOACnWQ2QOC-9k-nN9GJF94pDHe1lYl--Aj77meBqcSGAZMgyPxRg2V0aMvKhPGP3pWEZzZUIoJpZIJ2NIJpcISsF116iXNlY3AyNTZrMaECadbTSaf3KZk7e9RkLS51O04QC8LpHWenIaRkJIHi6-eEc25hcMCDdGNwgnZfg3VkcIJ2Xw",
+				"ip_addr": "172.23.93.122",
+				"rpc_http_url": "http://172.23.93.122:8545",
+				"rpc_port_num": 8545,
+				"service_name": "el-3-geth-nimbus",
+				"ws_port_num": 8546,
+				"ws_url": "ws://172.23.93.122:8546"
+			},
+			"el_type": "geth",
+			"ethereum_metrics_exporter_context": null,
+			"remote_signer_context": null,
+			"remote_signer_type": "web3signer",
+			"snooper_beacon_context": null,
+			"snooper_engine_context": null,
+			"vc_context": {
+				"client_name": "nimbus",
+				"metrics_info": {
+					"config": {
+						"labels": {},
+						"scrape_interval": "15s"
+					},
+					"name": "vc-3-geth-nimbus",
+					"path": "/metrics",
+					"url": "172.23.233.111:8080"
+				},
+				"service_name": "vc-3-geth-nimbus"
+			},
+			"vc_type": "nimbus",
+			"xatu_sentry_context": null
+		}
+	],
+	"blockscout_sc_verif_url": null,
+	"final_genesis_timestamp": "1731421730",
+	"genesis_validators_root": "0x9b676088274f5b6fa4f8502332052b776f78df22be22bdfd820523678034aed8",
+	"grafana_info": {
+		"dashboard_path": "/d/QdTOwy-nz/eth2-merge-kurtosis-module-dashboard?orgId=1",
+		"password": "admin",
+		"user": "admin"
+	},
+	"network_id": "3151908",
+	"network_params": {
+		"additional_preloaded_contracts": {},
+		"churn_limit_quotient": 65536,
+		"custody_requirement": 4,
+		"data_column_sidecar_subnet_count": 128,
+		"deneb_fork_epoch": 0,
+		"deposit_contract_address": "0x4242424242424242424242424242424242424242",
+		"devnet_repo": "ethpandaops",
+		"eip7594_fork_epoch": 100000002,
+		"eip7594_fork_version": "0x60000038",
+		"ejection_balance": 16000000000,
+		"electra_fork_epoch": 500,
+		"eth1_follow_distance": 2048,
+		"fulu_fork_epoch": 100000001,
+		"genesis_delay": 20,
+		"genesis_gaslimit": 30000000,
+		"max_blobs_per_block": 6,
+		"max_per_epoch_activation_churn_limit": 8,
+		"min_validator_withdrawability_delay": 256,
+		"network": "kurtosis",
+		"network_id": "3151908",
+		"network_sync_base_url": "https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/",
+		"num_validator_keys_per_node": 256,
+		"prefunded_accounts": {},
+		"preregistered_validator_count": 0,
+		"preregistered_validator_keys_mnemonic": "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete",
+		"preset": "mainnet",
+		"samples_per_slot": 8,
+		"seconds_per_slot": 12,
+		"shard_committee_period": 1
+	},
+	"pre_funded_accounts": [
+		{
+			"address": "0x8943545177806ED17B9F23F0a21ee5948eCaa776",
+			"private_key": "bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31"
+		},
+		{
+			"address": "0xE25583099BA105D9ec0A67f5Ae86D90e50036425",
+			"private_key": "39725efee3fb28614de3bacaffe4cc4bd8c436257e2c8bb887c4b5c4be45e76d"
+		},
+		{
+			"address": "0x614561D2d143621E126e87831AEF287678B442b8",
+			"private_key": "53321db7c1e331d93a11a41d16f004d7ff63972ec8ec7c25db329728ceeb1710"
+		},
+		{
+			"address": "0xf93Ee4Cf8c6c40b329b0c0626F28333c132CF241",
+			"private_key": "ab63b23eb7941c1251757e24b3d2350d2bc05c3c388d06f8fe6feafefb1e8c70"
+		},
+		{
+			"address": "0x802dCbE1B1A97554B4F50DB5119E37E8e7336417",
+			"private_key": "5d2344259f42259f82d2c140aa66102ba89b57b4883ee441a8b312622bd42491"
+		},
+		{
+			"address": "0xAe95d8DA9244C37CaC0a3e16BA966a8e852Bb6D6",
+			"private_key": "27515f805127bebad2fb9b183508bdacb8c763da16f54e0678b16e8f28ef3fff"
+		},
+		{
+			"address": "0x2c57d1CFC6d5f8E4182a56b4cf75421472eBAEa4",
+			"private_key": "7ff1a4c1d57e5e784d327c4c7651e952350bc271f156afb3d00d20f5ef924856"
+		},
+		{
+			"address": "0x741bFE4802cE1C4b5b00F9Df2F5f179A1C89171A",
+			"private_key": "3a91003acaf4c21b3953d94fa4a6db694fa69e5242b2e37be05dd82761058899"
+		},
+		{
+			"address": "0xc3913d4D8bAb4914328651C2EAE817C8b78E1f4c",
+			"private_key": "bb1d0f125b4fb2bb173c318cdead45468474ca71474e2247776b2b4c0fa2d3f5"
+		},
+		{
+			"address": "0x65D08a056c17Ae13370565B04cF77D2AfA1cB9FA",
+			"private_key": "850643a0224065ecce3882673c21f56bcf6eef86274cc21cadff15930b59fc8c"
+		},
+		{
+			"address": "0x3e95dFbBaF6B348396E6674C7871546dCC568e56",
+			"private_key": "94eb3102993b41ec55c241060f47daa0f6372e2e3ad7e91612ae36c364042e44"
+		},
+		{
+			"address": "0x5918b2e647464d4743601a865753e64C8059Dc4F",
+			"private_key": "daf15504c22a352648a71ef2926334fe040ac1d5005019e09f6c979808024dc7"
+		},
+		{
+			"address": "0x589A698b7b7dA0Bec545177D3963A2741105C7C9",
+			"private_key": "eaba42282ad33c8ef2524f07277c03a776d98ae19f581990ce75becb7cfa1c23"
+		},
+		{
+			"address": "0x4d1CB4eB7969f8806E2CaAc0cbbB71f88C8ec413",
+			"private_key": "3fd98b5187bf6526734efaa644ffbb4e3670d66f5d0268ce0323ec09124bff61"
+		},
+		{
+			"address": "0xF5504cE2BcC52614F121aff9b93b2001d92715CA",
+			"private_key": "5288e2f440c7f0cb61a9be8afdeb4295f786383f96f5e35eb0c94ef103996b64"
+		},
+		{
+			"address": "0xF61E98E7D47aB884C244E39E031978E33162ff4b",
+			"private_key": "f296c7802555da2a5a662be70e078cbd38b44f96f8615ae529da41122ce8db05"
+		},
+		{
+			"address": "0xf1424826861ffbbD25405F5145B5E50d0F1bFc90",
+			"private_key": "bf3beef3bd999ba9f2451e06936f0423cd62b815c9233dd3bc90f7e02a1e8673"
+		},
+		{
+			"address": "0xfDCe42116f541fc8f7b0776e2B30832bD5621C85",
+			"private_key": "6ecadc396415970e91293726c3f5775225440ea0844ae5616135fd10d66b5954"
+		},
+		{
+			"address": "0xD9211042f35968820A3407ac3d80C725f8F75c14",
+			"private_key": "a492823c3e193d6c595f37a18e3c06650cf4c74558cc818b16130b293716106f"
+		},
+		{
+			"address": "0xD8F3183DEF51A987222D845be228e0Bbb932C222",
+			"private_key": "c5114526e042343c6d1899cad05e1c00ba588314de9b96929914ee0df18d46b2"
+		},
+		{
+			"address": "0xafF0CA253b97e54440965855cec0A8a2E2399896",
+			"private_key": "4b9f63ecf84210c5366c66d68fa1f5da1fa4f634fad6dfc86178e4d79ff9e59"
+		}
+	]
+}
+
+⭐ us on GitHub - https://github.com/kurtosis-tech/kurtosis
+[36mINFO[0m[2024-11-12T15:31:17+01:00] ============================================================= 
+[36mINFO[0m[2024-11-12T15:31:17+01:00] ||          Created enclave: kurtosis-geth-nimbus          || 
+[36mINFO[0m[2024-11-12T15:31:17+01:00] ============================================================= 
+Name:            kurtosis-geth-nimbus
+UUID:            6f7c3159698d
+Status:          RUNNING
+Creation Time:   Tue, 12 Nov 2024 15:27:51 CET
+Flags:           
+
+========================================= Files Artifacts =========================================
+UUID           Name
+4d89142a714b   1-nimbus-geth-0-255-0
+fa989c6925ff   2-nimbus-geth-256-511-0
+4ac68f61c1f0   3-nimbus-geth-512-767-0
+d13435458c95   dora-config
+99909aabd1a8   el-forkmon-config
+661c117ef689   el_cl_genesis_data
+7ccf94de4368   final-genesis-timestamp
+1acd872dc348   genesis-el-cl-env-file
+1a72afbffe3f   genesis_validators_root
+183f131ce373   grafana-config
+fbc5c2e39000   grafana-dashboards
+43603d5f2722   jwt_file
+1f7b5601c507   keymanager_file
+7270ec782c84   prometheus-config
+defe45a93693   prysm-password
+da9c78a5f880   validator-ranges
+
+========================================== User Services ==========================================
+UUID           Name                                             Ports                                         Status
+416659b7f724   beacon-metrics-gazer                             http: 8080/tcp -> http://127.0.0.1:55170      RUNNING
+5a1efed4634f   cl-1-nimbus-geth                                 http: 4000/tcp -> http://127.0.0.1:55167      RUNNING
+                                                                metrics: 8008/tcp -> http://127.0.0.1:55168   
+                                                                tcp-discovery: 9000/tcp -> 127.0.0.1:55166    
+                                                                udp-discovery: 9000/udp                       
+0ce453fb9754   cl-2-nimbus-geth                                 http: 4000/tcp -> http://127.0.0.1:55146      RUNNING
+                                                                metrics: 8008/tcp -> http://127.0.0.1:55147   
+                                                                tcp-discovery: 9000/tcp -> 127.0.0.1:55148    
+                                                                udp-discovery: 9000/udp                       
+308f6c1b1b2c   cl-3-nimbus-geth                                 http: 4000/tcp -> http://127.0.0.1:55150      RUNNING
+                                                                metrics: 8008/tcp -> http://127.0.0.1:55151   
+                                                                tcp-discovery: 9000/tcp -> 127.0.0.1:55152    
+                                                                udp-discovery: 9000/udp                       
+fd0f4614de6b   dora                                             http: 8080/tcp -> http://127.0.0.1:55186      RUNNING
+0eeac87fede6   el-1-geth-nimbus                                 engine-rpc: 8551/tcp -> 127.0.0.1:55183       RUNNING
+                                                                metrics: 9001/tcp -> http://127.0.0.1:55181   
+                                                                rpc: 8545/tcp -> 127.0.0.1:55184              
+                                                                tcp-discovery: 30303/tcp -> 127.0.0.1:55182   
+                                                                udp-discovery: 30303/udp                      
+                                                                ws: 8546/tcp -> 127.0.0.1:55180               
+7d449f16a985   el-2-geth-nimbus                                 engine-rpc: 8551/tcp -> 127.0.0.1:55199       RUNNING
+                                                                metrics: 9001/tcp -> http://127.0.0.1:55197   
+                                                                rpc: 8545/tcp -> 127.0.0.1:55195              
+                                                                tcp-discovery: 30303/tcp -> 127.0.0.1:55198   
+                                                                udp-discovery: 30303/udp                      
+                                                                ws: 8546/tcp -> 127.0.0.1:55196               
+8eae3e9ad65e   el-3-geth-nimbus                                 engine-rpc: 8551/tcp -> 127.0.0.1:55192       RUNNING
+                                                                metrics: 9001/tcp -> http://127.0.0.1:55190   
+                                                                rpc: 8545/tcp -> 127.0.0.1:55193              
+                                                                tcp-discovery: 30303/tcp -> 127.0.0.1:55191   
+                                                                udp-discovery: 30303/udp                      
+                                                                ws: 8546/tcp -> 127.0.0.1:55189               
+5f3473ad8c4a   el-forkmon                                       http: 8080/tcp -> http://127.0.0.1:55176      RUNNING
+b89152b71507   grafana                                          http: 3000/tcp -> http://127.0.0.1:55158      RUNNING
+2296006faf17   mev-boost-1-nimbus-geth                          api: 18550/tcp -> 127.0.0.1:55172             RUNNING
+21aaa68f3d86   mev-boost-2-nimbus-geth                          api: 18550/tcp -> 127.0.0.1:55154             RUNNING
+c0b64646b108   mev-boost-3-nimbus-geth                          api: 18550/tcp -> 127.0.0.1:55162             RUNNING
+fdd2639902b8   mock-mev                                         rest: 18550/tcp -> 127.0.0.1:55174            RUNNING
+93fa4817f881   prometheus                                       http: 9090/tcp -> http://127.0.0.1:55164      RUNNING
+e3848e50c426   validator-key-generation-cl-validator-keystore   <none>                                        RUNNING
+4f2be180b53b   vc-1-geth-nimbus                                 metrics: 8080/tcp -> http://127.0.0.1:55156   RUNNING
+8be471f4ad95   vc-2-geth-nimbus                                 metrics: 8080/tcp -> http://127.0.0.1:55178   RUNNING
+b3e3111d3b48   vc-3-geth-nimbus                                 metrics: 8080/tcp -> http://127.0.0.1:55160   RUNNING
+

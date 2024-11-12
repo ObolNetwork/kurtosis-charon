@@ -1,0 +1,865 @@
+[36mINFO[0m[2024-11-12T15:32:34+01:00] Engine running in Kubernetes cluster, to connect to the engine from outside the cluster run 'kurtosis gateway' to open a local gateway to the engine 
+[36mINFO[0m[2024-11-12T15:32:35+01:00] Creating a new enclave for Starlark to run inside... 
+[36mINFO[0m[2024-11-12T15:32:44+01:00] Enclave 'kurtosis-geth-lodestar' created successfully 
+[36mINFO[0m[2024-11-12T15:32:44+01:00] Kurtosis CLI is running in a non interactive terminal. Everything will work but progress information and the progress bar will not be displayed. 
+
+Container images used in this run:
+> flashbots/mev-boost - locally cached
+> grafana/grafana:latest-ubuntu - locally cached
+> ethereum/client-go:latest - locally cached
+> ethpandaops/beacon-metrics-gazer:master - locally cached
+> ethpandaops/execution-monitor:master - locally cached
+> protolambda/eth2-val-tools:latest - locally cached
+> ethpandaops/dora:master - locally cached
+> prom/prometheus:latest - locally cached
+> badouralix/curl-jq - locally cached
+> python:3.11-alpine - locally cached
+> ethpandaops/ethereum-genesis-generator:3.4.1 - locally cached
+> ethpandaops/mock-builder:latest - locally cached
+> chainsafe/lodestar:v1.20.2 - locally cached
+
+Printing a message
+Sanity check passed
+
+Uploading file '/static_files/jwt/jwtsecret' to files artifact 'jwt_file'
+Files with artifact name 'jwt_file' uploaded with artifact UUID '93bc6dc4647e4164bb9d093abd8214fe'
+
+Uploading file '/static_files/keymanager/keymanager.txt' to files artifact 'keymanager_file'
+Files with artifact name 'keymanager_file' uploaded with artifact UUID 'd39b153b7a204f5982f5060d62c5420c'
+
+Printing a message
+Read the prometheus, grafana templates
+
+Printing a message
+Launching participant network with 3 participants and the following network params struct(additional_preloaded_contracts = {}, churn_limit_quotient = 65536, custody_requirement = 4, data_column_sidecar_subnet_count = 128, deneb_fork_epoch = 0, deposit_contract_address = "0x4242424242424242424242424242424242424242", devnet_repo = "ethpandaops", eip7594_fork_epoch = 100000002, eip7594_fork_version = "0x60000038", ejection_balance = 16000000000, electra_fork_epoch = 500, eth1_follow_distance = 2048, fulu_fork_epoch = 100000001, genesis_delay = 20, genesis_gaslimit = 30000000, max_blobs_per_block = 6, max_per_epoch_activation_churn_limit = 8, min_validator_withdrawability_delay = 256, network = "kurtosis", network_id = "3151908", network_sync_base_url = "https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/", num_validator_keys_per_node = 256, prefunded_accounts = {}, preregistered_validator_count = 0, preregistered_validator_keys_mnemonic = "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete", preset = "mainnet", samples_per_slot = 8, seconds_per_slot = 12, shard_committee_period = 1)
+
+Printing a message
+Generating cl validator key stores
+
+Adding service with name 'validator-key-generation-cl-validator-keystore' and image 'protolambda/eth2-val-tools:latest'
+Service 'validator-key-generation-cl-validator-keystore' added with service UUID '7e28ce178ca84229a9e79a0f631e6893'
+
+Generating keystores
+Command returned with exit code '0' with no output
+
+Verifying whether two values meet a certain condition '=='
+Verification succeeded. Value is '0'.
+
+Storing files from service 'validator-key-generation-cl-validator-keystore' at path '/node-0-keystores/' to files artifact with name '1-lodestar-geth-0-255-0'
+Files with artifact name '1-lodestar-geth-0-255-0' uploaded with artifact UUID '47838e7bcfba4119b60102a65e03f4c0'
+
+Storing files from service 'validator-key-generation-cl-validator-keystore' at path '/node-1-keystores/' to files artifact with name '2-lodestar-geth-256-511-0'
+Files with artifact name '2-lodestar-geth-256-511-0' uploaded with artifact UUID 'e0e3bf2324414f9e8d69054493a6c56e'
+
+Storing files from service 'validator-key-generation-cl-validator-keystore' at path '/node-2-keystores/' to files artifact with name '3-lodestar-geth-512-767-0'
+Files with artifact name '3-lodestar-geth-512-767-0' uploaded with artifact UUID 'aa52f2d630174bb7b228f2ea53b51fb1'
+
+Storing prysm password in a file
+Command returned with exit code '0' with no output
+
+Verifying whether two values meet a certain condition '=='
+Verification succeeded. Value is '0'.
+
+Storing files from service 'validator-key-generation-cl-validator-keystore' at path '/tmp/prysm-password.txt' to files artifact with name 'prysm-password'
+Files with artifact name 'prysm-password' uploaded with artifact UUID '47bb1ca6598d4c8c8e0f39c6013cd324'
+
+Printing a message
+{
+	"per_node_keystores": [
+		{
+			"files_artifact_uuid": "1-lodestar-geth-0-255-0",
+			"nimbus_keys_relative_dirpath": "/nimbus-keys",
+			"prysm_relative_dirpath": "/prysm",
+			"raw_keys_relative_dirpath": "/keys",
+			"raw_root_dirpath": "",
+			"raw_secrets_relative_dirpath": "/secrets",
+			"teku_keys_relative_dirpath": "/teku-keys",
+			"teku_secrets_relative_dirpath": "/teku-secrets"
+		},
+		{
+			"files_artifact_uuid": "2-lodestar-geth-256-511-0",
+			"nimbus_keys_relative_dirpath": "/nimbus-keys",
+			"prysm_relative_dirpath": "/prysm",
+			"raw_keys_relative_dirpath": "/keys",
+			"raw_root_dirpath": "",
+			"raw_secrets_relative_dirpath": "/secrets",
+			"teku_keys_relative_dirpath": "/teku-keys",
+			"teku_secrets_relative_dirpath": "/teku-secrets"
+		},
+		{
+			"files_artifact_uuid": "3-lodestar-geth-512-767-0",
+			"nimbus_keys_relative_dirpath": "/nimbus-keys",
+			"prysm_relative_dirpath": "/prysm",
+			"raw_keys_relative_dirpath": "/keys",
+			"raw_root_dirpath": "",
+			"raw_secrets_relative_dirpath": "/secrets",
+			"teku_keys_relative_dirpath": "/teku-keys",
+			"teku_secrets_relative_dirpath": "/teku-secrets"
+		}
+	],
+	"prysm_password_artifact_uuid": "prysm-password",
+	"prysm_password_relative_filepath": "prysm-password.txt"
+}
+
+Getting final genesis timestamp
+Command returned with exit code '0' and the following output: 1731422077
+
+Printing a message
+Generating EL CL data
+
+Rendering a template to a files artifact with name 'genesis-el-cl-env-file'
+Templates artifact name 'genesis-el-cl-env-file' rendered with artifact UUID 'e976af0d66b8475bb92790ef30d85df6'
+
+Creating genesis
+Command returned with exit code '0' and the following output:
+--------------------
++ '[' -f /data/metadata/genesis.json ']'
+++ mktemp -d -t ci-XXXXXXXXXX
++ tmp_dir=/tmp/ci-PwDZKtMymH
++ mkdir -p /data/metadata
++ python3 /apps/el-gen/envsubst.py
++ python3 /apps/el-gen/genesis_geth.py /tmp/ci-PwDZKtMymH/genesis-config.yaml
++ python3 /apps/el-gen/genesis_chainspec.py /tmp/ci-PwDZKtMymH/genesis-config.yaml
++ python3 /apps/el-gen/genesis_besu.py /tmp/ci-PwDZKtMymH/genesis-config.yaml
++ gen_cl_config
++ . /apps/el-gen/.venv/bin/activate
+++ deactivate nondestructive
+++ '[' -n /root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ']'
+++ PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export PATH
+++ unset _OLD_VIRTUAL_PATH
+++ '[' -n '' ']'
+++ '[' -n /bin/bash -o -n '' ']'
+++ hash -r
+++ '[' -n '' ']'
+++ unset VIRTUAL_ENV
+++ unset VIRTUAL_ENV_PROMPT
+++ '[' '!' nondestructive = nondestructive ']'
+++ VIRTUAL_ENV=/apps/el-gen/.venv
+++ export VIRTUAL_ENV
+++ _OLD_VIRTUAL_PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/apps/el-gen/.venv/bin:/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export PATH
+++ '[' -n '' ']'
+++ '[' -z '' ']'
+++ _OLD_VIRTUAL_PS1='(.venv) '
+++ PS1='(.venv) (.venv) '
+++ export PS1
+++ VIRTUAL_ENV_PROMPT='(.venv) '
+++ export VIRTUAL_ENV_PROMPT
+++ '[' -n /bin/bash -o -n '' ']'
+++ hash -r
++ set -x
++ '[' -f /data/metadata/genesis.ssz ']'
+++ mktemp -d -t ci-XXXXXXXXXX
++ tmp_dir=/tmp/ci-l22EX09367
++ mkdir -p /data/metadata
++ mkdir -p /data/parsed
+++ date -u -d @1731422077 '+%Y-%b-%d %I:%M:%S %p %Z'
++ HUMAN_READABLE_TIMESTAMP='2024-Nov-12 02:34:37 PM UTC'
++ COMMENT='# 2024-Nov-12 02:34:37 PM UTC'
++ envsubst
++ sed -i 's/#HUMAN_TIME_PLACEHOLDER/# 2024-Nov-12 02:34:37 PM UTC/' /data/metadata/config.yaml
++ envsubst
++ [[ mainnet == \m\i\n\i\m\a\l ]]
++ cp /tmp/ci-l22EX09367/mnemonics.yaml /data/metadata/mnemonics.yaml
++ grep DEPOSIT_CONTRACT_ADDRESS /data/metadata/config.yaml
++ cut -d ' ' -f2
++ echo 0
++ echo
++ envsubst
++ genesis_args=(deneb --config /data/metadata/config.yaml --mnemonics $tmp_dir/mnemonics.yaml --tranches-dir /data/metadata/tranches --state-output /data/metadata/genesis.ssz --preset-phase0 $PRESET_BASE --preset-altair $PRESET_BASE --preset-bellatrix $PRESET_BASE --preset-capella $PRESET_BASE --preset-deneb $PRESET_BASE)
++ [[ 0x00 == \0\x\0\1 ]]
++ [[ '' != '' ]]
++ [[ '' != '' ]]
++ genesis_args+=(--eth1-config /data/metadata/genesis.json)
++ '[' -z '' ']'
++ zcli_args=(pretty deneb BeaconState --preset-phase0 $PRESET_BASE --preset-altair $PRESET_BASE --preset-bellatrix $PRESET_BASE --preset-capella $PRESET_BASE --preset-deneb $PRESET_BASE /data/metadata/genesis.ssz)
++ /usr/local/bin/eth2-testnet-genesis deneb --config /data/metadata/config.yaml --mnemonics /tmp/ci-l22EX09367/mnemonics.yaml --tranches-dir /data/metadata/tranches --state-output /data/metadata/genesis.ssz --preset-phase0 mainnet --preset-altair mainnet --preset-bellatrix mainnet --preset-capella mainnet --preset-deneb mainnet --eth1-config /data/metadata/genesis.json
+zrnt version: v0.32.3
+Using CL MIN_GENESIS_TIME for genesis timestamp
+processing mnemonic 0, for 768 validators
+...validator 100/768
+...validator 200/768
+...validator 300/768
+...validator 400/768
+...validator 500/768
+...validator 600/768
+...validator 700/768
+Writing pubkeys list file...
+generated 768 validators from mnemonic yaml (/tmp/ci-l22EX09367/mnemonics.yaml)
+eth2 genesis at 1731422077 + 0 = 1731422077  (2024-11-12 14:34:37 +0000 UTC)
+done preparing state, serializing SSZ now...
+done!
++ /usr/local/bin/zcli pretty deneb BeaconState --preset-phase0 mainnet --preset-altair mainnet --preset-bellatrix mainnet --preset-capella mainnet --preset-deneb mainnet /data/metadata/genesis.ssz
++ echo 'Genesis args: deneb' --config /data/metadata/config.yaml --mnemonics /tmp/ci-l22EX09367/mnemonics.yaml --tranches-dir /data/metadata/tranches --state-output /data/metadata/genesis.ssz --preset-phase0 mainnet --preset-altair mainnet --preset-bellatrix mainnet --preset-capella mainnet --preset-deneb mainnet --eth1-config /data/metadata/genesis.json
+Genesis args: deneb --config /data/metadata/config.yaml --mnemonics /tmp/ci-l22EX09367/mnemonics.yaml --tranches-dir /data/metadata/tranches --state-output /data/metadata/genesis.ssz --preset-phase0 mainnet --preset-altair mainnet --preset-bellatrix mainnet --preset-capella mainnet --preset-deneb mainnet --eth1-config /data/metadata/genesis.json
+++ jq -r .latest_execution_payload_header.block_number /data/parsed/parsedConsensusGenesis.json
++ echo 'Genesis block number: 0'
+Genesis block number: 0
+++ jq -r .latest_execution_payload_header.block_hash /data/parsed/parsedConsensusGenesis.json
++ echo 'Genesis block hash: 0x54c64be54f07545ffe4cfa09402d5c12627d1efcbc1f4cc55541081927c55914'
+Genesis block hash: 0x54c64be54f07545ffe4cfa09402d5c12627d1efcbc1f4cc55541081927c55914
++ jq -r .eth1_data.block_hash /data/parsed/parsedConsensusGenesis.json
++ tr -d '\n'
++ jq -r .genesis_validators_root /data/parsed/parsedConsensusGenesis.json
++ tr -d '\n'
++ gen_shared_files
++ . /apps/el-gen/.venv/bin/activate
+++ deactivate nondestructive
+++ '[' -n /root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ']'
+++ PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export PATH
+++ unset _OLD_VIRTUAL_PATH
+++ '[' -n '' ']'
+++ '[' -n /bin/bash -o -n '' ']'
+++ hash -r
+++ '[' -n '(.venv) ' ']'
+++ PS1='(.venv) '
+++ export PS1
+++ unset _OLD_VIRTUAL_PS1
+++ unset VIRTUAL_ENV
+++ unset VIRTUAL_ENV_PROMPT
+++ '[' '!' nondestructive = nondestructive ']'
+++ VIRTUAL_ENV=/apps/el-gen/.venv
+++ export VIRTUAL_ENV
+++ _OLD_VIRTUAL_PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/apps/el-gen/.venv/bin:/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export PATH
+++ '[' -n '' ']'
+++ '[' -z '' ']'
+++ _OLD_VIRTUAL_PS1='(.venv) '
+++ PS1='(.venv) (.venv) '
+++ export PS1
+++ VIRTUAL_ENV_PROMPT='(.venv) '
+++ export VIRTUAL_ENV_PROMPT
+++ '[' -n /bin/bash -o -n '' ']'
+++ hash -r
++ set -x
++ mkdir -p /data/metadata
++ '[' -f /data/jwt/jwtsecret ']'
++ mkdir -p /data/jwt
+++ openssl rand -hex 32
+++ tr -d '\n'
++ echo -n 0x9c3c5ce8a0b2ca7c77059b59310dae3462ce67d3321b5dce314f91d2b016a4b5
++ '[' -f /data/metadata/genesis.json ']'
+++ cat /data/metadata/genesis.json
+++ jq -r '.config.terminalTotalDifficulty | tostring'
++ terminalTotalDifficulty=0
++ sed -i 's/TERMINAL_TOTAL_DIFFICULTY:.*/TERMINAL_TOTAL_DIFFICULTY: 0/' /data/metadata/config.yaml
++ '[' false = true ']'
+
+--------------------
+
+Reading genesis validators root
+Command returned with exit code '0' and the following output: 0x9b676088274f5b6fa4f8502332052b776f78df22be22bdfd820523678034aed8
+
+Reading prague time from genesis
+Command returned with exit code '0' and the following output: 1731614077
+
+Adding service with name 'el-1-geth-lodestar' and image 'ethereum/client-go:latest'
+Service 'el-1-geth-lodestar' added with service UUID 'e1d4940a65ce462090033b9513c4dc62'
+
+Waiting for at most '15m0s' for service 'el-1-geth-lodestar' to reach a certain state
+Wait took 1 tries (22.79296ms in total). Assertion passed with following:
+Request had response code '200' and body "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"id\":\"7192b95411cb2ecea85dd01f88eeb9625ab3bb6a7acd21ce7f0ab232b870bd86\",\"name\":\"Geth/v1.14.12-unstable-df182a74-20241111/linux-amd64/go1.23.3\",\"enode\":\"enode://4e5d94de72acccbbee2d5ed452e4d6935584412bacbd2af6a832a53c1e8ed9aae6b621ec70c2d613c7843f7390afc3b28e896df9f72d645746e064b599ef7e41@172.23.99.209:30303\",\"enr\":\"enr:-Ke4QPgjpsrpttW1_IzFjl8zezPU7eilf6ewcg2GeVedWXFnEfrHIAt60MbBgv9fxxGSgoN8DbIqvw_UhvgD-g0DlfaGAZMgzg62g2V0aMvKhESaPFWEZzZVfYJpZIJ2NIJpcISsF2PRiXNlY3AyNTZrMaEDTl2U3nKszLvuLV7UUuTWk1WEQSusvSr2qDKlPB6O2aqEc25hcMCDdGNwgnZfg3VkcIJ2Xw\",\"ip\":\"172.23.99.209\",\"ports\":{\"discovery\":30303,\"listener\":30303},\"listenAddr\":\"[::]:30303\",\"protocols\":{\"eth\":{\"network\":3151908,\"difficulty\":1,\"genesis\":\"0x54c64be54f07545ffe4cfa09402d5c12627d1efcbc1f4cc55541081927c55914\",\"config\":{\"chainId\":3151908,\"homesteadBlock\":0,\"eip150Block\":0,\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"berlinBlock\":0,\"londonBlock\":0,\"mergeNetsplitBlock\":0,\"shanghaiTime\":0,\"cancunTime\":0,\"pragueTime\":1731614077,\"terminalTotalDifficulty\":0,\"depositContractAddress\":\"0x4242424242424242424242424242424242424242\"},\"head\":\"0x54c64be54f07545ffe4cfa09402d5c12627d1efcbc1f4cc55541081927c55914\"},\"snap\":{}}}}\n", with extracted fields:
+'extract.enode': "enode://4e5d94de72acccbbee2d5ed452e4d6935584412bacbd2af6a832a53c1e8ed9aae6b621ec70c2d613c7843f7390afc3b28e896df9f72d645746e064b599ef7e41@172.23.99.209:30303"
+'extract.enr': "enr:-Ke4QPgjpsrpttW1_IzFjl8zezPU7eilf6ewcg2GeVedWXFnEfrHIAt60MbBgv9fxxGSgoN8DbIqvw_UhvgD-g0DlfaGAZMgzg62g2V0aMvKhESaPFWEZzZVfYJpZIJ2NIJpcISsF2PRiXNlY3AyNTZrMaEDTl2U3nKszLvuLV7UUuTWk1WEQSusvSr2qDKlPB6O2aqEc25hcMCDdGNwgnZfg3VkcIJ2Xw"
+
+Adding service with name 'el-2-geth-lodestar' and image 'ethereum/client-go:latest'
+Service 'el-2-geth-lodestar' added with service UUID '275406e309c44d728e311eb145592820'
+
+Waiting for at most '15m0s' for service 'el-2-geth-lodestar' to reach a certain state
+Wait took 1 tries (29.025422ms in total). Assertion passed with following:
+Request had response code '200' and body "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"id\":\"2df3d57f00803899fe184092d9f286035e9cd50c9ecc14d09316b3bc3c82613d\",\"name\":\"Geth/v1.14.9-unstable-e9467eec-20240829/linux-amd64/go1.23.0\",\"enode\":\"enode://01371a7d502eef8a12e09d046ab9e99cd8cb2d78cbf5fb9dee6d74864af05c8e5fa3d7eeff909faa8e61d4c6a08e27166da42eb0a3ba03f50858e0aef310dce3@172.23.30.91:30303\",\"enr\":\"enr:-Ke4QE_9qa7cjUXs2N1RinMZiJAhFdtw2ILmbg3KK39xhwr_IDCkqGMi8CLm4M9WlcdsvVfoIgmzqhheB_MQIVdYkayGAZMgzh8pg2V0aMvKhESaPFWEZzZVfYJpZIJ2NIJpcISsFx5biXNlY3AyNTZrMaEDATcafVAu74oS4J0EarnpnNjLLXjL9fud7m10hkrwXI6Ec25hcMCDdGNwgnZfg3VkcIJ2Xw\",\"ip\":\"172.23.30.91\",\"ports\":{\"discovery\":30303,\"listener\":30303},\"listenAddr\":\"[::]:30303\",\"protocols\":{\"eth\":{\"network\":3151908,\"difficulty\":1,\"genesis\":\"0x54c64be54f07545ffe4cfa09402d5c12627d1efcbc1f4cc55541081927c55914\",\"config\":{\"chainId\":3151908,\"homesteadBlock\":0,\"eip150Block\":0,\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"berlinBlock\":0,\"londonBlock\":0,\"mergeNetsplitBlock\":0,\"shanghaiTime\":0,\"cancunTime\":0,\"pragueTime\":1731614077,\"terminalTotalDifficulty\":0,\"terminalTotalDifficultyPassed\":true},\"head\":\"0x54c64be54f07545ffe4cfa09402d5c12627d1efcbc1f4cc55541081927c55914\"},\"snap\":{}}}}\n", with extracted fields:
+'extract.enode': "enode://01371a7d502eef8a12e09d046ab9e99cd8cb2d78cbf5fb9dee6d74864af05c8e5fa3d7eeff909faa8e61d4c6a08e27166da42eb0a3ba03f50858e0aef310dce3@172.23.30.91:30303"
+'extract.enr': "enr:-Ke4QE_9qa7cjUXs2N1RinMZiJAhFdtw2ILmbg3KK39xhwr_IDCkqGMi8CLm4M9WlcdsvVfoIgmzqhheB_MQIVdYkayGAZMgzh8pg2V0aMvKhESaPFWEZzZVfYJpZIJ2NIJpcISsFx5biXNlY3AyNTZrMaEDATcafVAu74oS4J0EarnpnNjLLXjL9fud7m10hkrwXI6Ec25hcMCDdGNwgnZfg3VkcIJ2Xw"
+
+Adding service with name 'el-3-geth-lodestar' and image 'ethereum/client-go:latest'
+Service 'el-3-geth-lodestar' added with service UUID '8c105ca63cca45a2a1ac44435361ca32'
+
+Waiting for at most '15m0s' for service 'el-3-geth-lodestar' to reach a certain state
+Wait took 1 tries (25.277346ms in total). Assertion passed with following:
+Request had response code '200' and body "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"id\":\"b039a2af4cc64e981f58d21a8a30cc331abfc79caef663dd89e04d5201da65e6\",\"name\":\"Geth/v1.14.9-unstable-e9467eec-20240829/linux-amd64/go1.23.0\",\"enode\":\"enode://f51499508dcaf946d88df2313d578586912ce9d95e9d112b69a6601c10cbd52a9b8d4ff500195c45d30f8e995785aa7ea28653c1b6e36cdd7c4aaeceaa6e9de8@172.23.89.229:30303\",\"enr\":\"enr:-Ke4QFNyStJuWSidCvXCOSuAoRfb5_n9B8TSFzRN_ZgQi4q9fCh6kAzHbEUqCkh3uGVWeiYxWMGZYs9mg-An9llXGIiGAZMgzi_tg2V0aMvKhESaPFWEZzZVfYJpZIJ2NIJpcISsF1nliXNlY3AyNTZrMaEC9RSZUI3K-UbYjfIxPVeFhpEs6dlenREraaZgHBDL1SqEc25hcMCDdGNwgnZfg3VkcIJ2Xw\",\"ip\":\"172.23.89.229\",\"ports\":{\"discovery\":30303,\"listener\":30303},\"listenAddr\":\"[::]:30303\",\"protocols\":{\"eth\":{\"network\":3151908,\"difficulty\":1,\"genesis\":\"0x54c64be54f07545ffe4cfa09402d5c12627d1efcbc1f4cc55541081927c55914\",\"config\":{\"chainId\":3151908,\"homesteadBlock\":0,\"eip150Block\":0,\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"berlinBlock\":0,\"londonBlock\":0,\"mergeNetsplitBlock\":0,\"shanghaiTime\":0,\"cancunTime\":0,\"pragueTime\":1731614077,\"terminalTotalDifficulty\":0,\"terminalTotalDifficultyPassed\":true},\"head\":\"0x54c64be54f07545ffe4cfa09402d5c12627d1efcbc1f4cc55541081927c55914\"},\"snap\":{}}}}\n", with extracted fields:
+'extract.enode': "enode://f51499508dcaf946d88df2313d578586912ce9d95e9d112b69a6601c10cbd52a9b8d4ff500195c45d30f8e995785aa7ea28653c1b6e36cdd7c4aaeceaa6e9de8@172.23.89.229:30303"
+'extract.enr': "enr:-Ke4QFNyStJuWSidCvXCOSuAoRfb5_n9B8TSFzRN_ZgQi4q9fCh6kAzHbEUqCkh3uGVWeiYxWMGZYs9mg-An9llXGIiGAZMgzi_tg2V0aMvKhESaPFWEZzZVfYJpZIJ2NIJpcISsF1nliXNlY3AyNTZrMaEC9RSZUI3K-UbYjfIxPVeFhpEs6dlenREraaZgHBDL1SqEc25hcMCDdGNwgnZfg3VkcIJ2Xw"
+
+Printing a message
+Successfully added 3 EL participants
+
+Printing a message
+Launching CL network
+
+Adding service with name 'cl-1-lodestar-geth' and image 'chainsafe/lodestar:v1.20.2'
+Service 'cl-1-lodestar-geth' added with service UUID '829b477614174f27aec98dc3c8c4392e'
+
+Running 'GET' request on service 'cl-1-lodestar-geth'
+Request had response code '200' and body "{\"data\":{\"peer_id\":\"16Uiu2HAm3P6trfdAemxUofVTcAtEeU6QajB3QiP4N1mCEd3Eak6z\",\"enr\":\"enr:-MS4QL_Q3GC59Gu70cU-2dx_fJInuqSWXWyXkm6EfB9CsNzzVBkvRu93EwZCSbhTSPhw7tn-lFmS6i7af1Buv1i10qUEh2F0dG5ldHOIAAAAAAAGAACEZXRoMpCz1qmNUAAAOP__________gmlkgnY0gmlwhKwXEUOJc2VjcDI1NmsxoQJ2NOyhgCJee7XsZ_D-qtoln4T5qehtxGNazEc-w7qPH4hzeW5jbmV0c4gAAAAAAAAAAIN0Y3CCIyiDdWRwgiMo\",\"p2p_addresses\":[\"/ip4/127.0.0.1/tcp/9000/p2p/16Uiu2HAm3P6trfdAemxUofVTcAtEeU6QajB3QiP4N1mCEd3Eak6z\",\"/ip4/172.31.239.220/tcp/9000/p2p/16Uiu2HAm3P6trfdAemxUofVTcAtEeU6QajB3QiP4N1mCEd3Eak6z\"],\"discovery_addresses\":[\"/ip4/172.23.17.67/tcp/9000\",\"/ip4/172.23.17.67/udp/9000\"],\"metadata\":{\"seq_number\":\"1\",\"attnets\":\"0x0000000000060000\",\"syncnets\":\"0x00\"}}}", with extracted fields:
+'extract.enr': "enr:-MS4QL_Q3GC59Gu70cU-2dx_fJInuqSWXWyXkm6EfB9CsNzzVBkvRu93EwZCSbhTSPhw7tn-lFmS6i7af1Buv1i10qUEh2F0dG5ldHOIAAAAAAAGAACEZXRoMpCz1qmNUAAAOP__________gmlkgnY0gmlwhKwXEUOJc2VjcDI1NmsxoQJ2NOyhgCJee7XsZ_D-qtoln4T5qehtxGNazEc-w7qPH4hzeW5jbmV0c4gAAAAAAAAAAIN0Y3CCIyiDdWRwgiMo"
+'extract.multiaddr': "/ip4/172.31.239.220/tcp/9000/p2p/16Uiu2HAm3P6trfdAemxUofVTcAtEeU6QajB3QiP4N1mCEd3Eak6z"
+'extract.peer_id': "16Uiu2HAm3P6trfdAemxUofVTcAtEeU6QajB3QiP4N1mCEd3Eak6z"
+
+Adding service with name 'cl-2-lodestar-geth' and image 'chainsafe/lodestar:v1.20.2'
+Service 'cl-2-lodestar-geth' added with service UUID '9e05add72c704fab87cbee3fd55f1f6a'
+
+Running 'GET' request on service 'cl-2-lodestar-geth'
+Request had response code '200' and body "{\"data\":{\"peer_id\":\"16Uiu2HAmQs2785m9dxvgJor6mw8kggJkWP2uFJtLoPD722wFoHQ3\",\"enr\":\"enr:-MS4QL188H1BQIPrJ8jlMBunwuUjGTbKUcNlKF6XgcQaR6BfMeyiO587r10tPnxBZ0oUKRZ414e-1neoghYYVLvBfSYEh2F0dG5ldHOIAAAAAAMAAACEZXRoMpCz1qmNUAAAOP__________gmlkgnY0gmlwhKwXJp2Jc2VjcDI1NmsxoQO1YTKzWNvwx2dBF5ME9rlKYau7XsEsBOVwf-wAuMJ4CIhzeW5jbmV0c4gAAAAAAAAAAIN0Y3CCIyiDdWRwgiMo\",\"p2p_addresses\":[\"/ip4/127.0.0.1/tcp/9000/p2p/16Uiu2HAmQs2785m9dxvgJor6mw8kggJkWP2uFJtLoPD722wFoHQ3\",\"/ip4/172.28.49.176/tcp/9000/p2p/16Uiu2HAmQs2785m9dxvgJor6mw8kggJkWP2uFJtLoPD722wFoHQ3\"],\"discovery_addresses\":[\"/ip4/172.23.38.157/tcp/9000\",\"/ip4/172.23.38.157/udp/9000\"],\"metadata\":{\"seq_number\":\"1\",\"attnets\":\"0x0000000003000000\",\"syncnets\":\"0x00\"}}}", with extracted fields:
+'extract.enr': "enr:-MS4QL188H1BQIPrJ8jlMBunwuUjGTbKUcNlKF6XgcQaR6BfMeyiO587r10tPnxBZ0oUKRZ414e-1neoghYYVLvBfSYEh2F0dG5ldHOIAAAAAAMAAACEZXRoMpCz1qmNUAAAOP__________gmlkgnY0gmlwhKwXJp2Jc2VjcDI1NmsxoQO1YTKzWNvwx2dBF5ME9rlKYau7XsEsBOVwf-wAuMJ4CIhzeW5jbmV0c4gAAAAAAAAAAIN0Y3CCIyiDdWRwgiMo"
+'extract.multiaddr': "/ip4/172.28.49.176/tcp/9000/p2p/16Uiu2HAmQs2785m9dxvgJor6mw8kggJkWP2uFJtLoPD722wFoHQ3"
+'extract.peer_id': "16Uiu2HAmQs2785m9dxvgJor6mw8kggJkWP2uFJtLoPD722wFoHQ3"
+
+Adding service with name 'cl-3-lodestar-geth' and image 'chainsafe/lodestar:v1.20.2'
+Service 'cl-3-lodestar-geth' added with service UUID 'b11b8f06b5004a73983d8905058c0582'
+
+Running 'GET' request on service 'cl-3-lodestar-geth'
+Request had response code '200' and body "{\"data\":{\"peer_id\":\"16Uiu2HAm9PiAbhQyKkQPrTgzWA6SFbvJWqF8uz5qg2C5LLo4JfTv\",\"enr\":\"enr:-MS4QOl2I3NucJDFJzvgrhszj1IJFkSEvYxwYJo8ghEUg3BaAgdarwq80sy_efEXwclW1HqCISJQmpx-cJygBUBkX-EEh2F0dG5ldHOIgAEAAAAAAACEZXRoMpCz1qmNUAAAOP__________gmlkgnY0gmlwhKwXRfGJc2VjcDI1NmsxoQLPgu1qxL4gR12ETZsrWER4OkAWJtRBJemdIleypwj8SYhzeW5jbmV0c4gAAAAAAAAAAIN0Y3CCIyiDdWRwgiMo\",\"p2p_addresses\":[\"/ip4/127.0.0.1/tcp/9000/p2p/16Uiu2HAm9PiAbhQyKkQPrTgzWA6SFbvJWqF8uz5qg2C5LLo4JfTv\",\"/ip4/172.27.222.160/tcp/9000/p2p/16Uiu2HAm9PiAbhQyKkQPrTgzWA6SFbvJWqF8uz5qg2C5LLo4JfTv\"],\"discovery_addresses\":[\"/ip4/172.23.69.241/tcp/9000\",\"/ip4/172.23.69.241/udp/9000\"],\"metadata\":{\"seq_number\":\"1\",\"attnets\":\"0x8001000000000000\",\"syncnets\":\"0x00\"}}}", with extracted fields:
+'extract.multiaddr': "/ip4/172.27.222.160/tcp/9000/p2p/16Uiu2HAm9PiAbhQyKkQPrTgzWA6SFbvJWqF8uz5qg2C5LLo4JfTv"
+'extract.peer_id': "16Uiu2HAm9PiAbhQyKkQPrTgzWA6SFbvJWqF8uz5qg2C5LLo4JfTv"
+'extract.enr': "enr:-MS4QOl2I3NucJDFJzvgrhszj1IJFkSEvYxwYJo8ghEUg3BaAgdarwq80sy_efEXwclW1HqCISJQmpx-cJygBUBkX-EEh2F0dG5ldHOIgAEAAAAAAACEZXRoMpCz1qmNUAAAOP__________gmlkgnY0gmlwhKwXRfGJc2VjcDI1NmsxoQLPgu1qxL4gR12ETZsrWER4OkAWJtRBJemdIleypwj8SYhzeW5jbmV0c4gAAAAAAAAAAIN0Y3CCIyiDdWRwgiMo"
+
+Printing a message
+Successfully added 3 CL participants
+
+Printing a message
+Start adding validators for participant #1
+
+Printing a message
+Using separate validator client for participant #1
+
+Adding service with name 'vc-1-geth-lodestar' and image 'chainsafe/lodestar:v1.20.2'
+Service 'vc-1-geth-lodestar' added with service UUID 'f73b659cbf90487e919ddf54f5d32a2e'
+
+Printing a message
+Successfully added 3 CL participants
+
+Printing a message
+Start adding validators for participant #2
+
+Printing a message
+Using separate validator client for participant #2
+
+Adding service with name 'vc-2-geth-lodestar' and image 'chainsafe/lodestar:v1.20.2'
+Service 'vc-2-geth-lodestar' added with service UUID '535c7f721940431cbc9ae024197ecaa7'
+
+Printing a message
+Successfully added 3 CL participants
+
+Printing a message
+Start adding validators for participant #3
+
+Printing a message
+Using separate validator client for participant #3
+
+Adding service with name 'vc-3-geth-lodestar' and image 'chainsafe/lodestar:v1.20.2'
+Service 'vc-3-geth-lodestar' added with service UUID '080cf11a58154216ace0ed6fd7c30f77'
+
+Printing a message
+NODE JSON RPC URI: '172.23.99.209:8545'
+
+Rendering a template to a files artifact with name 'validator-ranges'
+Templates artifact name 'validator-ranges' rendered with artifact UUID '6dca4c90cc9541ffa3910d8d8b7506d2'
+
+Adding service with name 'mock-mev' and image 'ethpandaops/mock-builder:latest'
+Service 'mock-mev' added with service UUID 'fc6dff1adbd44840af2a770eff8baccd'
+
+Printing a message
+args_with_right_defaults.participants[index].validator_count 256
+
+Adding service with name 'mev-boost-1-lodestar-geth' and image 'flashbots/mev-boost'
+Service 'mev-boost-1-lodestar-geth' added with service UUID '1033123f09134fc59836af19cdcca16d'
+
+Printing a message
+args_with_right_defaults.participants[index].validator_count 256
+
+Adding service with name 'mev-boost-2-lodestar-geth' and image 'flashbots/mev-boost'
+Service 'mev-boost-2-lodestar-geth' added with service UUID '9f097e4d02fa43cea4734928031359be'
+
+Printing a message
+args_with_right_defaults.participants[index].validator_count 256
+
+Adding service with name 'mev-boost-3-lodestar-geth' and image 'flashbots/mev-boost'
+Service 'mev-boost-3-lodestar-geth' added with service UUID '2c58e8c7d3f943449eb8b1722b2ae27f'
+
+Printing a message
+Launching el forkmon
+
+Rendering a template to a files artifact with name 'el-forkmon-config'
+Templates artifact name 'el-forkmon-config' rendered with artifact UUID 'ca7b993a3f9144318b3c70678e49b3a7'
+
+Adding service with name 'el-forkmon' and image 'ethpandaops/execution-monitor:master'
+Service 'el-forkmon' added with service UUID '5d79cf301f9540abb8823765279b0fb4'
+
+Printing a message
+Successfully launched execution layer forkmon
+
+Printing a message
+Launching beacon metrics gazer
+
+Adding service with name 'beacon-metrics-gazer' and image 'ethpandaops/beacon-metrics-gazer:master'
+Service 'beacon-metrics-gazer' added with service UUID 'f3d634675e1a460799c2a90fef3a9e49'
+
+Printing a message
+Successfully launched beacon metrics gazer
+
+Printing a message
+Launching dora
+
+Rendering a template to a files artifact with name 'dora-config'
+Templates artifact name 'dora-config' rendered with artifact UUID '4edc6a0661a741c7afeb21bc5f9ce8ab'
+
+Adding service with name 'dora' and image 'ethpandaops/dora:master'
+Service 'dora' added with service UUID 'a9ecc4181ec1408aa2e13ba1481e0211'
+
+Printing a message
+Successfully launched dora
+
+Printing a message
+Launching prometheus...
+
+Rendering a template to a files artifact with name 'prometheus-config'
+Templates artifact name 'prometheus-config' rendered with artifact UUID '63c04f50984044688bc1e7d60c5631e4'
+
+Adding service with name 'prometheus' and image 'prom/prometheus:latest'
+Service 'prometheus' added with service UUID '88de71a492d948a4a86785dde517a163'
+
+Printing a message
+Launching grafana...
+
+Rendering a template to a files artifact with name 'grafana-config'
+Templates artifact name 'grafana-config' rendered with artifact UUID '31df5661ef8b4defb6de31d237933131'
+
+Uploading file '/static_files/grafana-config/dashboards' to files artifact 'grafana-dashboards'
+Files with artifact name 'grafana-dashboards' uploaded with artifact UUID '98ddd50a4edd438f8a9ef854570cf7b7'
+
+Adding service with name 'grafana' and image 'grafana/grafana:latest-ubuntu'
+Service 'grafana' added with service UUID '6da1299652e74e3497aa2ca84cb84c83'
+
+Printing a message
+Successfully launched grafana
+
+Starlark code successfully run. Output was:
+{
+	"all_participants": [
+		{
+			"cl_context": {
+				"beacon_grpc_url": "",
+				"beacon_http_url": "http://172.23.17.67:4000",
+				"beacon_service_name": "cl-1-lodestar-geth",
+				"cl_nodes_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "cl-1-lodestar-geth",
+						"path": "/metrics",
+						"url": "172.23.17.67:8008"
+					}
+				],
+				"client_name": "lodestar",
+				"enr": "enr:-MS4QL_Q3GC59Gu70cU-2dx_fJInuqSWXWyXkm6EfB9CsNzzVBkvRu93EwZCSbhTSPhw7tn-lFmS6i7af1Buv1i10qUEh2F0dG5ldHOIAAAAAAAGAACEZXRoMpCz1qmNUAAAOP__________gmlkgnY0gmlwhKwXEUOJc2VjcDI1NmsxoQJ2NOyhgCJee7XsZ_D-qtoln4T5qehtxGNazEc-w7qPH4hzeW5jbmV0c4gAAAAAAAAAAIN0Y3CCIyiDdWRwgiMo",
+				"http_port": 4000,
+				"ip_addr": "172.23.17.67",
+				"multiaddr": "/ip4/172.31.239.220/tcp/9000/p2p/16Uiu2HAm3P6trfdAemxUofVTcAtEeU6QajB3QiP4N1mCEd3Eak6z",
+				"peer_id": "16Uiu2HAm3P6trfdAemxUofVTcAtEeU6QajB3QiP4N1mCEd3Eak6z",
+				"snooper_enabled": false,
+				"snooper_engine_context": null,
+				"supernode": false,
+				"validator_keystore_files_artifact_uuid": "1-lodestar-geth-0-255-0"
+			},
+			"cl_type": "lodestar",
+			"el_context": {
+				"client_name": "geth",
+				"el_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "el-1-geth-lodestar",
+						"path": "/debug/metrics/prometheus",
+						"url": "172.23.99.209:9001"
+					}
+				],
+				"engine_rpc_port_num": 8551,
+				"enode": "enode://4e5d94de72acccbbee2d5ed452e4d6935584412bacbd2af6a832a53c1e8ed9aae6b621ec70c2d613c7843f7390afc3b28e896df9f72d645746e064b599ef7e41@172.23.99.209:30303",
+				"enr": "enr:-Ke4QPgjpsrpttW1_IzFjl8zezPU7eilf6ewcg2GeVedWXFnEfrHIAt60MbBgv9fxxGSgoN8DbIqvw_UhvgD-g0DlfaGAZMgzg62g2V0aMvKhESaPFWEZzZVfYJpZIJ2NIJpcISsF2PRiXNlY3AyNTZrMaEDTl2U3nKszLvuLV7UUuTWk1WEQSusvSr2qDKlPB6O2aqEc25hcMCDdGNwgnZfg3VkcIJ2Xw",
+				"ip_addr": "172.23.99.209",
+				"rpc_http_url": "http://172.23.99.209:8545",
+				"rpc_port_num": 8545,
+				"service_name": "el-1-geth-lodestar",
+				"ws_port_num": 8546,
+				"ws_url": "ws://172.23.99.209:8546"
+			},
+			"el_type": "geth",
+			"ethereum_metrics_exporter_context": null,
+			"remote_signer_context": null,
+			"remote_signer_type": "web3signer",
+			"snooper_beacon_context": null,
+			"snooper_engine_context": null,
+			"vc_context": {
+				"client_name": "lodestar",
+				"metrics_info": {
+					"config": {
+						"labels": {},
+						"scrape_interval": "15s"
+					},
+					"name": "vc-1-geth-lodestar",
+					"path": "/metrics",
+					"url": "172.23.4.198:8080"
+				},
+				"service_name": "vc-1-geth-lodestar"
+			},
+			"vc_type": "lodestar",
+			"xatu_sentry_context": null
+		},
+		{
+			"cl_context": {
+				"beacon_grpc_url": "",
+				"beacon_http_url": "http://172.23.38.157:4000",
+				"beacon_service_name": "cl-2-lodestar-geth",
+				"cl_nodes_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "cl-2-lodestar-geth",
+						"path": "/metrics",
+						"url": "172.23.38.157:8008"
+					}
+				],
+				"client_name": "lodestar",
+				"enr": "enr:-MS4QL188H1BQIPrJ8jlMBunwuUjGTbKUcNlKF6XgcQaR6BfMeyiO587r10tPnxBZ0oUKRZ414e-1neoghYYVLvBfSYEh2F0dG5ldHOIAAAAAAMAAACEZXRoMpCz1qmNUAAAOP__________gmlkgnY0gmlwhKwXJp2Jc2VjcDI1NmsxoQO1YTKzWNvwx2dBF5ME9rlKYau7XsEsBOVwf-wAuMJ4CIhzeW5jbmV0c4gAAAAAAAAAAIN0Y3CCIyiDdWRwgiMo",
+				"http_port": 4000,
+				"ip_addr": "172.23.38.157",
+				"multiaddr": "/ip4/172.28.49.176/tcp/9000/p2p/16Uiu2HAmQs2785m9dxvgJor6mw8kggJkWP2uFJtLoPD722wFoHQ3",
+				"peer_id": "16Uiu2HAmQs2785m9dxvgJor6mw8kggJkWP2uFJtLoPD722wFoHQ3",
+				"snooper_enabled": false,
+				"snooper_engine_context": null,
+				"supernode": false,
+				"validator_keystore_files_artifact_uuid": "2-lodestar-geth-256-511-0"
+			},
+			"cl_type": "lodestar",
+			"el_context": {
+				"client_name": "geth",
+				"el_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "el-2-geth-lodestar",
+						"path": "/debug/metrics/prometheus",
+						"url": "172.23.30.91:9001"
+					}
+				],
+				"engine_rpc_port_num": 8551,
+				"enode": "enode://01371a7d502eef8a12e09d046ab9e99cd8cb2d78cbf5fb9dee6d74864af05c8e5fa3d7eeff909faa8e61d4c6a08e27166da42eb0a3ba03f50858e0aef310dce3@172.23.30.91:30303",
+				"enr": "enr:-Ke4QE_9qa7cjUXs2N1RinMZiJAhFdtw2ILmbg3KK39xhwr_IDCkqGMi8CLm4M9WlcdsvVfoIgmzqhheB_MQIVdYkayGAZMgzh8pg2V0aMvKhESaPFWEZzZVfYJpZIJ2NIJpcISsFx5biXNlY3AyNTZrMaEDATcafVAu74oS4J0EarnpnNjLLXjL9fud7m10hkrwXI6Ec25hcMCDdGNwgnZfg3VkcIJ2Xw",
+				"ip_addr": "172.23.30.91",
+				"rpc_http_url": "http://172.23.30.91:8545",
+				"rpc_port_num": 8545,
+				"service_name": "el-2-geth-lodestar",
+				"ws_port_num": 8546,
+				"ws_url": "ws://172.23.30.91:8546"
+			},
+			"el_type": "geth",
+			"ethereum_metrics_exporter_context": null,
+			"remote_signer_context": null,
+			"remote_signer_type": "web3signer",
+			"snooper_beacon_context": null,
+			"snooper_engine_context": null,
+			"vc_context": {
+				"client_name": "lodestar",
+				"metrics_info": {
+					"config": {
+						"labels": {},
+						"scrape_interval": "15s"
+					},
+					"name": "vc-2-geth-lodestar",
+					"path": "/metrics",
+					"url": "172.23.118.94:8080"
+				},
+				"service_name": "vc-2-geth-lodestar"
+			},
+			"vc_type": "lodestar",
+			"xatu_sentry_context": null
+		},
+		{
+			"cl_context": {
+				"beacon_grpc_url": "",
+				"beacon_http_url": "http://172.23.69.241:4000",
+				"beacon_service_name": "cl-3-lodestar-geth",
+				"cl_nodes_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "cl-3-lodestar-geth",
+						"path": "/metrics",
+						"url": "172.23.69.241:8008"
+					}
+				],
+				"client_name": "lodestar",
+				"enr": "enr:-MS4QOl2I3NucJDFJzvgrhszj1IJFkSEvYxwYJo8ghEUg3BaAgdarwq80sy_efEXwclW1HqCISJQmpx-cJygBUBkX-EEh2F0dG5ldHOIgAEAAAAAAACEZXRoMpCz1qmNUAAAOP__________gmlkgnY0gmlwhKwXRfGJc2VjcDI1NmsxoQLPgu1qxL4gR12ETZsrWER4OkAWJtRBJemdIleypwj8SYhzeW5jbmV0c4gAAAAAAAAAAIN0Y3CCIyiDdWRwgiMo",
+				"http_port": 4000,
+				"ip_addr": "172.23.69.241",
+				"multiaddr": "/ip4/172.27.222.160/tcp/9000/p2p/16Uiu2HAm9PiAbhQyKkQPrTgzWA6SFbvJWqF8uz5qg2C5LLo4JfTv",
+				"peer_id": "16Uiu2HAm9PiAbhQyKkQPrTgzWA6SFbvJWqF8uz5qg2C5LLo4JfTv",
+				"snooper_enabled": false,
+				"snooper_engine_context": null,
+				"supernode": false,
+				"validator_keystore_files_artifact_uuid": "3-lodestar-geth-512-767-0"
+			},
+			"cl_type": "lodestar",
+			"el_context": {
+				"client_name": "geth",
+				"el_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "el-3-geth-lodestar",
+						"path": "/debug/metrics/prometheus",
+						"url": "172.23.89.229:9001"
+					}
+				],
+				"engine_rpc_port_num": 8551,
+				"enode": "enode://f51499508dcaf946d88df2313d578586912ce9d95e9d112b69a6601c10cbd52a9b8d4ff500195c45d30f8e995785aa7ea28653c1b6e36cdd7c4aaeceaa6e9de8@172.23.89.229:30303",
+				"enr": "enr:-Ke4QFNyStJuWSidCvXCOSuAoRfb5_n9B8TSFzRN_ZgQi4q9fCh6kAzHbEUqCkh3uGVWeiYxWMGZYs9mg-An9llXGIiGAZMgzi_tg2V0aMvKhESaPFWEZzZVfYJpZIJ2NIJpcISsF1nliXNlY3AyNTZrMaEC9RSZUI3K-UbYjfIxPVeFhpEs6dlenREraaZgHBDL1SqEc25hcMCDdGNwgnZfg3VkcIJ2Xw",
+				"ip_addr": "172.23.89.229",
+				"rpc_http_url": "http://172.23.89.229:8545",
+				"rpc_port_num": 8545,
+				"service_name": "el-3-geth-lodestar",
+				"ws_port_num": 8546,
+				"ws_url": "ws://172.23.89.229:8546"
+			},
+			"el_type": "geth",
+			"ethereum_metrics_exporter_context": null,
+			"remote_signer_context": null,
+			"remote_signer_type": "web3signer",
+			"snooper_beacon_context": null,
+			"snooper_engine_context": null,
+			"vc_context": {
+				"client_name": "lodestar",
+				"metrics_info": {
+					"config": {
+						"labels": {},
+						"scrape_interval": "15s"
+					},
+					"name": "vc-3-geth-lodestar",
+					"path": "/metrics",
+					"url": "172.23.42.251:8080"
+				},
+				"service_name": "vc-3-geth-lodestar"
+			},
+			"vc_type": "lodestar",
+			"xatu_sentry_context": null
+		}
+	],
+	"blockscout_sc_verif_url": null,
+	"final_genesis_timestamp": "1731422077",
+	"genesis_validators_root": "0x9b676088274f5b6fa4f8502332052b776f78df22be22bdfd820523678034aed8",
+	"grafana_info": {
+		"dashboard_path": "/d/QdTOwy-nz/eth2-merge-kurtosis-module-dashboard?orgId=1",
+		"password": "admin",
+		"user": "admin"
+	},
+	"network_id": "3151908",
+	"network_params": {
+		"additional_preloaded_contracts": {},
+		"churn_limit_quotient": 65536,
+		"custody_requirement": 4,
+		"data_column_sidecar_subnet_count": 128,
+		"deneb_fork_epoch": 0,
+		"deposit_contract_address": "0x4242424242424242424242424242424242424242",
+		"devnet_repo": "ethpandaops",
+		"eip7594_fork_epoch": 100000002,
+		"eip7594_fork_version": "0x60000038",
+		"ejection_balance": 16000000000,
+		"electra_fork_epoch": 500,
+		"eth1_follow_distance": 2048,
+		"fulu_fork_epoch": 100000001,
+		"genesis_delay": 20,
+		"genesis_gaslimit": 30000000,
+		"max_blobs_per_block": 6,
+		"max_per_epoch_activation_churn_limit": 8,
+		"min_validator_withdrawability_delay": 256,
+		"network": "kurtosis",
+		"network_id": "3151908",
+		"network_sync_base_url": "https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/",
+		"num_validator_keys_per_node": 256,
+		"prefunded_accounts": {},
+		"preregistered_validator_count": 0,
+		"preregistered_validator_keys_mnemonic": "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete",
+		"preset": "mainnet",
+		"samples_per_slot": 8,
+		"seconds_per_slot": 12,
+		"shard_committee_period": 1
+	},
+	"pre_funded_accounts": [
+		{
+			"address": "0x8943545177806ED17B9F23F0a21ee5948eCaa776",
+			"private_key": "bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31"
+		},
+		{
+			"address": "0xE25583099BA105D9ec0A67f5Ae86D90e50036425",
+			"private_key": "39725efee3fb28614de3bacaffe4cc4bd8c436257e2c8bb887c4b5c4be45e76d"
+		},
+		{
+			"address": "0x614561D2d143621E126e87831AEF287678B442b8",
+			"private_key": "53321db7c1e331d93a11a41d16f004d7ff63972ec8ec7c25db329728ceeb1710"
+		},
+		{
+			"address": "0xf93Ee4Cf8c6c40b329b0c0626F28333c132CF241",
+			"private_key": "ab63b23eb7941c1251757e24b3d2350d2bc05c3c388d06f8fe6feafefb1e8c70"
+		},
+		{
+			"address": "0x802dCbE1B1A97554B4F50DB5119E37E8e7336417",
+			"private_key": "5d2344259f42259f82d2c140aa66102ba89b57b4883ee441a8b312622bd42491"
+		},
+		{
+			"address": "0xAe95d8DA9244C37CaC0a3e16BA966a8e852Bb6D6",
+			"private_key": "27515f805127bebad2fb9b183508bdacb8c763da16f54e0678b16e8f28ef3fff"
+		},
+		{
+			"address": "0x2c57d1CFC6d5f8E4182a56b4cf75421472eBAEa4",
+			"private_key": "7ff1a4c1d57e5e784d327c4c7651e952350bc271f156afb3d00d20f5ef924856"
+		},
+		{
+			"address": "0x741bFE4802cE1C4b5b00F9Df2F5f179A1C89171A",
+			"private_key": "3a91003acaf4c21b3953d94fa4a6db694fa69e5242b2e37be05dd82761058899"
+		},
+		{
+			"address": "0xc3913d4D8bAb4914328651C2EAE817C8b78E1f4c",
+			"private_key": "bb1d0f125b4fb2bb173c318cdead45468474ca71474e2247776b2b4c0fa2d3f5"
+		},
+		{
+			"address": "0x65D08a056c17Ae13370565B04cF77D2AfA1cB9FA",
+			"private_key": "850643a0224065ecce3882673c21f56bcf6eef86274cc21cadff15930b59fc8c"
+		},
+		{
+			"address": "0x3e95dFbBaF6B348396E6674C7871546dCC568e56",
+			"private_key": "94eb3102993b41ec55c241060f47daa0f6372e2e3ad7e91612ae36c364042e44"
+		},
+		{
+			"address": "0x5918b2e647464d4743601a865753e64C8059Dc4F",
+			"private_key": "daf15504c22a352648a71ef2926334fe040ac1d5005019e09f6c979808024dc7"
+		},
+		{
+			"address": "0x589A698b7b7dA0Bec545177D3963A2741105C7C9",
+			"private_key": "eaba42282ad33c8ef2524f07277c03a776d98ae19f581990ce75becb7cfa1c23"
+		},
+		{
+			"address": "0x4d1CB4eB7969f8806E2CaAc0cbbB71f88C8ec413",
+			"private_key": "3fd98b5187bf6526734efaa644ffbb4e3670d66f5d0268ce0323ec09124bff61"
+		},
+		{
+			"address": "0xF5504cE2BcC52614F121aff9b93b2001d92715CA",
+			"private_key": "5288e2f440c7f0cb61a9be8afdeb4295f786383f96f5e35eb0c94ef103996b64"
+		},
+		{
+			"address": "0xF61E98E7D47aB884C244E39E031978E33162ff4b",
+			"private_key": "f296c7802555da2a5a662be70e078cbd38b44f96f8615ae529da41122ce8db05"
+		},
+		{
+			"address": "0xf1424826861ffbbD25405F5145B5E50d0F1bFc90",
+			"private_key": "bf3beef3bd999ba9f2451e06936f0423cd62b815c9233dd3bc90f7e02a1e8673"
+		},
+		{
+			"address": "0xfDCe42116f541fc8f7b0776e2B30832bD5621C85",
+			"private_key": "6ecadc396415970e91293726c3f5775225440ea0844ae5616135fd10d66b5954"
+		},
+		{
+			"address": "0xD9211042f35968820A3407ac3d80C725f8F75c14",
+			"private_key": "a492823c3e193d6c595f37a18e3c06650cf4c74558cc818b16130b293716106f"
+		},
+		{
+			"address": "0xD8F3183DEF51A987222D845be228e0Bbb932C222",
+			"private_key": "c5114526e042343c6d1899cad05e1c00ba588314de9b96929914ee0df18d46b2"
+		},
+		{
+			"address": "0xafF0CA253b97e54440965855cec0A8a2E2399896",
+			"private_key": "4b9f63ecf84210c5366c66d68fa1f5da1fa4f634fad6dfc86178e4d79ff9e59"
+		}
+	]
+}
+
+⭐ us on GitHub - https://github.com/kurtosis-tech/kurtosis
+[36mINFO[0m[2024-11-12T15:37:10+01:00] =============================================================== 
+[36mINFO[0m[2024-11-12T15:37:10+01:00] ||          Created enclave: kurtosis-geth-lodestar          || 
+[36mINFO[0m[2024-11-12T15:37:10+01:00] =============================================================== 
+Name:            kurtosis-geth-lodestar
+UUID:            1d6fd6353b95
+Status:          RUNNING
+Creation Time:   Tue, 12 Nov 2024 15:33:30 CET
+Flags:           
+
+========================================= Files Artifacts =========================================
+UUID           Name
+47838e7bcfba   1-lodestar-geth-0-255-0
+e0e3bf232441   2-lodestar-geth-256-511-0
+aa52f2d63017   3-lodestar-geth-512-767-0
+4edc6a0661a7   dora-config
+ca7b993a3f91   el-forkmon-config
+78707d764b68   el_cl_genesis_data
+6493d434e3af   final-genesis-timestamp
+e976af0d66b8   genesis-el-cl-env-file
+6cbed0901dd4   genesis_validators_root
+31df5661ef8b   grafana-config
+98ddd50a4edd   grafana-dashboards
+93bc6dc4647e   jwt_file
+d39b153b7a20   keymanager_file
+63c04f509840   prometheus-config
+47bb1ca6598d   prysm-password
+6dca4c90cc95   validator-ranges
+
+========================================== User Services ==========================================
+UUID           Name                                             Ports                                         Status
+f3d634675e1a   beacon-metrics-gazer                             http: 8080/tcp -> http://127.0.0.1:55276      RUNNING
+829b47761417   cl-1-lodestar-geth                               http: 4000/tcp -> http://127.0.0.1:55294      RUNNING
+                                                                metrics: 8008/tcp -> http://127.0.0.1:55295   
+                                                                tcp-discovery: 9000/tcp -> 127.0.0.1:55293    
+                                                                udp-discovery: 9000/udp                       
+9e05add72c70   cl-2-lodestar-geth                               http: 4000/tcp -> http://127.0.0.1:55280      RUNNING
+                                                                metrics: 8008/tcp -> http://127.0.0.1:55278   
+                                                                tcp-discovery: 9000/tcp -> 127.0.0.1:55279    
+                                                                udp-discovery: 9000/udp                       
+b11b8f06b500   cl-3-lodestar-geth                               http: 4000/tcp -> http://127.0.0.1:55301      RUNNING
+                                                                metrics: 8008/tcp -> http://127.0.0.1:55299   
+                                                                tcp-discovery: 9000/tcp -> 127.0.0.1:55300    
+                                                                udp-discovery: 9000/udp                       
+a9ecc4181ec1   dora                                             http: 8080/tcp -> http://127.0.0.1:55321      RUNNING
+e1d4940a65ce   el-1-geth-lodestar                               engine-rpc: 8551/tcp -> 127.0.0.1:55309       RUNNING
+                                                                metrics: 9001/tcp -> http://127.0.0.1:55307   
+                                                                rpc: 8545/tcp -> 127.0.0.1:55310              
+                                                                tcp-discovery: 30303/tcp -> 127.0.0.1:55308   
+                                                                udp-discovery: 30303/udp                      
+                                                                ws: 8546/tcp -> 127.0.0.1:55311               
+275406e309c4   el-2-geth-lodestar                               engine-rpc: 8551/tcp -> 127.0.0.1:55313       RUNNING
+                                                                metrics: 9001/tcp -> http://127.0.0.1:55316   
+                                                                rpc: 8545/tcp -> 127.0.0.1:55314              
+                                                                tcp-discovery: 30303/tcp -> 127.0.0.1:55317   
+                                                                udp-discovery: 30303/udp                      
+                                                                ws: 8546/tcp -> 127.0.0.1:55315               
+8c105ca63cca   el-3-geth-lodestar                               engine-rpc: 8551/tcp -> 127.0.0.1:55285       RUNNING
+                                                                metrics: 9001/tcp -> http://127.0.0.1:55283   
+                                                                rpc: 8545/tcp -> 127.0.0.1:55286              
+                                                                tcp-discovery: 30303/tcp -> 127.0.0.1:55284   
+                                                                udp-discovery: 30303/udp                      
+                                                                ws: 8546/tcp -> 127.0.0.1:55287               
+5d79cf301f95   el-forkmon                                       http: 8080/tcp -> http://127.0.0.1:55303      RUNNING
+6da1299652e7   grafana                                          http: 3000/tcp -> http://127.0.0.1:55289      RUNNING
+1033123f0913   mev-boost-1-lodestar-geth                        api: 18550/tcp -> 127.0.0.1:55297             RUNNING
+9f097e4d02fa   mev-boost-2-lodestar-geth                        api: 18550/tcp -> 127.0.0.1:55291             RUNNING
+2c58e8c7d3f9   mev-boost-3-lodestar-geth                        api: 18550/tcp -> 127.0.0.1:55305             RUNNING
+fc6dff1adbd4   mock-mev                                         rest: 18550/tcp -> 127.0.0.1:55319            RUNNING
+88de71a492d9   prometheus                                       http: 9090/tcp -> http://127.0.0.1:55325      RUNNING
+7e28ce178ca8   validator-key-generation-cl-validator-keystore   <none>                                        RUNNING
+f73b659cbf90   vc-1-geth-lodestar                               metrics: 8080/tcp -> http://127.0.0.1:55274   RUNNING
+535c7f721940   vc-2-geth-lodestar                               metrics: 8080/tcp -> http://127.0.0.1:55323   RUNNING
+080cf11a5815   vc-3-geth-lodestar                               metrics: 8080/tcp -> http://127.0.0.1:55272   RUNNING
+
