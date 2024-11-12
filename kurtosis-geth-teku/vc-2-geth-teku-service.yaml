@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kurtosistech.com/ports: metrics:8080/TCP/http-2m0s
+  creationTimestamp: "2024-11-12T14:51:46Z"
+  labels:
+    kurtosistech.com/app-id: kurtosis
+    kurtosistech.com/enclave-id: 8b2dfadf4dd74aa78785e8016afcfd12
+    kurtosistech.com/guid: 3c3367c14367453a88dc6e85b7a91f73
+    kurtosistech.com/id: vc-2-geth-teku
+    kurtosistech.com/resource-type: user-service
+  name: vc-2-geth-teku
+  namespace: kt-kurtosis-geth-teku
+  resourceVersion: "31031072"
+  uid: 39597d8c-b005-4abb-ae4d-39b0c9411325
+spec:
+  clusterIP: 172.23.180.227
+  clusterIPs:
+  - 172.23.180.227
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: nonexistent-port
+    port: 1
+    protocol: TCP
+    targetPort: 1
+  - appProtocol: http
+    name: metrics
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    kurtosistech.com/app-id: kurtosis
+    kurtosistech.com/enclave-id: 8b2dfadf4dd74aa78785e8016afcfd12
+    kurtosistech.com/guid: 3c3367c14367453a88dc6e85b7a91f73
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

@@ -1,0 +1,181 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    cni.projectcalico.org/containerID: d4db77beb49ab88385c8f57c35fd218de1ad83959227d0ffd1fd79f892fc673d
+    cni.projectcalico.org/podIP: 172.28.49.151/32
+    cni.projectcalico.org/podIPs: 172.28.49.151/32
+    kurtosistech.com/ports: metrics:8080/TCP/http-2m0s
+  creationTimestamp: "2024-11-12T14:37:16Z"
+  labels:
+    kurtosistech.com.custom/ethereum-package.client: lodestar
+    kurtosistech.com.custom/ethereum-package.client-image: chainsafe-lodestar_v1.20.2
+    kurtosistech.com.custom/ethereum-package.client-type: validator
+    kurtosistech.com.custom/ethereum-package.connected-client: lodestar
+    kurtosistech.com.custom/ethereum-package.sha256: ""
+    kurtosistech.com/app-id: kurtosis
+    kurtosistech.com/enclave-id: 1d6fd6353b954b9eb8ca4fa1eee0b429
+    kurtosistech.com/guid: 080cf11a58154216ace0ed6fd7c30f77
+    kurtosistech.com/id: vc-3-geth-lodestar
+    kurtosistech.com/resource-type: user-service
+  name: vc-3-geth-lodestar
+  namespace: kt-kurtosis-geth-lodestar
+  resourceVersion: "31025706"
+  uid: a6e41a24-1fa9-40c6-9715-d1021f8a76e1
+spec:
+  containers:
+  - args:
+    - validator
+    - --logLevel=info
+    - --paramsFile=/network-configs/config.yaml
+    - --beaconNodes=http://172.23.69.241:4000
+    - --suggestedFeeRecipient=0x8943545177806ED17B9F23F0a21ee5948eCaa776
+    - --metrics
+    - --metrics.address=0.0.0.0
+    - --metrics.port=8080
+    - --graffiti=3-geth-lodestar
+    - --useProduceBlockV3
+    - --disableKeystoresThreadPool
+    - --keystoresDir=/validator-keys/keys
+    - --secretsDir=/validator-keys/secrets
+    - --builder
+    image: chainsafe/lodestar:v1.20.2
+    imagePullPolicy: IfNotPresent
+    name: user-service-container
+    ports:
+    - containerPort: 8080
+      name: metrics
+      protocol: TCP
+    resources: {}
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /network-configs
+      name: files-artifact-expansion
+      subPath: "0"
+    - mountPath: /validator-keys
+      name: files-artifact-expansion
+      subPath: "1"
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-k7hvd
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  initContainers:
+  - env:
+    - name: SERIALIZED_ARGS
+      value: '{"apiContainerIpAddress":"172.23.64.238","apiContainerPort":7443,"filesArtifactExpansions":[{"filesIdentifier":"el_cl_genesis_data","dirPathToExpandTo":"/files-artifacts/de7c28cec36c4494a1b39a061cf818b3"},{"filesIdentifier":"3-lodestar-geth-512-767-0","dirPathToExpandTo":"/files-artifacts/9979377318334b55b62780e3fe0277a8"}]}'
+    image: kurtosistech/files-artifacts-expander:1.3.1
+    imagePullPolicy: IfNotPresent
+    name: files-artifact-expander
+    resources: {}
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /files-artifacts/de7c28cec36c4494a1b39a061cf818b3
+      name: files-artifact-expansion
+      subPath: "0"
+    - mountPath: /files-artifacts/9979377318334b55b62780e3fe0277a8
+      name: files-artifact-expansion
+      subPath: "1"
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-k7hvd
+      readOnly: true
+  nodeName: 10.233.130.148
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Never
+  schedulerName: default-scheduler
+  securityContext: {}
+  serviceAccount: default
+  serviceAccountName: default
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 120
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 120
+  volumes:
+  - emptyDir: {}
+    name: files-artifact-expansion
+  - name: kube-api-access-k7hvd
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-12T14:37:18Z"
+    status: "True"
+    type: PodReadyToStartContainers
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-12T14:37:18Z"
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-12T14:37:19Z"
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-12T14:37:19Z"
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-12T14:37:16Z"
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: containerd://1cf3c9029159616ea311dbc5983234e76964c9b10e41260b1a767b38c3008b5f
+    image: docker.io/chainsafe/lodestar:v1.20.2
+    imageID: docker.io/chainsafe/lodestar@sha256:99acaa461be96779f71fcc88eda04d758a7ec6f49633b5a0feb1aef8d4012582
+    lastState: {}
+    name: user-service-container
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2024-11-12T14:37:18Z"
+  hostIP: 10.233.130.148
+  hostIPs:
+  - ip: 10.233.130.148
+  initContainerStatuses:
+  - containerID: containerd://708d7fa186f02716ab8a3ec69759e676f63910ed8e126485952623273d398cf0
+    image: docker.io/kurtosistech/files-artifacts-expander:1.3.1
+    imageID: docker.io/kurtosistech/files-artifacts-expander@sha256:2518bf2d828b47e84f7c7b7f8e28f4e315333e76c68ab78088b5276036e8d00a
+    lastState: {}
+    name: files-artifact-expander
+    ready: true
+    restartCount: 0
+    started: false
+    state:
+      terminated:
+        containerID: containerd://708d7fa186f02716ab8a3ec69759e676f63910ed8e126485952623273d398cf0
+        exitCode: 0
+        finishedAt: "2024-11-12T14:37:18Z"
+        reason: Completed
+        startedAt: "2024-11-12T14:37:18Z"
+  phase: Running
+  podIP: 172.28.49.151
+  podIPs:
+  - ip: 172.28.49.151
+  qosClass: BestEffort
+  startTime: "2024-11-12T14:37:16Z"

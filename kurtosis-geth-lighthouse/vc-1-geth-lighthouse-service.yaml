@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kurtosistech.com/ports: metrics:8080/TCP/http-2m0s
+  creationTimestamp: "2024-11-12T14:23:14Z"
+  labels:
+    kurtosistech.com/app-id: kurtosis
+    kurtosistech.com/enclave-id: dd31738a0d9549658bcafcf85dab9ffe
+    kurtosistech.com/guid: ed35d0d8d385461cbf4960044f1a2db3
+    kurtosistech.com/id: vc-1-geth-lighthouse
+    kurtosistech.com/resource-type: user-service
+  name: vc-1-geth-lighthouse
+  namespace: kt-kurtosis-geth-lighthouse
+  resourceVersion: "31019924"
+  uid: 5389d236-ace2-46e8-9680-8601f0c9559b
+spec:
+  clusterIP: 172.23.67.141
+  clusterIPs:
+  - 172.23.67.141
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: nonexistent-port
+    port: 1
+    protocol: TCP
+    targetPort: 1
+  - appProtocol: http
+    name: metrics
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    kurtosistech.com/app-id: kurtosis
+    kurtosistech.com/enclave-id: dd31738a0d9549658bcafcf85dab9ffe
+    kurtosistech.com/guid: ed35d0d8d385461cbf4960044f1a2db3
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
