@@ -1,8 +1,0 @@
-metrics-enabled: true
-metrics-host-allowlist: "*"
-metrics-interface: "0.0.0.0"
-metrics-port: "8008"
-validators-keystore-locking-enabled: false
-network: "/opt/teku/config.yaml"
-validator-keys: "/opt/charon/validator_keys:/opt/charon/validator_keys"
-validators-proposer-default-fee-recipient: "0x8943545177806ED17B9F23F0a21ee5948eCaa776"
