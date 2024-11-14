@@ -6,7 +6,7 @@ x-node-base:
   networks: [network1]
   # network_mode: "host"
   # for nimbus add: --feature-set-enable=json_requests
-  command: "run --testnet-chain-id=3151908 --testnet-fork-version='0x10000038' --testnet-genesis-timestamp=${TESTNET_GENESIS_TIME_STAMP} --testnet-name=testnet --testnet-capella-hard-fork='0x40000038'"
+  command: "run --testnet-chain-id=3151908 --testnet-fork-version='0x10000038' --testnet-genesis-timestamp=${TESTNET_GENESIS_TIME_STAMP} --testnet-name=testnet --testnet-capella-hard-fork='0x40000038' --feature-set-enable=json_requests"
   volumes:
     - ./.charon:/opt/charon/.charon/
 
@@ -26,7 +26,7 @@ services:
   #  \___|_| |_|\__,_|_|  \___/|_| |_|  \___|_|_|\___|_| |_|\__|___/
   node0:
     <<: *node-base
-    container_name: node0
+    container_name: node0-${CL_NAME}
     environment:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node0/charon-enr-private-key
@@ -44,7 +44,7 @@ services:
 
   node1:
     <<: *node-base
-    container_name: node1
+    container_name: node1-${CL_NAME}
     environment:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node1/charon-enr-private-key
@@ -62,7 +62,7 @@ services:
 
   node2:
     <<: *node-base
-    container_name: node2
+    container_name: node2-${CL_NAME}
     environment:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node2/charon-enr-private-key
@@ -372,7 +372,7 @@ services:
   prometheus:
     image: prom/prometheus:${PROMETHEUS_VERSION:-v2.44.0}
     ports:
-      - "9090:9090"
+      - "${MONITORING_PORT_PROMETHEUS}"
     networks: [network1]
     volumes:
       - ./prometheus/prometheustmp.yml:/etc/prometheus/prometheus.yml
