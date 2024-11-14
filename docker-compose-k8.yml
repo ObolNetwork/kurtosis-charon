@@ -6,7 +6,7 @@ x-node-base:
   networks: [network1]
   # network_mode: "host"
   # for nimbus add: --feature-set-enable=json_requests
-  command: "run --testnet-chain-id=3151908 --testnet-fork-version='0x10000038' --testnet-genesis-timestamp=${TESTNET_GENESIS_TIME_STAMP} --testnet-name=testnet --testnet-capella-hard-fork='0x40000038' --feature-set-enable=json_requests"
+  command: "run --testnet-chain-id=3151908 --testnet-fork-version='0x10000038' --testnet-genesis-timestamp=${TESTNET_GENESIS_TIME_STAMP} --testnet-name=testnet --testnet-capella-hard-fork='0x40000038'"
   volumes:
     - ./.charon:/opt/charon/.charon/
 
