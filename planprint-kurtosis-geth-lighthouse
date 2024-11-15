@@ -1,0 +1,754 @@
+[36mINFO[0m[2024-11-15T15:41:42+01:00] Engine running in Kubernetes cluster, to connect to the engine from outside the cluster run 'kurtosis gateway' to open a local gateway to the engine 
+[36mINFO[0m[2024-11-15T15:41:42+01:00] Creating a new enclave for Starlark to run inside... 
+[36mINFO[0m[2024-11-15T15:41:49+01:00] Enclave 'kurtosis-geth-lighthouse' created successfully 
+[36mINFO[0m[2024-11-15T15:41:49+01:00] Kurtosis CLI is running in a non interactive terminal. Everything will work but progress information and the progress bar will not be displayed. 
+
+Container images used in this run:
+> sigp/lighthouse:v5.3.0 - locally cached
+> protolambda/eth2-val-tools:latest - locally cached
+> ethpandaops/ethereum-genesis-generator:3.4.1 - locally cached
+> ethereum/client-go:latest - locally cached
+> badouralix/curl-jq - locally cached
+> python:3.11-alpine - locally cached
+
+Printing a message
+Sanity check passed
+
+Uploading file '/static_files/jwt/jwtsecret' to files artifact 'jwt_file'
+Files with artifact name 'jwt_file' uploaded with artifact UUID 'ba818665038e492d9a0681cd369ef02f'
+
+Uploading file '/static_files/keymanager/keymanager.txt' to files artifact 'keymanager_file'
+Files with artifact name 'keymanager_file' uploaded with artifact UUID '6df83de1481245bca10b76431da88562'
+
+Printing a message
+Read the prometheus, grafana templates
+
+Printing a message
+Launching participant network with 3 participants and the following network params struct(additional_preloaded_contracts = {}, churn_limit_quotient = 65536, custody_requirement = 4, data_column_sidecar_subnet_count = 128, deneb_fork_epoch = 0, deposit_contract_address = "0x4242424242424242424242424242424242424242", devnet_repo = "ethpandaops", eip7594_fork_epoch = 100000002, eip7594_fork_version = "0x60000038", ejection_balance = 16000000000, electra_fork_epoch = 500, eth1_follow_distance = 2048, fulu_fork_epoch = 100000001, genesis_delay = 20, genesis_gaslimit = 30000000, max_blobs_per_block = 6, max_per_epoch_activation_churn_limit = 8, min_validator_withdrawability_delay = 256, network = "kurtosis", network_id = "3151908", network_sync_base_url = "https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/", num_validator_keys_per_node = 64, prefunded_accounts = {}, preregistered_validator_count = 0, preregistered_validator_keys_mnemonic = "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete", preset = "mainnet", samples_per_slot = 8, seconds_per_slot = 12, shard_committee_period = 1)
+
+Printing a message
+Generating cl validator key stores
+
+Adding service with name 'validator-key-generation-cl-validator-keystore' and image 'protolambda/eth2-val-tools:latest'
+Service 'validator-key-generation-cl-validator-keystore' added with service UUID '30ef08bd089049588291e04481ab6c40'
+
+Generating keystores
+Command returned with exit code '0' with no output
+
+Verifying whether two values meet a certain condition '=='
+Verification succeeded. Value is '0'.
+
+Storing files from service 'validator-key-generation-cl-validator-keystore' at path '/node-0-keystores/' to files artifact with name '1-lighthouse-geth-0-63-0'
+Files with artifact name '1-lighthouse-geth-0-63-0' uploaded with artifact UUID 'dae84b3668e34f1e945ecf40bdd2c3a6'
+
+Storing files from service 'validator-key-generation-cl-validator-keystore' at path '/node-1-keystores/' to files artifact with name '2-lighthouse-geth-64-127-0'
+Files with artifact name '2-lighthouse-geth-64-127-0' uploaded with artifact UUID 'f77c7399229a470a8eb7e97ada1b9078'
+
+Storing files from service 'validator-key-generation-cl-validator-keystore' at path '/node-2-keystores/' to files artifact with name '3-lighthouse-geth-128-191-0'
+Files with artifact name '3-lighthouse-geth-128-191-0' uploaded with artifact UUID '6ff597c3750a4021b2fa94f762e48003'
+
+Storing prysm password in a file
+Command returned with exit code '0' with no output
+
+Verifying whether two values meet a certain condition '=='
+Verification succeeded. Value is '0'.
+
+Storing files from service 'validator-key-generation-cl-validator-keystore' at path '/tmp/prysm-password.txt' to files artifact with name 'prysm-password'
+Files with artifact name 'prysm-password' uploaded with artifact UUID '690478d56b7d4a5ca0d6a4b3807e052f'
+
+Printing a message
+{
+	"per_node_keystores": [
+		{
+			"files_artifact_uuid": "1-lighthouse-geth-0-63-0",
+			"nimbus_keys_relative_dirpath": "/nimbus-keys",
+			"prysm_relative_dirpath": "/prysm",
+			"raw_keys_relative_dirpath": "/keys",
+			"raw_root_dirpath": "",
+			"raw_secrets_relative_dirpath": "/secrets",
+			"teku_keys_relative_dirpath": "/teku-keys",
+			"teku_secrets_relative_dirpath": "/teku-secrets"
+		},
+		{
+			"files_artifact_uuid": "2-lighthouse-geth-64-127-0",
+			"nimbus_keys_relative_dirpath": "/nimbus-keys",
+			"prysm_relative_dirpath": "/prysm",
+			"raw_keys_relative_dirpath": "/keys",
+			"raw_root_dirpath": "",
+			"raw_secrets_relative_dirpath": "/secrets",
+			"teku_keys_relative_dirpath": "/teku-keys",
+			"teku_secrets_relative_dirpath": "/teku-secrets"
+		},
+		{
+			"files_artifact_uuid": "3-lighthouse-geth-128-191-0",
+			"nimbus_keys_relative_dirpath": "/nimbus-keys",
+			"prysm_relative_dirpath": "/prysm",
+			"raw_keys_relative_dirpath": "/keys",
+			"raw_root_dirpath": "",
+			"raw_secrets_relative_dirpath": "/secrets",
+			"teku_keys_relative_dirpath": "/teku-keys",
+			"teku_secrets_relative_dirpath": "/teku-secrets"
+		}
+	],
+	"prysm_password_artifact_uuid": "prysm-password",
+	"prysm_password_relative_filepath": "prysm-password.txt"
+}
+
+Getting final genesis timestamp
+Command returned with exit code '0' and the following output: 1731681814
+
+Printing a message
+Generating EL CL data
+
+Rendering a template to a files artifact with name 'genesis-el-cl-env-file'
+Templates artifact name 'genesis-el-cl-env-file' rendered with artifact UUID '63d131e75ea84a6b9ea50de84d5e9aed'
+
+Creating genesis
+Command returned with exit code '0' and the following output:
+--------------------
++ '[' -f /data/metadata/genesis.json ']'
+++ mktemp -d -t ci-XXXXXXXXXX
++ tmp_dir=/tmp/ci-DFCn08UX9z
++ mkdir -p /data/metadata
++ python3 /apps/el-gen/envsubst.py
++ python3 /apps/el-gen/genesis_geth.py /tmp/ci-DFCn08UX9z/genesis-config.yaml
++ python3 /apps/el-gen/genesis_chainspec.py /tmp/ci-DFCn08UX9z/genesis-config.yaml
++ python3 /apps/el-gen/genesis_besu.py /tmp/ci-DFCn08UX9z/genesis-config.yaml
++ gen_cl_config
++ . /apps/el-gen/.venv/bin/activate
+++ deactivate nondestructive
+++ '[' -n /root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ']'
+++ PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export PATH
+++ unset _OLD_VIRTUAL_PATH
+++ '[' -n '' ']'
+++ '[' -n /bin/bash -o -n '' ']'
+++ hash -r
+++ '[' -n '' ']'
+++ unset VIRTUAL_ENV
+++ unset VIRTUAL_ENV_PROMPT
+++ '[' '!' nondestructive = nondestructive ']'
+++ VIRTUAL_ENV=/apps/el-gen/.venv
+++ export VIRTUAL_ENV
+++ _OLD_VIRTUAL_PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/apps/el-gen/.venv/bin:/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export PATH
+++ '[' -n '' ']'
+++ '[' -z '' ']'
+++ _OLD_VIRTUAL_PS1='(.venv) '
+++ PS1='(.venv) (.venv) '
+++ export PS1
+++ VIRTUAL_ENV_PROMPT='(.venv) '
+++ export VIRTUAL_ENV_PROMPT
+++ '[' -n /bin/bash -o -n '' ']'
+++ hash -r
++ set -x
++ '[' -f /data/metadata/genesis.ssz ']'
+++ mktemp -d -t ci-XXXXXXXXXX
++ tmp_dir=/tmp/ci-uyZAzfkyN1
++ mkdir -p /data/metadata
++ mkdir -p /data/parsed
+++ date -u -d @1731681814 '+%Y-%b-%d %I:%M:%S %p %Z'
++ HUMAN_READABLE_TIMESTAMP='2024-Nov-15 02:43:34 PM UTC'
++ COMMENT='# 2024-Nov-15 02:43:34 PM UTC'
++ envsubst
++ sed -i 's/#HUMAN_TIME_PLACEHOLDER/# 2024-Nov-15 02:43:34 PM UTC/' /data/metadata/config.yaml
++ envsubst
++ [[ mainnet == \m\i\n\i\m\a\l ]]
++ cp /tmp/ci-uyZAzfkyN1/mnemonics.yaml /data/metadata/mnemonics.yaml
++ cut -d ' ' -f2
++ grep DEPOSIT_CONTRACT_ADDRESS /data/metadata/config.yaml
++ echo 0
++ echo
++ envsubst
++ genesis_args=(deneb --config /data/metadata/config.yaml --mnemonics $tmp_dir/mnemonics.yaml --tranches-dir /data/metadata/tranches --state-output /data/metadata/genesis.ssz --preset-phase0 $PRESET_BASE --preset-altair $PRESET_BASE --preset-bellatrix $PRESET_BASE --preset-capella $PRESET_BASE --preset-deneb $PRESET_BASE)
++ [[ 0x00 == \0\x\0\1 ]]
++ [[ '' != '' ]]
++ [[ '' != '' ]]
++ genesis_args+=(--eth1-config /data/metadata/genesis.json)
++ '[' -z '' ']'
++ zcli_args=(pretty deneb BeaconState --preset-phase0 $PRESET_BASE --preset-altair $PRESET_BASE --preset-bellatrix $PRESET_BASE --preset-capella $PRESET_BASE --preset-deneb $PRESET_BASE /data/metadata/genesis.ssz)
++ /usr/local/bin/eth2-testnet-genesis deneb --config /data/metadata/config.yaml --mnemonics /tmp/ci-uyZAzfkyN1/mnemonics.yaml --tranches-dir /data/metadata/tranches --state-output /data/metadata/genesis.ssz --preset-phase0 mainnet --preset-altair mainnet --preset-bellatrix mainnet --preset-capella mainnet --preset-deneb mainnet --eth1-config /data/metadata/genesis.json
+zrnt version: v0.32.3
+Using CL MIN_GENESIS_TIME for genesis timestamp
+processing mnemonic 0, for 192 validators
+...validator 100/192
+Writing pubkeys list file...
+generated 192 validators from mnemonic yaml (/tmp/ci-uyZAzfkyN1/mnemonics.yaml)
+eth2 genesis at 1731681814 + 0 = 1731681814  (2024-11-15 14:43:34 +0000 UTC)
+done preparing state, serializing SSZ now...
+done!
++ /usr/local/bin/zcli pretty deneb BeaconState --preset-phase0 mainnet --preset-altair mainnet --preset-bellatrix mainnet --preset-capella mainnet --preset-deneb mainnet /data/metadata/genesis.ssz
++ echo 'Genesis args: deneb' --config /data/metadata/config.yaml --mnemonics /tmp/ci-uyZAzfkyN1/mnemonics.yaml --tranches-dir /data/metadata/tranches --state-output /data/metadata/genesis.ssz --preset-phase0 mainnet --preset-altair mainnet --preset-bellatrix mainnet --preset-capella mainnet --preset-deneb mainnet --eth1-config /data/metadata/genesis.json
+Genesis args: deneb --config /data/metadata/config.yaml --mnemonics /tmp/ci-uyZAzfkyN1/mnemonics.yaml --tranches-dir /data/metadata/tranches --state-output /data/metadata/genesis.ssz --preset-phase0 mainnet --preset-altair mainnet --preset-bellatrix mainnet --preset-capella mainnet --preset-deneb mainnet --eth1-config /data/metadata/genesis.json
+++ jq -r .latest_execution_payload_header.block_number /data/parsed/parsedConsensusGenesis.json
++ echo 'Genesis block number: 0'
+Genesis block number: 0
+++ jq -r .latest_execution_payload_header.block_hash /data/parsed/parsedConsensusGenesis.json
++ echo 'Genesis block hash: 0xd811c280610428f21157f93eeec2b46ad1d5b70f0487e721a1a98047042fe509'
+Genesis block hash: 0xd811c280610428f21157f93eeec2b46ad1d5b70f0487e721a1a98047042fe509
++ jq -r .eth1_data.block_hash /data/parsed/parsedConsensusGenesis.json
++ tr -d '\n'
++ jq -r .genesis_validators_root /data/parsed/parsedConsensusGenesis.json
++ tr -d '\n'
++ gen_shared_files
++ . /apps/el-gen/.venv/bin/activate
+++ deactivate nondestructive
+++ '[' -n /root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin ']'
+++ PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export PATH
+++ unset _OLD_VIRTUAL_PATH
+++ '[' -n '' ']'
+++ '[' -n /bin/bash -o -n '' ']'
+++ hash -r
+++ '[' -n '(.venv) ' ']'
+++ PS1='(.venv) '
+++ export PS1
+++ unset _OLD_VIRTUAL_PS1
+++ unset VIRTUAL_ENV
+++ unset VIRTUAL_ENV_PROMPT
+++ '[' '!' nondestructive = nondestructive ']'
+++ VIRTUAL_ENV=/apps/el-gen/.venv
+++ export VIRTUAL_ENV
+++ _OLD_VIRTUAL_PATH=/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ PATH=/apps/el-gen/.venv/bin:/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+++ export PATH
+++ '[' -n '' ']'
+++ '[' -z '' ']'
+++ _OLD_VIRTUAL_PS1='(.venv) '
+++ PS1='(.venv) (.venv) '
+++ export PS1
+++ VIRTUAL_ENV_PROMPT='(.venv) '
+++ export VIRTUAL_ENV_PROMPT
+++ '[' -n /bin/bash -o -n '' ']'
+++ hash -r
++ set -x
++ mkdir -p /data/metadata
++ '[' -f /data/jwt/jwtsecret ']'
++ mkdir -p /data/jwt
+++ openssl rand -hex 32
+++ tr -d '\n'
++ echo -n 0x871e67b1303b116e8a60426159bd4585debf42a4bb657c8bf24776ca096e1b3d
++ '[' -f /data/metadata/genesis.json ']'
+++ cat /data/metadata/genesis.json
+++ jq -r '.config.terminalTotalDifficulty | tostring'
++ terminalTotalDifficulty=0
++ sed -i 's/TERMINAL_TOTAL_DIFFICULTY:.*/TERMINAL_TOTAL_DIFFICULTY: 0/' /data/metadata/config.yaml
++ '[' false = true ']'
+
+--------------------
+
+Reading genesis validators root
+Command returned with exit code '0' and the following output: 0xa63a1b2ffefb0fea452e9ad530c9a4bbd58c97c6ad82da001f142be64c91d61b
+
+Reading prague time from genesis
+Command returned with exit code '0' and the following output: 1731873814
+
+Adding service with name 'el-1-geth-lighthouse' and image 'ethereum/client-go:latest'
+Service 'el-1-geth-lighthouse' added with service UUID '705c0dcce1a84e10b3337ec3ad79cd63'
+
+Waiting for at most '15m0s' for service 'el-1-geth-lighthouse' to reach a certain state
+Wait took 1 tries (104.065529ms in total). Assertion passed with following:
+Request had response code '200' and body "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"id\":\"d6633a90cee8def1ba7b25b194dfd85133905bef7b3a9c1144d4cb9e93e5f625\",\"name\":\"Geth/v1.14.12-unstable-a5fe7353-20241021/linux-amd64/go1.23.2\",\"enode\":\"enode://c818f266b587c97869b11d86d0e71b99e39f6f33947d32d22e222ac578406b983a00165a07951e04f2c4656eebb097ad8ef173be4f265ccf371f18ab2708830f@172.23.70.252:30303\",\"enr\":\"enr:-Ke4QOPGEwfl_l-EF1XtfVMZfntdNRrNSIIxPltOnDj1MVq6Bon5K06lZh42c-87OETRO5gaggbLGzs2VGwV2tFbPcGGAZMwSVxUg2V0aMvKhFN23uuEZzpMFoJpZIJ2NIJpcISsF0b8iXNlY3AyNTZrMaEDyBjyZrWHyXhpsR2G0OcbmeOfbzOUfTLSLiIqxXhAa5iEc25hcMCDdGNwgnZfg3VkcIJ2Xw\",\"ip\":\"172.23.70.252\",\"ports\":{\"discovery\":30303,\"listener\":30303},\"listenAddr\":\"[::]:30303\",\"protocols\":{\"eth\":{\"network\":3151908,\"difficulty\":1,\"genesis\":\"0xd811c280610428f21157f93eeec2b46ad1d5b70f0487e721a1a98047042fe509\",\"config\":{\"chainId\":3151908,\"homesteadBlock\":0,\"eip150Block\":0,\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"berlinBlock\":0,\"londonBlock\":0,\"mergeNetsplitBlock\":0,\"shanghaiTime\":0,\"cancunTime\":0,\"pragueTime\":1731873814,\"terminalTotalDifficulty\":0,\"terminalTotalDifficultyPassed\":true,\"depositContractAddress\":\"0x4242424242424242424242424242424242424242\"},\"head\":\"0xd811c280610428f21157f93eeec2b46ad1d5b70f0487e721a1a98047042fe509\"},\"snap\":{}}}}\n", with extracted fields:
+'extract.enode': "enode://c818f266b587c97869b11d86d0e71b99e39f6f33947d32d22e222ac578406b983a00165a07951e04f2c4656eebb097ad8ef173be4f265ccf371f18ab2708830f@172.23.70.252:30303"
+'extract.enr': "enr:-Ke4QOPGEwfl_l-EF1XtfVMZfntdNRrNSIIxPltOnDj1MVq6Bon5K06lZh42c-87OETRO5gaggbLGzs2VGwV2tFbPcGGAZMwSVxUg2V0aMvKhFN23uuEZzpMFoJpZIJ2NIJpcISsF0b8iXNlY3AyNTZrMaEDyBjyZrWHyXhpsR2G0OcbmeOfbzOUfTLSLiIqxXhAa5iEc25hcMCDdGNwgnZfg3VkcIJ2Xw"
+
+Adding service with name 'el-2-geth-lighthouse' and image 'ethereum/client-go:latest'
+Service 'el-2-geth-lighthouse' added with service UUID '5aa6d3de49474bd88ce5f005ab7a01df'
+
+Waiting for at most '15m0s' for service 'el-2-geth-lighthouse' to reach a certain state
+Wait took 1 tries (118.412212ms in total). Assertion passed with following:
+Request had response code '200' and body "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"id\":\"e94cb784068477aaf895ba64961fcd58ea3883f95efc479462d74b499585d630\",\"name\":\"Geth/v1.14.12-unstable-a5fe7353-20241021/linux-amd64/go1.23.2\",\"enode\":\"enode://54f36aabb668b33467d4ef753369167abd7232c1c97777ee084e41af010d6a5d0781e7d90ff64484e2964a69710fbeeb702e5124bda080a0056d673d6cd802e1@172.23.208.176:30303\",\"enr\":\"enr:-Ke4QALiOR-fVmgMqFn7AhOjVLqQxziIm7OV9_kyUR_HocenMorQahFIMJ-_tjuBSTIxvfsaGGkFVLnhWVNme2BBGUKGAZMwSY5Wg2V0aMvKhFN23uuEZzpMFoJpZIJ2NIJpcISsF9CwiXNlY3AyNTZrMaEDVPNqq7ZoszRn1O91M2kWer1yMsHJd3fuCE5BrwENal2Ec25hcMCDdGNwgnZfg3VkcIJ2Xw\",\"ip\":\"172.23.208.176\",\"ports\":{\"discovery\":30303,\"listener\":30303},\"listenAddr\":\"[::]:30303\",\"protocols\":{\"eth\":{\"network\":3151908,\"difficulty\":1,\"genesis\":\"0xd811c280610428f21157f93eeec2b46ad1d5b70f0487e721a1a98047042fe509\",\"config\":{\"chainId\":3151908,\"homesteadBlock\":0,\"eip150Block\":0,\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"berlinBlock\":0,\"londonBlock\":0,\"mergeNetsplitBlock\":0,\"shanghaiTime\":0,\"cancunTime\":0,\"pragueTime\":1731873814,\"terminalTotalDifficulty\":0,\"terminalTotalDifficultyPassed\":true,\"depositContractAddress\":\"0x4242424242424242424242424242424242424242\"},\"head\":\"0xd811c280610428f21157f93eeec2b46ad1d5b70f0487e721a1a98047042fe509\"},\"snap\":{}}}}\n", with extracted fields:
+'extract.enode': "enode://54f36aabb668b33467d4ef753369167abd7232c1c97777ee084e41af010d6a5d0781e7d90ff64484e2964a69710fbeeb702e5124bda080a0056d673d6cd802e1@172.23.208.176:30303"
+'extract.enr': "enr:-Ke4QALiOR-fVmgMqFn7AhOjVLqQxziIm7OV9_kyUR_HocenMorQahFIMJ-_tjuBSTIxvfsaGGkFVLnhWVNme2BBGUKGAZMwSY5Wg2V0aMvKhFN23uuEZzpMFoJpZIJ2NIJpcISsF9CwiXNlY3AyNTZrMaEDVPNqq7ZoszRn1O91M2kWer1yMsHJd3fuCE5BrwENal2Ec25hcMCDdGNwgnZfg3VkcIJ2Xw"
+
+Adding service with name 'el-3-geth-lighthouse' and image 'ethereum/client-go:latest'
+Service 'el-3-geth-lighthouse' added with service UUID '926f5d9c5fb04669ab3aec8308d61fad'
+
+Waiting for at most '15m0s' for service 'el-3-geth-lighthouse' to reach a certain state
+Wait took 1 tries (207.695578ms in total). Assertion passed with following:
+Request had response code '200' and body "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"id\":\"8b3a92ae9b44f4ba6a67c3288f3adaf7757e04fe2694fabc860df81e4a68584a\",\"name\":\"Geth/v1.14.12-unstable-a5fe7353-20241021/linux-amd64/go1.23.2\",\"enode\":\"enode://ca2a4a879c55fc7ec7d417a7b6fcf50ac282a5739e317b735889ac8a2cfac740270cf7fd1ea4f1df39e73af28e53d696b2084edd3565afd5028af7b23c6e2727@172.23.75.165:30303\",\"enr\":\"enr:-Ke4QNGK3C2pmo6EyiEE4-hXnIlPS0ee8_yU4QKhdlvT-yzuZiCJIMCkp03W96bcUO3NDIYhEAIIh5YGcRf0DKPhTriGAZMwSa7Eg2V0aMvKhFN23uuEZzpMFoJpZIJ2NIJpcISsF0uliXNlY3AyNTZrMaEDyipKh5xV_H7H1Bentvz1CsKCpXOeMXtzWImsiiz6x0CEc25hcMCDdGNwgnZfg3VkcIJ2Xw\",\"ip\":\"172.23.75.165\",\"ports\":{\"discovery\":30303,\"listener\":30303},\"listenAddr\":\"[::]:30303\",\"protocols\":{\"eth\":{\"network\":3151908,\"difficulty\":1,\"genesis\":\"0xd811c280610428f21157f93eeec2b46ad1d5b70f0487e721a1a98047042fe509\",\"config\":{\"chainId\":3151908,\"homesteadBlock\":0,\"eip150Block\":0,\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"berlinBlock\":0,\"londonBlock\":0,\"mergeNetsplitBlock\":0,\"shanghaiTime\":0,\"cancunTime\":0,\"pragueTime\":1731873814,\"terminalTotalDifficulty\":0,\"terminalTotalDifficultyPassed\":true,\"depositContractAddress\":\"0x4242424242424242424242424242424242424242\"},\"head\":\"0xd811c280610428f21157f93eeec2b46ad1d5b70f0487e721a1a98047042fe509\"},\"snap\":{}}}}\n", with extracted fields:
+'extract.enode': "enode://ca2a4a879c55fc7ec7d417a7b6fcf50ac282a5739e317b735889ac8a2cfac740270cf7fd1ea4f1df39e73af28e53d696b2084edd3565afd5028af7b23c6e2727@172.23.75.165:30303"
+'extract.enr': "enr:-Ke4QNGK3C2pmo6EyiEE4-hXnIlPS0ee8_yU4QKhdlvT-yzuZiCJIMCkp03W96bcUO3NDIYhEAIIh5YGcRf0DKPhTriGAZMwSa7Eg2V0aMvKhFN23uuEZzpMFoJpZIJ2NIJpcISsF0uliXNlY3AyNTZrMaEDyipKh5xV_H7H1Bentvz1CsKCpXOeMXtzWImsiiz6x0CEc25hcMCDdGNwgnZfg3VkcIJ2Xw"
+
+Printing a message
+Successfully added 3 EL participants
+
+Printing a message
+Launching CL network
+
+Adding service with name 'cl-1-lighthouse-geth' and image 'sigp/lighthouse:v5.3.0'
+Service 'cl-1-lighthouse-geth' added with service UUID '745c1c7309a440958091718a545e774e'
+
+Running 'GET' request on service 'cl-1-lighthouse-geth'
+Request had response code '200' and body "{\"data\":{\"peer_id\":\"16Uiu2HAm6aKgA3qYYCZJGJtoLGQ7jo6G9oPi7BpCHy1CUyExcyrs\",\"enr\":\"enr:-MS4QFOhz7hgi8jxl-0qusvbFDJhT3TBPp0U6-mZ3DqVzZx5QUUiSdofx4IwxwUIQWhjwQ4sbCK3yx3s6c6H-Yd_fQcDh2F0dG5ldHOIABgAAAAAAACEZXRoMpABzFWtYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXfm2EcXVpY4IjKYlzZWNwMjU2azGhAqWn01jVLDbibdvd_ifzJ1QbR1YBI7Jn6nnOI_gRlDq0iHN5bmNuZXRzAIN0Y3CCIyiDdWRwgiMo\",\"p2p_addresses\":[\"/ip4/172.23.126.109/tcp/9000/p2p/16Uiu2HAm6aKgA3qYYCZJGJtoLGQ7jo6G9oPi7BpCHy1CUyExcyrs\"],\"discovery_addresses\":[\"/ip4/172.23.126.109/udp/9000/p2p/16Uiu2HAm6aKgA3qYYCZJGJtoLGQ7jo6G9oPi7BpCHy1CUyExcyrs\"],\"metadata\":{\"seq_number\":\"2\",\"attnets\":\"0x0018000000000000\",\"syncnets\":\"0x00\"}}}", with extracted fields:
+'extract.multiaddr': "/ip4/172.23.126.109/tcp/9000/p2p/16Uiu2HAm6aKgA3qYYCZJGJtoLGQ7jo6G9oPi7BpCHy1CUyExcyrs"
+'extract.peer_id': "16Uiu2HAm6aKgA3qYYCZJGJtoLGQ7jo6G9oPi7BpCHy1CUyExcyrs"
+'extract.enr': "enr:-MS4QFOhz7hgi8jxl-0qusvbFDJhT3TBPp0U6-mZ3DqVzZx5QUUiSdofx4IwxwUIQWhjwQ4sbCK3yx3s6c6H-Yd_fQcDh2F0dG5ldHOIABgAAAAAAACEZXRoMpABzFWtYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXfm2EcXVpY4IjKYlzZWNwMjU2azGhAqWn01jVLDbibdvd_ifzJ1QbR1YBI7Jn6nnOI_gRlDq0iHN5bmNuZXRzAIN0Y3CCIyiDdWRwgiMo"
+
+Adding service with name 'cl-2-lighthouse-geth' and image 'sigp/lighthouse:v5.3.0'
+Service 'cl-2-lighthouse-geth' added with service UUID 'd588b586dfcd4a6db576785085bedb82'
+
+Running 'GET' request on service 'cl-2-lighthouse-geth'
+Request had response code '200' and body "{\"data\":{\"peer_id\":\"16Uiu2HAkvfDatZqC2gpSTMJRTUfauFp1piv8vkVjLAijV79qrmB1\",\"enr\":\"enr:-MS4QLa7bKUWcR0qbxjtGoM6sUhluBbwRWFdSp3ze7AJkhjkb0jCpoUNvpyXpCCZ6WNUb4H7hIZM4_guWdsE_qsn8MwDh2F0dG5ldHOIgAEAAAAAAACEZXRoMpABzFWtYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXgoaEcXVpY4IjKYlzZWNwMjU2azGhAhJT-TRoRuzHc2YN530-Q39s-cZvPP8QhvxDoUUDOOGciHN5bmNuZXRzAIN0Y3CCIyiDdWRwgiMo\",\"p2p_addresses\":[\"/ip4/172.23.130.134/tcp/9000/p2p/16Uiu2HAkvfDatZqC2gpSTMJRTUfauFp1piv8vkVjLAijV79qrmB1\"],\"discovery_addresses\":[\"/ip4/172.23.130.134/udp/9000/p2p/16Uiu2HAkvfDatZqC2gpSTMJRTUfauFp1piv8vkVjLAijV79qrmB1\"],\"metadata\":{\"seq_number\":\"2\",\"attnets\":\"0x8001000000000000\",\"syncnets\":\"0x00\"}}}", with extracted fields:
+'extract.enr': "enr:-MS4QLa7bKUWcR0qbxjtGoM6sUhluBbwRWFdSp3ze7AJkhjkb0jCpoUNvpyXpCCZ6WNUb4H7hIZM4_guWdsE_qsn8MwDh2F0dG5ldHOIgAEAAAAAAACEZXRoMpABzFWtYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXgoaEcXVpY4IjKYlzZWNwMjU2azGhAhJT-TRoRuzHc2YN530-Q39s-cZvPP8QhvxDoUUDOOGciHN5bmNuZXRzAIN0Y3CCIyiDdWRwgiMo"
+'extract.multiaddr': "/ip4/172.23.130.134/tcp/9000/p2p/16Uiu2HAkvfDatZqC2gpSTMJRTUfauFp1piv8vkVjLAijV79qrmB1"
+'extract.peer_id': "16Uiu2HAkvfDatZqC2gpSTMJRTUfauFp1piv8vkVjLAijV79qrmB1"
+
+Adding service with name 'cl-3-lighthouse-geth' and image 'sigp/lighthouse:v5.3.0'
+Service 'cl-3-lighthouse-geth' added with service UUID 'daad1a64a71a45a6bb70c00268f29eaf'
+
+Running 'GET' request on service 'cl-3-lighthouse-geth'
+Request had response code '200' and body "{\"data\":{\"peer_id\":\"16Uiu2HAm1L8itFxCXNgvbZMFiWtBbos5ZubJzTaZb7CnEPrTnk25\",\"enr\":\"enr:-MS4QLDxyLlOJTi462vgHatspSYNMWhU3EQQm6tHL7FNKFqcBPqG0gCD7E1enixyB7CbGx0fPZpfUQ-c3Pls0sRpLJ8Dh2F0dG5ldHOIAAAAAAAAAwCEZXRoMpABzFWtYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXGB2EcXVpY4IjKYlzZWNwMjU2azGhAle64AN01aoX_eQBgYJSK6LddW2VAbyPvA9710kXlUqSiHN5bmNuZXRzAIN0Y3CCIyiDdWRwgiMo\",\"p2p_addresses\":[\"/ip4/172.23.24.29/tcp/9000/p2p/16Uiu2HAm1L8itFxCXNgvbZMFiWtBbos5ZubJzTaZb7CnEPrTnk25\"],\"discovery_addresses\":[\"/ip4/172.23.24.29/udp/9000/p2p/16Uiu2HAm1L8itFxCXNgvbZMFiWtBbos5ZubJzTaZb7CnEPrTnk25\"],\"metadata\":{\"seq_number\":\"2\",\"attnets\":\"0x0000000000000300\",\"syncnets\":\"0x00\"}}}", with extracted fields:
+'extract.enr': "enr:-MS4QLDxyLlOJTi462vgHatspSYNMWhU3EQQm6tHL7FNKFqcBPqG0gCD7E1enixyB7CbGx0fPZpfUQ-c3Pls0sRpLJ8Dh2F0dG5ldHOIAAAAAAAAAwCEZXRoMpABzFWtYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXGB2EcXVpY4IjKYlzZWNwMjU2azGhAle64AN01aoX_eQBgYJSK6LddW2VAbyPvA9710kXlUqSiHN5bmNuZXRzAIN0Y3CCIyiDdWRwgiMo"
+'extract.multiaddr': "/ip4/172.23.24.29/tcp/9000/p2p/16Uiu2HAm1L8itFxCXNgvbZMFiWtBbos5ZubJzTaZb7CnEPrTnk25"
+'extract.peer_id': "16Uiu2HAm1L8itFxCXNgvbZMFiWtBbos5ZubJzTaZb7CnEPrTnk25"
+
+Printing a message
+Successfully added 3 CL participants
+
+Printing a message
+Start adding validators for participant #1
+
+Printing a message
+Using separate validator client for participant #1
+
+Adding service with name 'vc-1-geth-lighthouse' and image 'sigp/lighthouse:v5.3.0'
+Service 'vc-1-geth-lighthouse' added with service UUID '63dee6c8398d427fb001f2e3cab78215'
+
+Printing a message
+Successfully added 3 CL participants
+
+Printing a message
+Start adding validators for participant #2
+
+Printing a message
+Using separate validator client for participant #2
+
+Adding service with name 'vc-2-geth-lighthouse' and image 'sigp/lighthouse:v5.3.0'
+Service 'vc-2-geth-lighthouse' added with service UUID 'affe18a4dffc4a5d90c84288402c0a62'
+
+Printing a message
+Successfully added 3 CL participants
+
+Printing a message
+Start adding validators for participant #3
+
+Printing a message
+Using separate validator client for participant #3
+
+Adding service with name 'vc-3-geth-lighthouse' and image 'sigp/lighthouse:v5.3.0'
+Service 'vc-3-geth-lighthouse' added with service UUID '65621ae481bf4ba2a871b074379b4a93'
+
+Printing a message
+NODE JSON RPC URI: '172.23.70.252:8545'
+
+Rendering a template to a files artifact with name 'validator-ranges'
+Templates artifact name 'validator-ranges' rendered with artifact UUID 'fcaab56ba4dc4daeb0500b6e662b29b6'
+
+Starlark code successfully run. Output was:
+{
+	"all_participants": [
+		{
+			"cl_context": {
+				"beacon_grpc_url": "",
+				"beacon_http_url": "http://172.23.126.109:4000",
+				"beacon_service_name": "cl-1-lighthouse-geth",
+				"cl_nodes_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "cl-1-lighthouse-geth",
+						"path": "/metrics",
+						"url": "172.23.126.109:5054"
+					}
+				],
+				"client_name": "lighthouse",
+				"enr": "enr:-MS4QFOhz7hgi8jxl-0qusvbFDJhT3TBPp0U6-mZ3DqVzZx5QUUiSdofx4IwxwUIQWhjwQ4sbCK3yx3s6c6H-Yd_fQcDh2F0dG5ldHOIABgAAAAAAACEZXRoMpABzFWtYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXfm2EcXVpY4IjKYlzZWNwMjU2azGhAqWn01jVLDbibdvd_ifzJ1QbR1YBI7Jn6nnOI_gRlDq0iHN5bmNuZXRzAIN0Y3CCIyiDdWRwgiMo",
+				"http_port": 4000,
+				"ip_addr": "172.23.126.109",
+				"multiaddr": "/ip4/172.23.126.109/tcp/9000/p2p/16Uiu2HAm6aKgA3qYYCZJGJtoLGQ7jo6G9oPi7BpCHy1CUyExcyrs",
+				"peer_id": "16Uiu2HAm6aKgA3qYYCZJGJtoLGQ7jo6G9oPi7BpCHy1CUyExcyrs",
+				"snooper_enabled": false,
+				"snooper_engine_context": null,
+				"supernode": false,
+				"validator_keystore_files_artifact_uuid": "1-lighthouse-geth-0-63-0"
+			},
+			"cl_type": "lighthouse",
+			"el_context": {
+				"client_name": "geth",
+				"el_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "el-1-geth-lighthouse",
+						"path": "/debug/metrics/prometheus",
+						"url": "172.23.70.252:9001"
+					}
+				],
+				"engine_rpc_port_num": 8551,
+				"enode": "enode://c818f266b587c97869b11d86d0e71b99e39f6f33947d32d22e222ac578406b983a00165a07951e04f2c4656eebb097ad8ef173be4f265ccf371f18ab2708830f@172.23.70.252:30303",
+				"enr": "enr:-Ke4QOPGEwfl_l-EF1XtfVMZfntdNRrNSIIxPltOnDj1MVq6Bon5K06lZh42c-87OETRO5gaggbLGzs2VGwV2tFbPcGGAZMwSVxUg2V0aMvKhFN23uuEZzpMFoJpZIJ2NIJpcISsF0b8iXNlY3AyNTZrMaEDyBjyZrWHyXhpsR2G0OcbmeOfbzOUfTLSLiIqxXhAa5iEc25hcMCDdGNwgnZfg3VkcIJ2Xw",
+				"ip_addr": "172.23.70.252",
+				"rpc_http_url": "http://172.23.70.252:8545",
+				"rpc_port_num": 8545,
+				"service_name": "el-1-geth-lighthouse",
+				"ws_port_num": 8546,
+				"ws_url": "ws://172.23.70.252:8546"
+			},
+			"el_type": "geth",
+			"ethereum_metrics_exporter_context": null,
+			"remote_signer_context": null,
+			"remote_signer_type": "web3signer",
+			"snooper_beacon_context": null,
+			"snooper_engine_context": null,
+			"vc_context": {
+				"client_name": "lighthouse",
+				"metrics_info": {
+					"config": {
+						"labels": {},
+						"scrape_interval": "15s"
+					},
+					"name": "vc-1-geth-lighthouse",
+					"path": "/metrics",
+					"url": "172.23.106.102:8080"
+				},
+				"service_name": "vc-1-geth-lighthouse"
+			},
+			"vc_type": "lighthouse",
+			"xatu_sentry_context": null
+		},
+		{
+			"cl_context": {
+				"beacon_grpc_url": "",
+				"beacon_http_url": "http://172.23.130.134:4000",
+				"beacon_service_name": "cl-2-lighthouse-geth",
+				"cl_nodes_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "cl-2-lighthouse-geth",
+						"path": "/metrics",
+						"url": "172.23.130.134:5054"
+					}
+				],
+				"client_name": "lighthouse",
+				"enr": "enr:-MS4QLa7bKUWcR0qbxjtGoM6sUhluBbwRWFdSp3ze7AJkhjkb0jCpoUNvpyXpCCZ6WNUb4H7hIZM4_guWdsE_qsn8MwDh2F0dG5ldHOIgAEAAAAAAACEZXRoMpABzFWtYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXgoaEcXVpY4IjKYlzZWNwMjU2azGhAhJT-TRoRuzHc2YN530-Q39s-cZvPP8QhvxDoUUDOOGciHN5bmNuZXRzAIN0Y3CCIyiDdWRwgiMo",
+				"http_port": 4000,
+				"ip_addr": "172.23.130.134",
+				"multiaddr": "/ip4/172.23.130.134/tcp/9000/p2p/16Uiu2HAkvfDatZqC2gpSTMJRTUfauFp1piv8vkVjLAijV79qrmB1",
+				"peer_id": "16Uiu2HAkvfDatZqC2gpSTMJRTUfauFp1piv8vkVjLAijV79qrmB1",
+				"snooper_enabled": false,
+				"snooper_engine_context": null,
+				"supernode": false,
+				"validator_keystore_files_artifact_uuid": "2-lighthouse-geth-64-127-0"
+			},
+			"cl_type": "lighthouse",
+			"el_context": {
+				"client_name": "geth",
+				"el_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "el-2-geth-lighthouse",
+						"path": "/debug/metrics/prometheus",
+						"url": "172.23.208.176:9001"
+					}
+				],
+				"engine_rpc_port_num": 8551,
+				"enode": "enode://54f36aabb668b33467d4ef753369167abd7232c1c97777ee084e41af010d6a5d0781e7d90ff64484e2964a69710fbeeb702e5124bda080a0056d673d6cd802e1@172.23.208.176:30303",
+				"enr": "enr:-Ke4QALiOR-fVmgMqFn7AhOjVLqQxziIm7OV9_kyUR_HocenMorQahFIMJ-_tjuBSTIxvfsaGGkFVLnhWVNme2BBGUKGAZMwSY5Wg2V0aMvKhFN23uuEZzpMFoJpZIJ2NIJpcISsF9CwiXNlY3AyNTZrMaEDVPNqq7ZoszRn1O91M2kWer1yMsHJd3fuCE5BrwENal2Ec25hcMCDdGNwgnZfg3VkcIJ2Xw",
+				"ip_addr": "172.23.208.176",
+				"rpc_http_url": "http://172.23.208.176:8545",
+				"rpc_port_num": 8545,
+				"service_name": "el-2-geth-lighthouse",
+				"ws_port_num": 8546,
+				"ws_url": "ws://172.23.208.176:8546"
+			},
+			"el_type": "geth",
+			"ethereum_metrics_exporter_context": null,
+			"remote_signer_context": null,
+			"remote_signer_type": "web3signer",
+			"snooper_beacon_context": null,
+			"snooper_engine_context": null,
+			"vc_context": {
+				"client_name": "lighthouse",
+				"metrics_info": {
+					"config": {
+						"labels": {},
+						"scrape_interval": "15s"
+					},
+					"name": "vc-2-geth-lighthouse",
+					"path": "/metrics",
+					"url": "172.23.111.42:8080"
+				},
+				"service_name": "vc-2-geth-lighthouse"
+			},
+			"vc_type": "lighthouse",
+			"xatu_sentry_context": null
+		},
+		{
+			"cl_context": {
+				"beacon_grpc_url": "",
+				"beacon_http_url": "http://172.23.24.29:4000",
+				"beacon_service_name": "cl-3-lighthouse-geth",
+				"cl_nodes_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "cl-3-lighthouse-geth",
+						"path": "/metrics",
+						"url": "172.23.24.29:5054"
+					}
+				],
+				"client_name": "lighthouse",
+				"enr": "enr:-MS4QLDxyLlOJTi462vgHatspSYNMWhU3EQQm6tHL7FNKFqcBPqG0gCD7E1enixyB7CbGx0fPZpfUQ-c3Pls0sRpLJ8Dh2F0dG5ldHOIAAAAAAAAAwCEZXRoMpABzFWtYAAAOPQBAAAAAAAAgmlkgnY0gmlwhKwXGB2EcXVpY4IjKYlzZWNwMjU2azGhAle64AN01aoX_eQBgYJSK6LddW2VAbyPvA9710kXlUqSiHN5bmNuZXRzAIN0Y3CCIyiDdWRwgiMo",
+				"http_port": 4000,
+				"ip_addr": "172.23.24.29",
+				"multiaddr": "/ip4/172.23.24.29/tcp/9000/p2p/16Uiu2HAm1L8itFxCXNgvbZMFiWtBbos5ZubJzTaZb7CnEPrTnk25",
+				"peer_id": "16Uiu2HAm1L8itFxCXNgvbZMFiWtBbos5ZubJzTaZb7CnEPrTnk25",
+				"snooper_enabled": false,
+				"snooper_engine_context": null,
+				"supernode": false,
+				"validator_keystore_files_artifact_uuid": "3-lighthouse-geth-128-191-0"
+			},
+			"cl_type": "lighthouse",
+			"el_context": {
+				"client_name": "geth",
+				"el_metrics_info": [
+					{
+						"config": {
+							"labels": {},
+							"scrape_interval": "15s"
+						},
+						"name": "el-3-geth-lighthouse",
+						"path": "/debug/metrics/prometheus",
+						"url": "172.23.75.165:9001"
+					}
+				],
+				"engine_rpc_port_num": 8551,
+				"enode": "enode://ca2a4a879c55fc7ec7d417a7b6fcf50ac282a5739e317b735889ac8a2cfac740270cf7fd1ea4f1df39e73af28e53d696b2084edd3565afd5028af7b23c6e2727@172.23.75.165:30303",
+				"enr": "enr:-Ke4QNGK3C2pmo6EyiEE4-hXnIlPS0ee8_yU4QKhdlvT-yzuZiCJIMCkp03W96bcUO3NDIYhEAIIh5YGcRf0DKPhTriGAZMwSa7Eg2V0aMvKhFN23uuEZzpMFoJpZIJ2NIJpcISsF0uliXNlY3AyNTZrMaEDyipKh5xV_H7H1Bentvz1CsKCpXOeMXtzWImsiiz6x0CEc25hcMCDdGNwgnZfg3VkcIJ2Xw",
+				"ip_addr": "172.23.75.165",
+				"rpc_http_url": "http://172.23.75.165:8545",
+				"rpc_port_num": 8545,
+				"service_name": "el-3-geth-lighthouse",
+				"ws_port_num": 8546,
+				"ws_url": "ws://172.23.75.165:8546"
+			},
+			"el_type": "geth",
+			"ethereum_metrics_exporter_context": null,
+			"remote_signer_context": null,
+			"remote_signer_type": "web3signer",
+			"snooper_beacon_context": null,
+			"snooper_engine_context": null,
+			"vc_context": {
+				"client_name": "lighthouse",
+				"metrics_info": {
+					"config": {
+						"labels": {},
+						"scrape_interval": "15s"
+					},
+					"name": "vc-3-geth-lighthouse",
+					"path": "/metrics",
+					"url": "172.23.25.255:8080"
+				},
+				"service_name": "vc-3-geth-lighthouse"
+			},
+			"vc_type": "lighthouse",
+			"xatu_sentry_context": null
+		}
+	],
+	"final_genesis_timestamp": "1731681814",
+	"genesis_validators_root": "0xa63a1b2ffefb0fea452e9ad530c9a4bbd58c97c6ad82da001f142be64c91d61b",
+	"network_id": "3151908",
+	"network_params": {
+		"additional_preloaded_contracts": {},
+		"churn_limit_quotient": 65536,
+		"custody_requirement": 4,
+		"data_column_sidecar_subnet_count": 128,
+		"deneb_fork_epoch": 0,
+		"deposit_contract_address": "0x4242424242424242424242424242424242424242",
+		"devnet_repo": "ethpandaops",
+		"eip7594_fork_epoch": 100000002,
+		"eip7594_fork_version": "0x60000038",
+		"ejection_balance": 16000000000,
+		"electra_fork_epoch": 500,
+		"eth1_follow_distance": 2048,
+		"fulu_fork_epoch": 100000001,
+		"genesis_delay": 20,
+		"genesis_gaslimit": 30000000,
+		"max_blobs_per_block": 6,
+		"max_per_epoch_activation_churn_limit": 8,
+		"min_validator_withdrawability_delay": 256,
+		"network": "kurtosis",
+		"network_id": "3151908",
+		"network_sync_base_url": "https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/",
+		"num_validator_keys_per_node": 64,
+		"prefunded_accounts": {},
+		"preregistered_validator_count": 0,
+		"preregistered_validator_keys_mnemonic": "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete",
+		"preset": "mainnet",
+		"samples_per_slot": 8,
+		"seconds_per_slot": 12,
+		"shard_committee_period": 1
+	},
+	"pre_funded_accounts": [
+		{
+			"address": "0x8943545177806ED17B9F23F0a21ee5948eCaa776",
+			"private_key": "bcdf20249abf0ed6d944c0288fad489e33f66b3960d9e6229c1cd214ed3bbe31"
+		},
+		{
+			"address": "0xE25583099BA105D9ec0A67f5Ae86D90e50036425",
+			"private_key": "39725efee3fb28614de3bacaffe4cc4bd8c436257e2c8bb887c4b5c4be45e76d"
+		},
+		{
+			"address": "0x614561D2d143621E126e87831AEF287678B442b8",
+			"private_key": "53321db7c1e331d93a11a41d16f004d7ff63972ec8ec7c25db329728ceeb1710"
+		},
+		{
+			"address": "0xf93Ee4Cf8c6c40b329b0c0626F28333c132CF241",
+			"private_key": "ab63b23eb7941c1251757e24b3d2350d2bc05c3c388d06f8fe6feafefb1e8c70"
+		},
+		{
+			"address": "0x802dCbE1B1A97554B4F50DB5119E37E8e7336417",
+			"private_key": "5d2344259f42259f82d2c140aa66102ba89b57b4883ee441a8b312622bd42491"
+		},
+		{
+			"address": "0xAe95d8DA9244C37CaC0a3e16BA966a8e852Bb6D6",
+			"private_key": "27515f805127bebad2fb9b183508bdacb8c763da16f54e0678b16e8f28ef3fff"
+		},
+		{
+			"address": "0x2c57d1CFC6d5f8E4182a56b4cf75421472eBAEa4",
+			"private_key": "7ff1a4c1d57e5e784d327c4c7651e952350bc271f156afb3d00d20f5ef924856"
+		},
+		{
+			"address": "0x741bFE4802cE1C4b5b00F9Df2F5f179A1C89171A",
+			"private_key": "3a91003acaf4c21b3953d94fa4a6db694fa69e5242b2e37be05dd82761058899"
+		},
+		{
+			"address": "0xc3913d4D8bAb4914328651C2EAE817C8b78E1f4c",
+			"private_key": "bb1d0f125b4fb2bb173c318cdead45468474ca71474e2247776b2b4c0fa2d3f5"
+		},
+		{
+			"address": "0x65D08a056c17Ae13370565B04cF77D2AfA1cB9FA",
+			"private_key": "850643a0224065ecce3882673c21f56bcf6eef86274cc21cadff15930b59fc8c"
+		},
+		{
+			"address": "0x3e95dFbBaF6B348396E6674C7871546dCC568e56",
+			"private_key": "94eb3102993b41ec55c241060f47daa0f6372e2e3ad7e91612ae36c364042e44"
+		},
+		{
+			"address": "0x5918b2e647464d4743601a865753e64C8059Dc4F",
+			"private_key": "daf15504c22a352648a71ef2926334fe040ac1d5005019e09f6c979808024dc7"
+		},
+		{
+			"address": "0x589A698b7b7dA0Bec545177D3963A2741105C7C9",
+			"private_key": "eaba42282ad33c8ef2524f07277c03a776d98ae19f581990ce75becb7cfa1c23"
+		},
+		{
+			"address": "0x4d1CB4eB7969f8806E2CaAc0cbbB71f88C8ec413",
+			"private_key": "3fd98b5187bf6526734efaa644ffbb4e3670d66f5d0268ce0323ec09124bff61"
+		},
+		{
+			"address": "0xF5504cE2BcC52614F121aff9b93b2001d92715CA",
+			"private_key": "5288e2f440c7f0cb61a9be8afdeb4295f786383f96f5e35eb0c94ef103996b64"
+		},
+		{
+			"address": "0xF61E98E7D47aB884C244E39E031978E33162ff4b",
+			"private_key": "f296c7802555da2a5a662be70e078cbd38b44f96f8615ae529da41122ce8db05"
+		},
+		{
+			"address": "0xf1424826861ffbbD25405F5145B5E50d0F1bFc90",
+			"private_key": "bf3beef3bd999ba9f2451e06936f0423cd62b815c9233dd3bc90f7e02a1e8673"
+		},
+		{
+			"address": "0xfDCe42116f541fc8f7b0776e2B30832bD5621C85",
+			"private_key": "6ecadc396415970e91293726c3f5775225440ea0844ae5616135fd10d66b5954"
+		},
+		{
+			"address": "0xD9211042f35968820A3407ac3d80C725f8F75c14",
+			"private_key": "a492823c3e193d6c595f37a18e3c06650cf4c74558cc818b16130b293716106f"
+		},
+		{
+			"address": "0xD8F3183DEF51A987222D845be228e0Bbb932C222",
+			"private_key": "c5114526e042343c6d1899cad05e1c00ba588314de9b96929914ee0df18d46b2"
+		},
+		{
+			"address": "0xafF0CA253b97e54440965855cec0A8a2E2399896",
+			"private_key": "4b9f63ecf84210c5366c66d68fa1f5da1fa4f634fad6dfc86178e4d79ff9e59"
+		}
+	]
+}
+
+⭐ us on GitHub - https://github.com/kurtosis-tech/kurtosis
+[36mINFO[0m[2024-11-15T15:45:39+01:00] ================================================================= 
+[36mINFO[0m[2024-11-15T15:45:39+01:00] ||          Created enclave: kurtosis-geth-lighthouse          || 
+[36mINFO[0m[2024-11-15T15:45:39+01:00] ================================================================= 
+Name:            kurtosis-geth-lighthouse
+UUID:            a6afd25bcadf
+Status:          RUNNING
+Creation Time:   Fri, 15 Nov 2024 15:42:37 CET
+Flags:           
+
+========================================= Files Artifacts =========================================
+UUID           Name
+dae84b3668e3   1-lighthouse-geth-0-63-0
+f77c7399229a   2-lighthouse-geth-64-127-0
+6ff597c3750a   3-lighthouse-geth-128-191-0
+8afb071560d1   el_cl_genesis_data
+2e65484e996f   final-genesis-timestamp
+63d131e75ea8   genesis-el-cl-env-file
+c842005d7a38   genesis_validators_root
+ba818665038e   jwt_file
+6df83de14812   keymanager_file
+690478d56b7d   prysm-password
+fcaab56ba4dc   validator-ranges
+
+========================================== User Services ==========================================
+UUID           Name                                             Ports                                         Status
+745c1c7309a4   cl-1-lighthouse-geth                             http: 4000/tcp -> http://127.0.0.1:57849      RUNNING
+                                                                metrics: 5054/tcp -> http://127.0.0.1:57850   
+                                                                tcp-discovery: 9000/tcp -> 127.0.0.1:57851    
+                                                                udp-discovery: 9000/udp                       
+d588b586dfcd   cl-2-lighthouse-geth                             http: 4000/tcp -> http://127.0.0.1:57845      RUNNING
+                                                                metrics: 5054/tcp -> http://127.0.0.1:57846   
+                                                                tcp-discovery: 9000/tcp -> 127.0.0.1:57847    
+                                                                udp-discovery: 9000/udp                       
+daad1a64a71a   cl-3-lighthouse-geth                             http: 4000/tcp -> http://127.0.0.1:57858      RUNNING
+                                                                metrics: 5054/tcp -> http://127.0.0.1:57859   
+                                                                tcp-discovery: 9000/tcp -> 127.0.0.1:57860    
+                                                                udp-discovery: 9000/udp                       
+705c0dcce1a8   el-1-geth-lighthouse                             engine-rpc: 8551/tcp -> 127.0.0.1:57842       RUNNING
+                                                                metrics: 9001/tcp -> http://127.0.0.1:57840   
+                                                                rpc: 8545/tcp -> 127.0.0.1:57838              
+                                                                tcp-discovery: 30303/tcp -> 127.0.0.1:57841   
+                                                                udp-discovery: 30303/udp                      
+                                                                ws: 8546/tcp -> 127.0.0.1:57839               
+5aa6d3de4947   el-2-geth-lighthouse                             engine-rpc: 8551/tcp -> 127.0.0.1:57834       RUNNING
+                                                                metrics: 9001/tcp -> http://127.0.0.1:57832   
+                                                                rpc: 8545/tcp -> 127.0.0.1:57835              
+                                                                tcp-discovery: 30303/tcp -> 127.0.0.1:57833   
+                                                                udp-discovery: 30303/udp                      
+                                                                ws: 8546/tcp -> 127.0.0.1:57836               
+926f5d9c5fb0   el-3-geth-lighthouse                             engine-rpc: 8551/tcp -> 127.0.0.1:57864       RUNNING
+                                                                metrics: 9001/tcp -> http://127.0.0.1:57867   
+                                                                rpc: 8545/tcp -> 127.0.0.1:57865              
+                                                                tcp-discovery: 30303/tcp -> 127.0.0.1:57868   
+                                                                udp-discovery: 30303/udp                      
+                                                                ws: 8546/tcp -> 127.0.0.1:57866               
+30ef08bd0890   validator-key-generation-cl-validator-keystore   <none>                                        RUNNING
+63dee6c8398d   vc-1-geth-lighthouse                             metrics: 8080/tcp -> http://127.0.0.1:57862   RUNNING
+affe18a4dffc   vc-2-geth-lighthouse                             metrics: 8080/tcp -> http://127.0.0.1:57855   RUNNING
+65621ae481bf   vc-3-geth-lighthouse                             metrics: 8080/tcp -> http://127.0.0.1:57853   RUNNING
+
