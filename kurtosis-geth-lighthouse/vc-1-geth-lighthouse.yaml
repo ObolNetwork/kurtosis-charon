@@ -1,0 +1,184 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    cni.projectcalico.org/containerID: 9f435c748f15fd4798805d37678067313cba724eba5e3e35a95873db38c279ca
+    cni.projectcalico.org/podIP: 172.31.239.128/32
+    cni.projectcalico.org/podIPs: 172.31.239.128/32
+    kurtosistech.com/ports: metrics:8080/TCP/http-2m0s
+  creationTimestamp: "2024-11-15T14:46:21Z"
+  labels:
+    kurtosistech.com.custom/ethereum-package.client: lighthouse
+    kurtosistech.com.custom/ethereum-package.client-image: sigp-lighthouse_v5.3.0
+    kurtosistech.com.custom/ethereum-package.client-type: validator
+    kurtosistech.com.custom/ethereum-package.connected-client: lighthouse
+    kurtosistech.com.custom/ethereum-package.sha256: ""
+    kurtosistech.com/app-id: kurtosis
+    kurtosistech.com/enclave-id: a6afd25bcadf447d8ab555a222984163
+    kurtosistech.com/guid: 63dee6c8398d427fb001f2e3cab78215
+    kurtosistech.com/id: vc-1-geth-lighthouse
+    kurtosistech.com/resource-type: user-service
+  name: vc-1-geth-lighthouse
+  namespace: kt-kurtosis-geth-lighthouse
+  resourceVersion: "32447516"
+  uid: 84d8e326-3e6c-460b-8ad2-826d5cf7461a
+spec:
+  containers:
+  - args:
+    - lighthouse
+    - vc
+    - --debug-level=info
+    - --testnet-dir=/network-configs
+    - --validators-dir=/validator-keys/keys
+    - --secrets-dir=/validator-keys/secrets
+    - --init-slashing-protection
+    - --beacon-nodes=http://172.23.126.109:4000
+    - --suggested-fee-recipient=0x8943545177806ED17B9F23F0a21ee5948eCaa776
+    - --metrics
+    - --metrics-address=0.0.0.0
+    - --metrics-allow-origin=*
+    - --metrics-port=8080
+    - --graffiti=1-geth-lighthouse
+    env:
+    - name: RUST_BACKTRACE
+      value: full
+    image: sigp/lighthouse:v5.3.0
+    imagePullPolicy: IfNotPresent
+    name: user-service-container
+    ports:
+    - containerPort: 8080
+      name: metrics
+      protocol: TCP
+    resources: {}
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /network-configs
+      name: files-artifact-expansion
+      subPath: "0"
+    - mountPath: /validator-keys
+      name: files-artifact-expansion
+      subPath: "1"
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-8qzmf
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  initContainers:
+  - env:
+    - name: SERIALIZED_ARGS
+      value: '{"apiContainerIpAddress":"172.23.111.34","apiContainerPort":7443,"filesArtifactExpansions":[{"filesIdentifier":"el_cl_genesis_data","dirPathToExpandTo":"/files-artifacts/66514d8d443840f7bf485f2af0411e72"},{"filesIdentifier":"1-lighthouse-geth-0-63-0","dirPathToExpandTo":"/files-artifacts/1271f5c072144e188dbdbbd002c6a8ec"}]}'
+    image: kurtosistech/files-artifacts-expander:1.3.1
+    imagePullPolicy: IfNotPresent
+    name: files-artifact-expander
+    resources: {}
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /files-artifacts/66514d8d443840f7bf485f2af0411e72
+      name: files-artifact-expansion
+      subPath: "0"
+    - mountPath: /files-artifacts/1271f5c072144e188dbdbbd002c6a8ec
+      name: files-artifact-expansion
+      subPath: "1"
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-8qzmf
+      readOnly: true
+  nodeName: 10.233.131.196
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Never
+  schedulerName: default-scheduler
+  securityContext: {}
+  serviceAccount: default
+  serviceAccountName: default
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 120
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 120
+  volumes:
+  - emptyDir: {}
+    name: files-artifact-expansion
+  - name: kube-api-access-8qzmf
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-15T14:46:21Z"
+    status: "True"
+    type: PodReadyToStartContainers
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-15T14:46:21Z"
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-15T14:46:22Z"
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-15T14:46:22Z"
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2024-11-15T14:46:21Z"
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: containerd://e39947f5d38adf787d831eae1d71bebc576132768d9fcd897c6041fbba12cc7e
+    image: docker.io/sigp/lighthouse:v5.3.0
+    imageID: docker.io/sigp/lighthouse@sha256:f9b97e018d549a7fa8c742a6cb5b6c7d4780d1cdce707d823dd378aaf3dd34c5
+    lastState: {}
+    name: user-service-container
+    ready: true
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2024-11-15T14:46:22Z"
+  hostIP: 10.233.131.196
+  hostIPs:
+  - ip: 10.233.131.196
+  initContainerStatuses:
+  - containerID: containerd://9b7b6ef34c26b6eaabb9302b79821c6518e6b8ef31e5d82311cafb8e5800d8ef
+    image: docker.io/kurtosistech/files-artifacts-expander:1.3.1
+    imageID: docker.io/kurtosistech/files-artifacts-expander@sha256:2518bf2d828b47e84f7c7b7f8e28f4e315333e76c68ab78088b5276036e8d00a
+    lastState: {}
+    name: files-artifact-expander
+    ready: true
+    restartCount: 0
+    started: false
+    state:
+      terminated:
+        containerID: containerd://9b7b6ef34c26b6eaabb9302b79821c6518e6b8ef31e5d82311cafb8e5800d8ef
+        exitCode: 0
+        finishedAt: "2024-11-15T14:46:21Z"
+        reason: Completed
+        startedAt: "2024-11-15T14:46:21Z"
+  phase: Running
+  podIP: 172.31.239.128
+  podIPs:
+  - ip: 172.31.239.128
+  qosClass: BestEffort
+  startTime: "2024-11-15T14:46:21Z"
