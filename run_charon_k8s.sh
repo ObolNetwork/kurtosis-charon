@@ -55,8 +55,7 @@ extract_bn_ip() {
             enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-api-port=/ {print $2}')
         elif [[ $beaconClient == *"nimbus"* ]]; then
              enr_address=$(echo "$kurtosis_inspect_output" | awk -F '--nat=extip:' '{if (NF>1) print $2}' | awk '{print $1}' | cut -d' ' -f1)
-             enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}') + 3 ))
-             echo "STIPE TESTING HTTP PORT: $enr_address_port"
+             enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F '--rest-port=' '{if (NF>1) print $2}' | awk '{print $1}') + 3 ))
         elif [[ $beaconClient == *"prysm"* ]]; then
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-host-ip=/ {print $2}')
             enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}') + 4 ))
