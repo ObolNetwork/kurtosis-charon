@@ -370,9 +370,8 @@ services:
   # |_| |_| |_|\___/|_| |_|_|\__\___/|_|  |_|_| |_|\__, |
   #                                                |___/
   prometheus:
+    container_name: prometheus-${CL_NAME}
     image: prom/prometheus:${PROMETHEUS_VERSION:-v2.44.0}
-    ports:
-      - "${MONITORING_PORT_PROMETHEUS}"
     networks: [network1]
     volumes:
       - ./prometheus/prometheustmp.yml:/etc/prometheus/prometheus.yml
