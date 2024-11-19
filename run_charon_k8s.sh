@@ -237,21 +237,22 @@ fi
 echo "NETWORK_NAME=${CLUSTER_NAME}" >> ./.env
 ## Append the CL_NAME to the .env file
 echo "CL_NAME=${CL_NAME}" >> ./.env
-# Determine the prometheus port based on the CL_NAME
-if [ "$CL_NAME" == "teku" ]; then
-  MONITORING_PORT_PROMETHEUS="9090:9090"
-elif [ "$CL_NAME" == "lighthouse" ]; then
-  MONITORING_PORT_PROMETHEUS="9091:9091"
-elif [ "$CL_NAME" == "lodestar" ]; then
-  MONITORING_PORT_PROMETHEUS="9092:9092"
-elif [ "$CL_NAME" == "nimbus" ]; then
-  MONITORING_PORT_PROMETHEUS="9093:9093"
-else
-  MONITORING_PORT_PROMETHEUS="9094:9094"
-fi
+## Determine the prometheus port based on the CL_NAME
+# TODO: Remove all of this code
+#if [ "$CL_NAME" == "teku" ]; then
+#  MONITORING_PORT_PROMETHEUS="9090:9090"
+#elif [ "$CL_NAME" == "lighthouse" ]; then
+#  MONITORING_PORT_PROMETHEUS="9091:9091"
+#elif [ "$CL_NAME" == "lodestar" ]; then
+#  MONITORING_PORT_PROMETHEUS="9092:9092"
+#elif [ "$CL_NAME" == "nimbus" ]; then
+#  MONITORING_PORT_PROMETHEUS="9093:9093"
+#else
+#  MONITORING_PORT_PROMETHEUS="9094:9094"
+#fi
 
-# Append the prometheus port to the .env file
-echo "MONITORING_PORT_PROMETHEUS=${MONITORING_PORT_PROMETHEUS}" >> ./.env
+## Append the prometheus port to the .env file
+#echo "MONITORING_PORT_PROMETHEUS=${MONITORING_PORT_PROMETHEUS}" >> ./.env
 
 
 
