@@ -1,7 +1,7 @@
 x-node-base:
   # Pegged charon version (update this for each release).
   &node-base
-  image: obolnetwork/charon:latest
+  image: obolnetwork/charon:v1.2.0-rc1
   restart: unless-stopped
   networks: [network1]
   # network_mode: "host"
@@ -151,7 +151,7 @@ services:
       - ./testnet:/opt/lighthouse/network-configs
 
   vc0-teku:
-    image: consensys/teku:${TEKU_VERSION:-24.8}
+    image: consensys/teku:${TEKU_VERSION:-24.10.3}
     networks: [network1]
     # network_mode: "host"
     depends_on: [node0]
@@ -160,7 +160,6 @@ services:
       validator-client
       --beacon-node-api-endpoint="http://node0:3600"
       --config-file "/opt/charon/teku/teku-config.yaml"
-      --Xblock-v3-enabled true
       --validators-external-signer-slashing-protection-enabled true
       --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
       --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
@@ -172,7 +171,7 @@ services:
       - ./testnet/config.yaml:/opt/teku/config.yaml
 
   vc1-teku:
-    image: consensys/teku:${TEKU_VERSION:-24.8}
+    image: consensys/teku:${TEKU_VERSION:-24.10.3}
     networks: [network1]
     # network_mode: "host"
     depends_on: [node1]
@@ -181,7 +180,6 @@ services:
       validator-client
       --beacon-node-api-endpoint=http://node1:3600
       --config-file "/opt/charon/teku/teku-config.yaml"
-      --Xblock-v3-enabled true
       --validators-external-signer-slashing-protection-enabled true
       --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
       --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
@@ -193,7 +191,7 @@ services:
       - ./testnet/config.yaml:/opt/teku/config.yaml
 
   vc2-teku:
-    image: consensys/teku:${TEKU_VERSION:-24.8}
+    image: consensys/teku:${TEKU_VERSION:-24.10.3}
     networks: [network1]
     # network_mode: "host"
     depends_on: [node2]
@@ -202,7 +200,6 @@ services:
       validator-client
       --beacon-node-api-endpoint=http://node2:3600
       --config-file "/opt/charon/teku/teku-config.yaml"
-      --Xblock-v3-enabled true
       --validators-external-signer-slashing-protection-enabled true
       --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
       --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
@@ -253,7 +250,7 @@ services:
       - ./nimbus/run.sh:/home/user/data/run.sh
 
   vc0-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.20.2}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.23.0}
     depends_on: [node0]
     entrypoint: /opt/lodestar/run.sh
     networks: [network1]
@@ -270,7 +267,7 @@ services:
     restart: unless-stopped
 
   vc1-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.20.2}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.23.0}
     depends_on: [node1]
     entrypoint: /opt/lodestar/run.sh
     networks: [network1]
@@ -288,7 +285,7 @@ services:
     restart: unless-stopped
 
   vc2-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.20.2}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.23.0}
     depends_on: [node2]
     entrypoint: /opt/lodestar/run.sh
     networks: [network1]
