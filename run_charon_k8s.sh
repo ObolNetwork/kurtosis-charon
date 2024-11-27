@@ -54,14 +54,14 @@ extract_bn_ip() {
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-advertised-ip=/ {print $2}')
             enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-api-port=/ {print $2}')
         elif [[ $beaconClient == *"nimbus"* ]]; then
-            enr_address=$(echo "$kurtosis_inspect_output" | awk -F: '/--nat=extip:/ {print $2}')
-            enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}') + 3 ))
+             enr_address=$(echo "$kurtosis_inspect_output" | awk -F '--nat=extip:' '{if (NF>1) print $2}' | awk '{print $1}' | cut -d' ' -f1)
+             enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F '--rest-port=' '{if (NF>1) print $2}' | awk '{print $1}') + 3 ))
         elif [[ $beaconClient == *"prysm"* ]]; then
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-host-ip=/ {print $2}')
             enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}') + 4 ))
         elif [[ $beaconClient == *"lodestar"* ]]; then
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr.ip=/ {print $2}')
-            enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}') + 2 ))
+            enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F= '/--rest.port=/ {print $2}') + 2 ))
         fi
         echo "Beacon node address found: $enr_address:$enr_address_port"
         ret+=($(echo "host.docker.internal:${idx}${enr_address_port}"))
@@ -235,6 +235,26 @@ else
 fi
 
 echo "NETWORK_NAME=${CLUSTER_NAME}" >> ./.env
+## Append the CL_NAME to the .env file
+echo "CL_NAME=${CL_NAME}" >> ./.env
+## Determine the prometheus port based on the CL_NAME
+# TODO: Remove all of this code
+#if [ "$CL_NAME" == "teku" ]; then
+#  MONITORING_PORT_PROMETHEUS="9090:9090"
+#elif [ "$CL_NAME" == "lighthouse" ]; then
+#  MONITORING_PORT_PROMETHEUS="9091:9091"
+#elif [ "$CL_NAME" == "lodestar" ]; then
+#  MONITORING_PORT_PROMETHEUS="9092:9092"
+#elif [ "$CL_NAME" == "nimbus" ]; then
+#  MONITORING_PORT_PROMETHEUS="9093:9093"
+#else
+#  MONITORING_PORT_PROMETHEUS="9094:9094"
+#fi
+
+## Append the prometheus port to the .env file
+#echo "MONITORING_PORT_PROMETHEUS=${MONITORING_PORT_PROMETHEUS}" >> ./.env
+
+
 
 cp Makefile_k8s ./${CLUSTER_NAME}/Makefile
 cp -r node* ./${CLUSTER_NAME}/.charon/cluster
