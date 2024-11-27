@@ -1,4 +1,4 @@
-x-node-base:
+ßx-node-base:
   # Pegged charon version (update this for each release).
   &node-base
   image: obolnetwork/charon:v1.3.0
