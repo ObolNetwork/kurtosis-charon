@@ -96,7 +96,6 @@ snooper_enabled: false
 ethereum_metrics_exporter_enabled: false
 parallel_keystore_generation: false
 disable_peer_scoring: false
-grafana_additional_dashboards: []
 persistent: false
 mev_type: mock
 mev_params:
