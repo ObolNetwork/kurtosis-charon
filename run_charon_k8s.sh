@@ -237,41 +237,15 @@ fi
 echo "NETWORK_NAME=${CLUSTER_NAME}" >> ./.env
 ## Append the CL_NAME to the .env file
 echo "CL_NAME=${CL_NAME}" >> ./.env
-## Determine the prometheus port based on the CL_NAME
-# TODO: Remove all of this code
-#if [ "$CL_NAME" == "teku" ]; then
-#  MONITORING_PORT_PROMETHEUS="9090:9090"
-#elif [ "$CL_NAME" == "lighthouse" ]; then
-#  MONITORING_PORT_PROMETHEUS="9091:9091"
-#elif [ "$CL_NAME" == "lodestar" ]; then
-#  MONITORING_PORT_PROMETHEUS="9092:9092"
-#elif [ "$CL_NAME" == "nimbus" ]; then
-#  MONITORING_PORT_PROMETHEUS="9093:9093"
-#else
-#  MONITORING_PORT_PROMETHEUS="9094:9094"
-#fi
-
-## Append the prometheus port to the .env file
-#echo "MONITORING_PORT_PROMETHEUS=${MONITORING_PORT_PROMETHEUS}" >> ./.env
-
-
 
 cp Makefile_k8s ./${CLUSTER_NAME}/Makefile
 cp -r node* ./${CLUSTER_NAME}/.charon/cluster
 cp .env ./${CLUSTER_NAME}/.env
-#if [ "$CL_NAME" == "lighthouse" ]; then
-    cp -r lighthouse ./${CLUSTER_NAME}/lighthouse
-#fi
-#if [ "$CL_NAME" == "teku" ]; then
-    cp -r teku ./${CLUSTER_NAME}/teku
-#fi
-#if [ "$CL_NAME" == "prysm" ]; then
-    cp -r prysm ./${CLUSTER_NAME}/prysm
-#fi
-#if [ "$CL_NAME" == "nimbus" ]; then
-    cp -r nimbus ./${CLUSTER_NAME}/nimbus
-#fi
-    cp -r lodestar ./${CLUSTER_NAME}/lodestar
+cp -r lighthouse ./${CLUSTER_NAME}/lighthouse
+cp -r teku ./${CLUSTER_NAME}/teku
+cp -r prysm ./${CLUSTER_NAME}/prysm
+cp -r nimbus ./${CLUSTER_NAME}/nimbus
+cp -r lodestar ./${CLUSTER_NAME}/lodestar
 cp -r prometheus ./${CLUSTER_NAME}/prometheus
 cp docker-compose-k8.yml ./${CLUSTER_NAME}/docker-compose.yml
 rm -rf node*
