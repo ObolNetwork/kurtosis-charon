@@ -26,7 +26,7 @@ services:
   #  \___|_| |_|\__,_|_|  \___/|_| |_|  \___|_|_|\___|_| |_|\__|___/
   node0:
     <<: *node-base
-    container_name: node0
+    container_name: node0-${CL_NAME}
     environment:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node0/charon-enr-private-key
@@ -44,7 +44,7 @@ services:
 
   node1:
     <<: *node-base
-    container_name: node1
+    container_name: node1-${CL_NAME}
     environment:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node1/charon-enr-private-key
@@ -62,7 +62,7 @@ services:
 
   node2:
     <<: *node-base
-    container_name: node2
+    container_name: node2-${CL_NAME}
     environment:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node2/charon-enr-private-key
@@ -151,7 +151,7 @@ services:
       - ./testnet:/opt/lighthouse/network-configs
 
   vc0-teku:
-    image: consensys/teku:${TEKU_VERSION:-24.8}
+    image: consensys/teku:${TEKU_VERSION:-24.10.3}
     networks: [network1]
     # network_mode: "host"
     depends_on: [node0]
@@ -171,7 +171,7 @@ services:
       - ./testnet/config.yaml:/opt/teku/config.yaml
 
   vc1-teku:
-    image: consensys/teku:${TEKU_VERSION:-24.8}
+    image: consensys/teku:${TEKU_VERSION:-24.10.3}
     networks: [network1]
     # network_mode: "host"
     depends_on: [node1]
@@ -191,7 +191,7 @@ services:
       - ./testnet/config.yaml:/opt/teku/config.yaml
 
   vc2-teku:
-    image: consensys/teku:${TEKU_VERSION:-24.8}
+    image: consensys/teku:${TEKU_VERSION:-24.10.3}
     networks: [network1]
     # network_mode: "host"
     depends_on: [node2]
@@ -250,7 +250,7 @@ services:
       - ./nimbus/run.sh:/home/user/data/run.sh
 
   vc0-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.20.2}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.23.0}
     depends_on: [node0]
     entrypoint: /opt/lodestar/run.sh
     networks: [network1]
@@ -267,7 +267,7 @@ services:
     restart: unless-stopped
 
   vc1-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.20.2}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.23.0}
     depends_on: [node1]
     entrypoint: /opt/lodestar/run.sh
     networks: [network1]
@@ -285,7 +285,7 @@ services:
     restart: unless-stopped
 
   vc2-lodestar:
-    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.20.2}
+    image: chainsafe/lodestar:${LODESTAR_VERSION:-v1.23.0}
     depends_on: [node2]
     entrypoint: /opt/lodestar/run.sh
     networks: [network1]
@@ -367,9 +367,8 @@ services:
   # |_| |_| |_|\___/|_| |_|_|\__\___/|_|  |_|_| |_|\__, |
   #                                                |___/
   prometheus:
+    container_name: prometheus-${CL_NAME}
     image: prom/prometheus:${PROMETHEUS_VERSION:-v2.44.0}
-    ports:
-      - "9090:9090"
     networks: [network1]
     volumes:
       - ./prometheus/prometheustmp.yml:/etc/prometheus/prometheus.yml
@@ -398,4 +397,4 @@ networks:
   network1:
     name: ${NETWORK_NAME}
     # driver: bridge
-    external: true
+    # external: true

@@ -6,7 +6,16 @@ then
   exit 1
 fi
 
-# Function to check if a directory exists and delete it
+if [ "$1" = "" ]
+then
+  echo "Cluster name is missing!!! Please provide cluster name. Example: ./run_charon_k8s.sh <cluster-name>"
+  exit
+fi
+
+CLUSTER_NAME=$1
+CL_NAME=$(echo $CLUSTER_NAME | cut -d'-' -f3)
+
+# Function to check if a cluster directory exists and delete it
 delete_directory_if_exists() {
     if [ -d "$1" ]; then
         rm -r "$1"
@@ -31,8 +40,8 @@ extract_bn_ip() {
     local -n ret=$4 
     ret=()
 
+    idx=1
     for beaconClient in ${names[@]}; do
-
     # Extract the --enr-address value from the kurtosis service inspect command
     if [ -n "$uuid" ]; then
         kurtosis_inspect_output=$(kurtosis service inspect "$uuid" "$beaconClient")
@@ -40,26 +49,26 @@ extract_bn_ip() {
         # if $beaconClient contains "lighthouse" then
         if [[ $beaconClient == *"lighthouse"* ]]; then
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr-address=/ {print $2}')
-            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}')
+            enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}') + 1 ))
         elif [[ $beaconClient == *"teku"* ]]; then
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-advertised-ip=/ {print $2}')
             enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-api-port=/ {print $2}')
         elif [[ $beaconClient == *"nimbus"* ]]; then
-            enr_address=$(echo "$kurtosis_inspect_output" | awk -F '--nat=extip:' '{if (NF>1) print $2}' | awk '{print $1}' | cut -d' ' -f1)
-            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F '--rest-port=' '{if (NF>1) print $2}' | awk '{print $1}')
+             enr_address=$(echo "$kurtosis_inspect_output" | awk -F '--nat=extip:' '{if (NF>1) print $2}' | awk '{print $1}' | cut -d' ' -f1)
+             enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F '--rest-port=' '{if (NF>1) print $2}' | awk '{print $1}') + 3 ))
         elif [[ $beaconClient == *"prysm"* ]]; then
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-host-ip=/ {print $2}')
-            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}')
+            enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}') + 4 ))
         elif [[ $beaconClient == *"lodestar"* ]]; then
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr.ip=/ {print $2}')
-            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest.port=/ {print $2}')
+            enr_address_port=$(( $(echo "$kurtosis_inspect_output" | awk -F= '/--rest.port=/ {print $2}') + 2 ))
         fi
         echo "Beacon node address found: $enr_address:$enr_address_port"
-        ret+=($(echo "$enr_address:$enr_address_port"))
+        ret+=($(echo "host.docker.internal:${idx}${enr_address_port}"))
     else
         echo "UUID not found."
     fi
-
+    idx=$((idx + 1))
     done
     
 }
@@ -71,16 +80,17 @@ rm -rf testnet
 rm -rf keystore
 rm -rf charon-keys
 rm -rf node*
-rm -rf .charon
-rm .env
+rm -rf $CLUSTER_NAME
 cp .env.sample .env
+mkdir -p ./${CLUSTER_NAME}/testnet
+mkdir -p ./${CLUSTER_NAME}/.charon/cluster
 
 
 # Delete the 'keystore-secrets' folder if it exists
-delete_directory_if_exists "testnet"
+# delete_directory_if_exists "testnet-$CLUSTER_NAME"
 
 # Run the kurtosis enclave ls command and capture its output
-enclave_output=$(kurtosis enclave ls)
+enclave_output=$(kurtosis enclave ls | grep -E $CLUSTER_NAME)
 
 # Use grep and awk to extract the UUID
 uuid=$(echo "$enclave_output" | grep -oE '^[0-9a-f]+ ' | awk '{print $1}')
@@ -109,7 +119,7 @@ while IFS= read -r line; do
     # Append the line to the JSON content variable
     json_content+="$line"$'\n'
   fi
-done < "planprint"
+done < "planprint-$CLUSTER_NAME"
 
 # Print or use the JSON content variable as needed
 # Use jq to extract the value of validator_keystore_files_artifact_uuid
@@ -120,7 +130,7 @@ beaconClients=$(echo "$json_content" | jq -r '.all_participants[].cl_context.bea
 
 if [ -n "$uuid" ]; then
     # Run the kurtosis port print command with the extracted UUID and save the output to a variable
-    cl_port=$(kurtosis port print "$uuid" "$beaconClient" http)
+    cl_port=$(kurtosis port print "$uuid" "$beaconClient" http | grep -Eo 'http://[0-9\.]+:[0-9]+')
     
     # Print the output
     echo "Port Print Output: ${cl_port}"
@@ -134,7 +144,7 @@ echo "Validator Keystore Files Artifact UUID: $uuidValidator"
         # Run the kurtosis files download commands to download the keys
         # kurtosis files download "$uuid" keystore-keys
         kurtosis files download "$uuid" $uuidValidator ./keystore
-        kurtosis files download "$uuid" el_cl_genesis_data ./testnet
+        kurtosis files download "$uuid" el_cl_genesis_data ./${CLUSTER_NAME}/testnet
 
         # Use curl to get the JSON response and extract the genesis_time
         url="${cl_port}/eth/v1/beacon/genesis"
@@ -164,32 +174,11 @@ fi
 first_keystore_dir=$(find_first_directory "keystore/keys")
 echo "First keystore directory: $first_keystore_dir"
 
-# # Copy 'voting-keystore.json' from the first directory to 'charon-keys' as 'keystore-0.json'
-# if [ -d "$first_keystore_dir" ]; then
-#     cp "$first_keystore_dir/voting-keystore.json" "$charon_dir/keystore-0.json"
-#     echo "Copied 'voting-keystore.json' to 'charon-keys' as 'keystore-0.json'"
-# else
-#     echo "No keystore directory found in 'keystore-keys'."
-# fi
-
-# # Extract the directory name (pubkey) from the first keystore directory
-# dir_name=$(basename "$first_keystore_dir")
-
-# # Check if a file with the same name exists in 'keystore-secrets' and copy it to 'charon-keys' as 'keystore-0.txt'
-# if [ -f "keystore/secrets/$dir_name" ]; then
-#     cp "keystore/secrets/$dir_name" "$charon_dir/keystore-0.txt"
-#     echo "Copied '$dir_name' from 'keystore-secrets' to 'charon-keys' as 'keystore-0.txt'"
-# else
-#     echo "No matching file found in 'keystore-secrets' for '$dir_name'."
-# fi
-
 # Find all directories in 'keystore-keys/keys'
 keystore_directories="keystore/keys/*"
 
-# Iterate over each directory
-
 # Counter to track the index
-index=0
+index=1
 
 # Iterate over each directory
 for keystore_dir in $keystore_directories; do
@@ -240,28 +229,39 @@ if [ -n "$genesis_time" ] && [ -n "$enr_address" ]; then
         echo "BN_$i=${bnips[$i]}" >> ./.env
     done
     # Run the docker command with the extracted genesis_time
-    docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" obolnetwork/charon:v1.2.0-rc2 create cluster --fee-recipient-addresses="0x8943545177806ED17B9F23F0a21ee5948eCaa776" --nodes=3 --withdrawal-addresses="0xBc7c960C1097ef1Af0FD32407701465f3c03e407" --name=test --split-existing-keys --split-keys-dir=charon-keys --testnet-chain-id=3151908 --testnet-fork-version="0x10000038" --testnet-genesis-timestamp="$genesis_time" --testnet-name=kurtosis-testnet
+    docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" obolnetwork/charon:latest create cluster --fee-recipient-addresses="0x8943545177806ED17B9F23F0a21ee5948eCaa776" --nodes=3 --withdrawal-addresses="0xBc7c960C1097ef1Af0FD32407701465f3c03e407" --name=${CLUSTER_NAME} --split-existing-keys --split-keys-dir=charon-keys --testnet-chain-id=3151908 --testnet-fork-version="0x10000038" --testnet-genesis-timestamp="$genesis_time" --testnet-name=kurtosis-testnet
 else
     echo "Genesis Time not found."
 fi
 
-# Find the network starting with "kt-" from `docker network ls`
-network_name=$(docker network ls --format '{{.Name}}' | grep -oE 'kt-[a-zA-Z0-9_-]+')
-echo "Network Name: $network_name"
+echo "NETWORK_NAME=${CLUSTER_NAME}" >> ./.env
+## Append the CL_NAME to the .env file
+echo "CL_NAME=${CL_NAME}" >> ./.env
 
-# Check if a network name was found
-if [ -n "$network_name" ]; then
-    echo "Found network: $network_name"
-    # Add the network name to the .env file    
-    echo "NETWORK_NAME=$network_name" >> ./.env
-else
-    echo "Network starting with 'kt-' not found."
-fi
-
-# Find first VC and kill it
-echo Killing first VC that was started by Kurtosis
-docker kill $(docker container ls -f "NAME=vc-1-*" --format '{{.Names}}')
-
-mkdir -p ./.charon/cluster
-cp -r node* ./.charon/cluster
+cp Makefile_k8s ./${CLUSTER_NAME}/Makefile
+cp -r node* ./${CLUSTER_NAME}/.charon/cluster
+cp .env ./${CLUSTER_NAME}/.env
+cp -r lighthouse ./${CLUSTER_NAME}/lighthouse
+cp -r teku ./${CLUSTER_NAME}/teku
+cp -r prysm ./${CLUSTER_NAME}/prysm
+cp -r nimbus ./${CLUSTER_NAME}/nimbus
+cp -r lodestar ./${CLUSTER_NAME}/lodestar
+cp -r prometheus ./${CLUSTER_NAME}/prometheus
+cp docker-compose-k8.yml ./${CLUSTER_NAME}/docker-compose.yml
 rm -rf node*
+rm -rf keystore*
+rm -rf charon-keys
+rm .env
+
+# Save the k8s VC pods configuration to a YAML file
+kubectl get pod vc-1-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-1-geth-${CL_NAME}.yaml && echo "Saving k8s VC pod config file: vc-1-geth-${CL_NAME}.yaml"
+kubectl get pod vc-2-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-2-geth-${CL_NAME}.yaml && echo "Saving k8s VC pod config file: vc-2-geth-${CL_NAME}.yaml"
+kubectl get pod vc-3-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-3-geth-${CL_NAME}.yaml && echo "Saving k8s VC pod config file: vc-3-geth-${CL_NAME}.yaml"
+# Save the k8s VC service configuration to a YAML file
+kubectl get service vc-1-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-1-geth-${CL_NAME}-service.yaml && echo "Saving k8s VC service config file: vc-1-geth-${CL_NAME}-service.yaml"
+kubectl get service vc-2-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-2-geth-${CL_NAME}-service.yaml && echo "Saving k8s VC service config file: vc-2-geth-${CL_NAME}-service.yaml"
+kubectl get service vc-3-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-3-geth-${CL_NAME}-service.yaml && echo "Saving k8s VC service config file: vc-3-geth-${CL_NAME}-service.yaml"
+# Delete all k8s VC pods.
+kubectl get pods -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs -I {} kubectl delete pod {} -n kt-${CLUSTER_NAME}
+# Delete all k8s VC services.
+kubectl get services -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs -I {} kubectl delete service {} -n kt-${CLUSTER_NAME}

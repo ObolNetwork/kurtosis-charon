@@ -58,5 +58,4 @@ exec node /usr/app/packages/cli/bin/lodestar validator \
     --builder="$BUILDER_API_ENABLED" \
     --builder.selection="$BUILDER_SELECTION" \
     --distributed \
-    --paramsFile="/opt/lodestar/config.yaml" \
-    --useProduceBlockV3=true
+    --paramsFile="/opt/lodestar/config.yaml"

@@ -149,3 +149,115 @@ Once you have the full stack up and running, you will be watching for logs produ
 * Make sure DV produces blocks and proposer duty is successful.
 
 If, after at least 15 minutes you do not observe any critical events, you can consider the DV is executed *successfully*.
+
+---
+
+---
+### Run Tests Kurtosis - Kubernetes
+
+1. **Login to aws:**
+
+Type in terminal
+
+`aws sso login`
+
+
+2. **Paste variables from aws in the terminal**
+
+https://obol.awsapps.com/start/#/?tab=accounts →
+``Obol Labs Dev → Access Keys → Option 1``
+> ---
+## PREREQUISITE ONLY FOR FIRST TIME SETUP
+1. In terminal type:
+
+    `kurtosis config path`
+
+2. Copy this:
+```
+config-version: 2
+should-send-metrics: true
+kurtosis-clusters:
+  docker:
+    type: "docker"
+  minikube:
+    type: "kubernetes"
+    config:
+      kubernetes-cluster-name: "minikube"
+      storage-class: "standard"
+      enclave-size-in-megabytes: 10
+  cloud:
+    type: "kubernetes"
+    config:
+      kubernetes-cluster-name: obol-ams2-1
+      storage-class: "openebs-hostpath"
+      enclave-size-in-megabytes: 1000000
+```
+3. Open your yaml path and paste this in it:
+``nano "/Users/<YOUR_USER>/Library/Application Support/kurtosis/kurtosis-config.yml"``
+> ---
+
+
+3. **Restart currently running kurtosis**
+
+    `kurtosis engine restart`
+
+    3a. Note - first timer: <span style="color:red">Set to point to cloud (This is needed only for first timer):</span>
+    `kurtosis cluster set cloud`
+
+
+4. **Initialize kurtosis gateway** 
+
+   `kurtosis gateway`
+
+
+5. **In <span style="color:red">new</span> terminal type:**
+
+    <span style="color:grey">consensus-client: lighthouse, lodestar, teku, nimbus, prysm</span>
+    
+    ```make geth-<consensus-client>```
+
+   <span style="color:grey">If this was successful you have just created kubernetes cluster with el’s, cl’s and vc’s (these vc’s we won't be using for testing)</span> 
+
+
+6. **Now, create charon cluster locally with all of its files (nodes, vcs, keys, etc.)** 
+
+    ``./run_charon_k8s <cluster-name>``
+
+<span style="color:grey">e.g. ./run_charon_k8s kurtosis-geth-lighthouse</span>
+
+<span style="color:grey">You have just now created a new folder with all the charon cluster files.</span> 
+
+7. **Navigate to charon cluster folder**
+
+   <span style="color:grey">consensus-client: lighthouse, lodestar, teku, nimbus, prysm</span>
+   
+   `cd kurtosis-geth-<consensus-client>`
+
+   <span style="color:grey">e.g. cd kurtosis-geth-lighthouse</span> 
+
+
+8. **Port forward**
+
+   `make run-k8s-pf-<consensus-client>`
+
+   <span style="color:grey">e.g. make run-k8s-pf-lighthouse</span>
+
+
+9. **Run charon cluster via docker**
+   
+   <span style="color:grey">validator-client: lighthouse, lodestar, teku, nimbus, prysm</span>
+
+   `make run-charon-<validator_client>`
+
+   <span style="color:grey">e.g. make run-charon-lodestar</span>
+
+💡 How this works:
+> With `make geth-<consensus-client>` you create consensus client that is deployed to kubernetes
+> 
+> With `make run-charon-<validator_client>` you choose which validator client you will run
+
+
+### Note
+ONCE TESTING IS FINISHED, GO AHEAD AND REMOVE CHARON NODES AND VCs FROM DOCKER AND ALL VOLUMES
+
+`docker-compose down -v`
