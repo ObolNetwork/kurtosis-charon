@@ -81,8 +81,8 @@ additional_services:
   - prometheus_grafana
 tx_spammer_params:
   tx_spammer_extra_args: []
-goomy_blob_params:
-  goomy_blob_args: []
+spamoor_blob_params:
+  spamoor_extra_args: []
 assertoor_params:
   image: ""
   run_stability_check: true
