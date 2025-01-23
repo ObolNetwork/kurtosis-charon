@@ -1,0 +1,141 @@
+{{- range .Values.NODES }}
+{{- if eq (int .VC_TYPE) 3 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vc{{ .index }}-import-script-config
+  namespace: {{ $.Values.CLUSTER_NAME }}
+data:
+  import-nimbus-script.sh: |
+    #!/bin/sh
+    tmpkeys="/data/nimbus/tmpkeys"
+    mkdir -p ${tmpkeys:="/validator_keys/tmpkeys"}
+    for f in /validator_keys/keystore-*.json; do
+      cp "${f:="/validator_keys/keystore-0.json"}" "${tmpkeys:="/validator_keys/tmpkeys"}"
+      cp "${f%.*}.txt" "${tmpkeys:="/validator_keys/tmpkeys"}"
+      cat "${f%.*}.txt" |
+      /data/nimbus/nimbus_beacon_node deposits import \
+      --data-dir=/data/nimbus \
+      ${tmpkeys:="/validator_keys/tmpkeys"}
+      rm "${tmpkeys:="/validator_keys/tmpkeys"}/$(basename "${f:="/validator_keys/keystore-0.json"}")"
+    done
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: vc{{ .index }}-nimbus
+  name: vc{{ .index }}-nimbus
+  namespace: {{ $.Values.CLUSTER_NAME }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vc{{ .index }}-nimbus
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: vc{{ .index }}-nimbus
+    spec:
+      securityContext:
+        runAsUser: 0
+      imagePullSecrets:
+        - name: docker-registry
+      initContainers:
+        - name: init-nimbus
+          image: statusim/nimbus-eth2:{{ .VC_VERSION }}
+          imagePullPolicy: Always
+          command: [ "sh", "-c", "cp -R /home/user/nimbus_beacon_node /data/nimbus" ]
+          volumeMounts:
+            - name: data
+              mountPath: /data/nimbus
+          securityContext:
+            runAsUser: 0
+        - name: download-config
+          image: amazon/aws-cli:latest
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name:  aws-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_SECRET_ACCESS_KEY
+          command:
+            - sh
+            - -ac
+            - aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/node{{ .index }}/validator_keys /validator_keys;
+          volumeMounts:
+            - name: validators
+              mountPath: /validator_keys
+          securityContext:
+            runAsUser: 0
+      containers:
+        - name: vc{{ .index }}-nimbus
+          image: statusim/nimbus-validator-client:{{ .VC_VERSION }}
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -ac
+            - |
+              cp /config/import-nimbus-script.sh /data/nimbus/import-nimbus-script.sh;
+              chmod +x /data/nimbus/import-nimbus-script.sh;
+              /data/nimbus/import-nimbus-script.sh;
+              exec /home/user/nimbus_validator_client \
+              --data-dir=/data/nimbus \
+              --beacon-node="http://node{{ .index }}:3600" \
+              --doppelganger-detection=false \
+              --metrics \
+              --metrics-address=0.0.0.0 \
+              --payload-builder=true
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: validators
+              mountPath: /validator_keys
+            - name: data
+              mountPath: /data/nimbus
+      volumes:
+        - name: config
+          configMap:
+            name: vc{{ .index }}-import-script-config
+        - name: validators
+          emptyDir: {}
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vc{{ .index }}-nimbus
+  namespace: {{ $.Values.CLUSTER_NAME }}
+  labels:
+    app: vc{{ .index }}-nimbus
+spec:
+  selector:
+    app: vc{{ .index }}-nimbus
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 8008
+      targetPort: 8008
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vc{{ .index }}-nimbus
+  namespace: {{ $.Values.CLUSTER_NAME }}
+spec:
+  selector:
+    matchLabels:
+      app: vc{{ .index }}-nimbus
+  endpoints:
+    - port: metrics
+{{- end }}
+{{- end }}

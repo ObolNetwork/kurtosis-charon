@@ -1,0 +1,32 @@
+{{- range .Values.NODES }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.CLUSTER_NAME }}
+spec:
+  selector:
+    app: {{ .name }}
+  ports:
+    - name: http-bootnode
+      protocol: TCP
+      port: 3640
+      targetPort: 3640
+    - name: monitoring
+      protocol: TCP
+      port: 3620
+      targetPort: 3620
+    - name: validator-api
+      protocol: TCP
+      port: 3600
+      targetPort: 3600
+    - name: p2p-tcp
+      protocol: TCP
+      port: 3610
+      targetPort: 3610
+    - name: p2p-udp
+      protocol: UDP
+      port: 3630
+      targetPort: 3630
+---
+{{- end }}

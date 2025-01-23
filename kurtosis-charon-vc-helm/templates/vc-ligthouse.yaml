@@ -1,0 +1,116 @@
+{{- range .Values.NODES }}
+{{- if eq (int .VC_TYPE) 1 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: vc{{ .index }}-lighthouse
+  name: vc{{ .index }}-lighthouse
+  namespace: {{ $.Values.CLUSTER_NAME }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vc{{ .index }}-lighthouse
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: vc{{ .index }}-lighthouse
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+      imagePullSecrets:
+        - name: docker-registry
+      initContainers:
+        - name: download-config
+          image: amazon/aws-cli:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_SECRET_ACCESS_KEY
+          command:
+            - sh
+            - -ac
+            - >
+              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/node{{ .index }}/validator_keys /data/lighthouse/validator_keys;
+              aws s3 cp s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/lighthouse-validators-definitions/vc-node-{{ .index }}.yaml /data/lighthouse/validator_definitions.yml;
+              aws s3 cp s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet /opt/lighthouse/network-configs;
+              chown -R 1000:1000 /data/lighthouse;
+          volumeMounts:
+            - name: data
+              mountPath: /data/lighthouse
+      containers:
+        - name: vc{{ .index }}-lighthouse
+          image: sigp/lighthouse:{{ .VC_VERSION }}
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -ace
+            - |
+              lighthouse vc \
+              --http \
+              --http-port=5052 \
+              --http-address=0.0.0.0 \
+              --http-allow-origin="*" \
+              --unencrypted-http-transport \
+              --beacon-nodes="http://node{{ .index }}:3600" \
+              --validators-dir=/data/lighthouse \
+              --network={{ $.Values.NETWORK }} \
+              --init-slashing-protection \
+              --metrics \
+              --metrics-address "0.0.0.0" \
+              --metrics-allow-origin "*" \
+              --metrics-port "5064" \
+              --use-long-timeouts \
+              --graffiti "Obol DVT" \
+              {{ $.Values.VC_EXTRA_ARGS.lighthouse }}
+          volumeMounts:
+            - name: data
+              mountPath: /data/lighthouse
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vc{{ .index }}-lighthouse
+  namespace: {{ $.Values.CLUSTER_NAME }}
+  labels:
+    app: vc{{ .index }}-lighthouse
+spec:
+  selector:
+    app: vc{{ .index }}-lighthouse
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 8008
+      targetPort: 8008
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vc{{ .index }}-lighthouse
+  namespace: {{ $.Values.CLUSTER_NAME }}
+spec:
+  selector:
+    matchLabels:
+      app: vc{{ .index }}-lighthouse
+  endpoints:
+    - port: metrics
+{{- end }}
+{{- end }}

@@ -1,0 +1,93 @@
+{{- range .Values.NODES }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.CLUSTER_NAME }}
+  labels:
+    app: {{ .name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ .name }}
+    spec:
+      securityContext:
+        runAsUser: 0
+        fsGroup: 0
+      volumes:
+        - name: cluster-config
+          emptyDir: {}
+      initContainers:
+        - name: download-cluster-config
+          image: amazon/aws-cli:latest
+          command:
+            - sh
+            - -ac
+            - |
+              mkdir -p /charon/{{ .name }};
+              aws s3 cp s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/{{ .name }}/charon-enr-private-key /charon/{{ .name }}/;
+              aws s3 cp s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/{{ .name }}/cluster-lock.json /charon/
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: AWS_SESSION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_SESSION_TOKEN
+          volumeMounts:
+            - name: cluster-config
+              mountPath: /charon
+      containers:
+        - name: {{ .name }}
+          image: ghcr.io/obolnetwork/charon:{{ .CHARON_VERSION }}
+          env:
+            - name: CHARON_LOKI_ADDRESSES
+              valueFrom:
+                secretKeyRef:
+                  name: canary-monitoring-secrets
+                  key: CHARON_LOKI_ADDRESSES
+          imagePullPolicy: Always
+          command: ["/usr/local/bin/charon"]
+          args: 
+            - "run"
+            - "--testnet-chain-id=3151908"
+            - "--testnet-fork-version=0x10000038"
+            - "--testnet-genesis-timestamp={{ printf "%d" (int $.Values.TESTNET_GENESIS_TIME_STAMP) }}"
+            - "--testnet-name=testnet"
+            - "--testnet-capella-hard-fork=0x40000038"
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 3620
+            initialDelaySeconds: 5
+            periodSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 3620
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          envFrom:
+            - configMapRef:
+                name: {{ .name }}-config
+          volumeMounts:
+            - name: cluster-config
+              mountPath: /charon
+---
+{{- end }}

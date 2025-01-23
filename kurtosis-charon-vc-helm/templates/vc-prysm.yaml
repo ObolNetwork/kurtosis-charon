@@ -1,0 +1,119 @@
+{{- range .Values.NODES }}
+{{- if eq (int .VC_TYPE) 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: vc{{ .index }}-prysm
+  name: vc{{ .index }}-prysm
+  namespace: {{ $.Values.CLUSTER_NAME }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vc{{ .index }}-prysm
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: vc{{ .index }}-prysm
+    spec:
+      imagePullSecrets:
+        - name: docker-registry
+      initContainers:
+        - name: download-config
+          image: amazon/aws-cli:latest
+          securityContext:
+            runAsUser: 0
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name:  aws-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_SECRET_ACCESS_KEY
+          command:
+            - sh
+            - -ac
+            - >
+              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/node{{ .index }}/validator_keys /validator_keys;
+          volumeMounts:
+            - name: validators
+              mountPath: "/validator_keys"
+      containers:
+        - name: vc{{ .index }}-prysm
+          image: debian:stable-slim
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -ace
+            - |
+              apt-get update && apt-get install -y curl
+              mkdir prysm && cd prysm
+              curl https://raw.githubusercontent.com/prysmaticlabs/prysm/{{ $.Values.PRYSM_VERSION }}/prysm.sh --output prysm.sh && chmod +x prysm.sh
+              mkdir -p /prysm-wallet
+              echo "prysm-validator-secret" > /wallet-password.txt
+              PRYSM_ALLOW_UNVERIFIED_BINARIES=1 ./prysm.sh validator wallet create --accept-terms-of-use --{{ $.Values.NETWORK }} --wallet-password-file=/wallet-password.txt --keymanager-kind=direct --wallet-dir="/prysm-wallet"
+              mkdir -p /tmpkeys
+              tmpkeys="/tmpkeys"
+              for f in /validator_keys/keystore-*.json; do
+                cp "${f:="/validator_keys/keystore-0.json"}" "${tmpkeys:="/tmpkeys"}"
+                cp "${f%.*}.txt" "${tmpkeys:="/tmpkeys"}"
+                PRYSM_ALLOW_UNVERIFIED_BINARIES=1 ./prysm.sh validator accounts import \
+                    --keys-dir="/tmpkeys" \
+                    --{{ $.Values.NETWORK }} --accept-terms-of-use \
+                    --account-password-file="${f%.*}.txt" \
+                    --wallet-password-file="/wallet-password.txt" \
+                    --wallet-dir="/prysm-wallet"
+                rm "${tmpkeys:="/tmpkeys"}/$(basename "${f:="/validator_keys/keystore-0.json"}")"
+              done
+              PRYSM_ALLOW_UNVERIFIED_BINARIES=1 ./prysm.sh validator \
+                --accept-terms-of-use \
+                --{{ $.Values.NETWORK }} \
+                --wallet-dir="/prysm-wallet" \
+                --wallet-password-file="/wallet-password.txt" \
+                --enable-beacon-rest-api \
+                --beacon-rest-api-provider="http://node{{ .index }}:3600" \
+                --enable-builder
+          volumeMounts:
+            - name: validators
+              mountPath: "/validator_keys"
+      volumes:
+        - name: validators
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vc{{ .index }}-prysm
+  namespace: {{ $.Values.CLUSTER_NAME }}
+  labels:
+    app: vc{{ .index }}-prysm
+spec:
+  selector:
+    app: vc{{ .index }}-prysm
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 8008
+      targetPort: 8008
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vc{{ .index }}-prysm
+  namespace: {{ $.Values.CLUSTER_NAME }}
+spec:
+  selector:
+    matchLabels:
+      app: vc{{ .index }}-prysm
+  endpoints:
+    - port: metrics
+{{- end }}
+{{- end }}

@@ -1,0 +1,203 @@
+{{- range .Values.NODES }}
+{{- if eq  (int .VC_TYPE) 2 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vc{{ .index }}-import-script-config
+  namespace: {{ $.Values.CLUSTER_NAME }}
+data:
+  import-lodestar-script.sh: |
+    #!/bin/sh
+    for f in /validator_keys/keystore-*.json; do
+      echo "Importing key ${f//json/json}"
+      node /usr/app/packages/cli/bin/lodestar validator import \
+          --dataDir="/opt/data" \
+          --network="{{ $.Values.NETWORK }}" \
+          --importKeystores="${f//json/json}" \
+          --importKeystoresPassword="${f//json/txt}"
+    done
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: vc{{ .index }}-lodestar
+  name: vc{{ .index }}-lodestar
+  namespace: {{ $.Values.CLUSTER_NAME }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vc{{ .index }}-lodestar
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: vc{{ .index }}-lodestar
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+      imagePullSecrets:
+        - name: docker-registry
+      initContainers:
+        - name: init-data-dir
+          image: busybox
+          command: ['sh', '-c', 'mkdir -p /opt/data/secrets /opt/data/lodestar && chown -R 1000:1000 /opt/data']
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: data
+              mountPath: "/opt/data"
+            - name: testnet
+              mountPath: "/opt/lodestar"
+        - name: download-config
+          image: amazon/aws-cli:latest
+          securityContext:
+            runAsUser: 0
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name:  aws-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: AWS_SESSION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_SESSION_TOKEN
+          {{- if $.Values.CLUSTER_PERF }}
+          command:
+            - sh
+            - -ac
+            - |
+              echo "Starting S3 copy..." &&
+              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/lodestar-validators-definitions/node{{ .index }} /opt/data/node{{ .index }} &&
+              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet /opt/data/lodestar/ &&
+              echo "S3 copy completed" &&
+              ls -la /opt/data/lodestar/ &&
+              cat /opt/lodestar/config.yaml || echo "config.yaml not found."
+              sleep 120
+          {{- else }}
+          command:
+            - sh
+            - -ac
+            - |
+              echo "Starting S3 copy..." &&
+              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/node{{ .index }}/validator_keys /validator_keys &&
+              echo "Copying testnet files..." &&
+              aws s3 ls s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet/ &&
+              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet/ /opt/data/lodestar/ &&
+              echo "S3 copy completed" &&
+              echo "Contents of /opt/lodestar:" &&
+              ls -la /opt/data/lodestar/ &&
+              cat /opt/data/lodestar/config.yaml || echo "config.yaml not found."
+              sleep 120
+          {{- end }}
+          volumeMounts:
+          {{- if $.Values.CLUSTER_PERF }}
+            - name: data
+              mountPath: "/opt/data"
+          {{- else }}
+            - name: validators
+              mountPath: "/validator_keys"
+            - name: data
+              mountPath: "/opt/data"
+          {{- end }}
+      containers:
+        - name: vc{{ .index }}-lodestar
+          image: chainsafe/lodestar:{{ .VC_VERSION }}
+          imagePullPolicy: Always
+          {{- if $.Values.CLUSTER_PERF }}
+          command:
+            - sh
+            - -ace
+            - |
+              node /usr/app/packages/cli/bin/lodestar validator \
+              --dataDir="/data/lodestar/node{{ .index }}" \
+              --metrics=true \
+              --metrics.address="0.0.0.0" \
+              --metrics.port=5064 \
+              --beaconNodes="http://node{{ .index }}:3600" \
+              --distributed \
+              --useProduceBlockV3=true \
+              {{ $.Values.VC_EXTRA_ARGS.lodestar }}
+          {{- else }}
+          command:
+            - sh
+            - -ace
+            - |
+              /opt/scripts/import-lodestar-script.sh
+              node /usr/app/packages/cli/bin/lodestar validator \
+              --dataDir="/opt/data" \
+              --network={{ $.Values.NETWORK }} \
+              --metrics=true \
+              --metrics.address="0.0.0.0" \
+              --metrics.port=5064 \
+              --beaconNodes="http://node{{ .index }}:3600" \
+              --distributed \
+              --paramsFile="/opt/data/lodestar/config.yaml" \
+              {{ $.Values.VC_EXTRA_ARGS.lodestar }}
+          {{- end }}
+          volumeMounts:
+          {{- if not $.Values.CLUSTER_PERF }}
+            - name: validators
+              mountPath: "/validator_keys"
+            - name: config
+              mountPath: "/opt/scripts/import-lodestar-script.sh"
+              subPath: import-lodestar-script.sh
+          {{- end }}
+            - name: data
+              mountPath: "/opt/data"
+      volumes:
+        - name: data
+          emptyDir: {}
+        {{- if not $.Values.CLUSTER_PERF }}
+        - name: validators
+          emptyDir: {}
+        - name: config
+          configMap:
+            defaultMode: 493
+            name: vc{{ .index }}-import-script-config
+        - name: testnet
+          emptyDir: {}
+        - name: scripts
+          emptyDir: {}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vc{{ .index }}-lodestar
+  namespace: {{ $.Values.CLUSTER_NAME }}
+  labels:
+    app: vc{{ .index }}-lodestar
+spec:
+  selector:
+    app: vc{{ .index }}-lodestar
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 8008
+      targetPort: 8008
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vc{{ .index }}-lodestar
+  namespace: {{ $.Values.CLUSTER_NAME }}
+spec:
+  selector:
+    matchLabels:
+      app: vc{{ .index }}-lodestar
+  endpoints:
+    - port: metrics
+{{- end }}
+{{- end }}
