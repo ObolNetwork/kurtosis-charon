@@ -1,0 +1,14 @@
+{{- range .Values.NODES }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.CLUSTER_NAME }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .name }}
+  endpoints:
+    - port: monitoring
+---
+{{- end }}

@@ -1,0 +1,38 @@
+{{- range .Values.NODES }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .name }}-config
+  namespace: {{ $.Values.CLUSTER_NAME }}
+data:
+  CHARON_VALIDATOR_API_ADDRESS: "0.0.0.0:3600"
+  CHARON_P2P_TCP_ADDRESS: "0.0.0.0:3610"
+  CHARON_MONITORING_ADDRESS: "0.0.0.0:3620"
+  CHARON_P2P_RELAYS: "{{ $.Values.CHARON_P2P_RELAYS }}"
+  CHARON_BEACON_NODE_ENDPOINTS: {{- if $.Values.BEACON_NODE_ENDPOINTS }}
+    "{{ $.Values.BEACON_NODE_ENDPOINTS }}"
+    {{- else }}
+    "{{ .BEACON_NODE_ENDPOINTS }}"
+    {{- end }}
+  CHARON_LOCK_FILE: {{- if $.Values.CLUSTER_PERF }}
+    "/charon/{{ .name }}/cluster-lock.json"
+    {{- else }}
+    "/charon/cluster-lock.json"
+    {{- end }}
+  CHARON_PRIVATE_KEY_FILE: "/charon/{{ .name }}/charon-enr-private-key"
+  CHARON_P2P_EXTERNAL_HOSTNAME: ""
+  CHARON_LOG_LEVEL: "debug"
+  CHARON_LOKI_ADDRESSES: "$CHARON_LOKI_ADDRESSES"
+  CHARON_LOKI_SERVICE: "charon"
+  CHARON_NO_VERIFY: "true"
+  CHARON_P2P_DISABLE_REUSEPORT: "true"
+  CHARON_PRIVATE_KEY_FILE_LOCK: "false"
+  CHARON_BUILDER_API: "{{ $.Values.CHARON_BUILDER_API }}"
+{{- if $.Values.CHARON_BEACON_NODE_SUBMIT_TIMEOUT }}
+  CHARON_BEACON_NODE_SUBMIT_TIMEOUT: "{{ $.Values.CHARON_BEACON_NODE_SUBMIT_TIMEOUT }}"
+{{- end }}
+{{- if $.Values.CHARON_BEACON_NODE_TIMEOUT }}
+  CHARON_BEACON_NODE_TIMEOUT: "{{ $.Values.CHARON_BEACON_NODE_TIMEOUT }}"
+{{- end }}
+---
+{{- end }}

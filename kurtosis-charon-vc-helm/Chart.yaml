@@ -1,0 +1,4 @@
+apiVersion: v2
+name: kurtosis-geth-lighthouse
+description: A Helm chart for deploying Charon canary cluster
+version: 0.1.0
