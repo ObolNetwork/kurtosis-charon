@@ -38,14 +38,22 @@ spec:
                 secretKeyRef:
                   name: aws-credentials
                   key: AWS_SECRET_ACCESS_KEY
+            - name: AWS_SESSION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_SESSION_TOKEN
           command:
             - sh
             - -ac
             - >
-              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/node{{ .index }}/validator_keys /validator_keys;
+              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/node{{ .index }}/validator_keys /validator_keys &&
+              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet /config;
           volumeMounts:
             - name: validators
               mountPath: "/validator_keys"
+            - name: config
+              mountPath: "/config"
       containers:
         - name: vc{{ .index }}-prysm
           image: debian:stable-slim
@@ -70,7 +78,8 @@ spec:
                     --{{ $.Values.NETWORK }} --accept-terms-of-use \
                     --account-password-file="${f%.*}.txt" \
                     --wallet-password-file="/wallet-password.txt" \
-                    --wallet-dir="/prysm-wallet"
+                    --wallet-dir="/prysm-wallet" \
+                    --chain-config-file="/config/config.yaml"
                 rm "${tmpkeys:="/tmpkeys"}/$(basename "${f:="/validator_keys/keystore-0.json"}")"
               done
               PRYSM_ALLOW_UNVERIFIED_BINARIES=1 ./prysm.sh validator \
@@ -80,12 +89,17 @@ spec:
                 --wallet-password-file="/wallet-password.txt" \
                 --enable-beacon-rest-api \
                 --beacon-rest-api-provider="http://node{{ .index }}:3600" \
-                --enable-builder
+                --enable-builder \
+                --chain-config-file="/config/config.yaml"
           volumeMounts:
             - name: validators
               mountPath: "/validator_keys"
+            - name: config
+              mountPath: "/config"
       volumes:
         - name: validators
+          emptyDir: {}
+        - name: config
           emptyDir: {}
 ---
 apiVersion: v1

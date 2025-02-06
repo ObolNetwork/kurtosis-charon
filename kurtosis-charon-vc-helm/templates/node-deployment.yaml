@@ -71,6 +71,7 @@ spec:
             - "--testnet-genesis-timestamp={{ printf "%d" (int $.Values.TESTNET_GENESIS_TIME_STAMP) }}"
             - "--testnet-name=testnet"
             - "--testnet-capella-hard-fork=0x40000038"
+            - "--feature-set-enable=json_requests"
           readinessProbe:
             httpGet:
               path: /readyz

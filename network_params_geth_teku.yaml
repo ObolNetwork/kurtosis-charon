@@ -51,8 +51,6 @@ participants:
     prometheus_config:
       scrape_interval: 15s
       labels: {}
-    blobber_enabled: false
-    blobber_extra_params: []
     builder_network_params: null
 network_params:
   network: kurtosis
@@ -81,8 +79,6 @@ network_params:
 #   - prometheus_grafana
 tx_spammer_params:
   tx_spammer_extra_args: []
-goomy_blob_params:
-  goomy_blob_args: []
 assertoor_params:
   image: ""
   run_stability_check: true

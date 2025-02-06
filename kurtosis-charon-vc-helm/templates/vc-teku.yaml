@@ -39,6 +39,11 @@ spec:
                 secretKeyRef:
                   key: AWS_SECRET_ACCESS_KEY
                   name: aws-credentials
+            - name: AWS_SESSION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: AWS_SESSION_TOKEN
+                  name: aws-credentials
           securityContext:
             runAsUser: 0
           command:
@@ -46,6 +51,7 @@ spec:
             - -ac
             - >
               aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/node{{ .index }}/validator_keys /validator_keys;
+              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet /config;
               rm -rf /data/teku/validator_keys 2>/dev/null || true;
               mkdir -p /data/teku/validator_keys;
               cp /validator_keys/* /data/teku/validator_keys;
@@ -55,6 +61,8 @@ spec:
               mountPath: /data/teku
             - name: validators
               mountPath: "/validator_keys"
+            - name: config
+              mountPath: "/config"
       containers:
         - name: vc{{ .index }}-teku
           image: consensys/teku:{{ .VC_VERSION }}
@@ -64,7 +72,7 @@ spec:
             - -ace
             - |
               /opt/teku/bin/teku vc \
-              --network={{ $.Values.NETWORK }} \
+              --network=/config/config.yaml \
               --log-destination=console \
               --data-base-path=/data/teku \
               --metrics-enabled=true \
@@ -79,10 +87,14 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data/teku
+            - name: config
+              mountPath: /config
       volumes:
         - name: validators
           emptyDir: {}
         - name: data
+          emptyDir: {}
+        - name: config
           emptyDir: {}
 ---
 apiVersion: v1
