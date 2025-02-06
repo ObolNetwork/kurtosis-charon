@@ -49,8 +49,6 @@ participants:
     prometheus_config:
       scrape_interval: 15s
       labels: {}
-    blobber_enabled: false
-    blobber_extra_params: []
     builder_network_params: null
 network_params:
   network: kurtosis
