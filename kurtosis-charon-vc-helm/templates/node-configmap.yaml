@@ -15,7 +15,8 @@ data:
     "{{ .BEACON_NODE_ENDPOINTS }}"
     {{- end }}
   CHARON_LOCK_FILE: {{- if $.Values.CLUSTER_PERF }}
-    "/charon/{{ .name }}/cluster-lock.json"
+    # "/charon/{{ .name }}/cluster-lock.json"
+     "/charon/cluster-lock.json"
     {{- else }}
     "/charon/cluster-lock.json"
     {{- end }}

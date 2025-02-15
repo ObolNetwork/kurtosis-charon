@@ -1,7 +1,7 @@
 participants:
 # EL
   - el_type: geth
-    el_image: ethereum/client-go:latest
+    el_image: ethereum/client-go:v1.15.1
     el_log_level: ""
     el_extra_env_vars: {}
     el_extra_labels: {}
@@ -14,7 +14,7 @@ participants:
     el_max_mem: 0
 # CL
     cl_type: nimbus
-    cl_image: statusim/nimbus-eth2:multiarch-v24.7.0
+    cl_image: statusim/nimbus-eth2:multiarch-v25.2.0
     cl_log_level: ""
     cl_extra_env_vars: {}
     cl_extra_labels: {}

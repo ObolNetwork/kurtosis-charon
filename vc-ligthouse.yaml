@@ -1,0 +1,157 @@
+{{- range .Values.NODES }}
+{{- if eq (int .VC_TYPE) 1 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: vc{{ .index }}-lighthouse
+  name: vc{{ .index }}-lighthouse
+  namespace: {{ $.Values.CLUSTER_NAME }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vc{{ .index }}-lighthouse
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: vc{{ .index }}-lighthouse
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+      imagePullSecrets:
+        - name: docker-registry
+      initContainers:
+        - name: init-download
+          image: amazon/aws-cli:latest
+          env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  key: AWS_ACCESS_KEY_ID
+                  name: aws-credentials
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: AWS_SECRET_ACCESS_KEY
+                  name: aws-credentials
+            - name: AWS_SESSION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: AWS_SESSION_TOKEN
+                  name: aws-credentials
+          securityContext:
+            runAsUser: 0
+          command:
+            - sh
+            - -ac
+            - >
+              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/node{{ .index }}/validator_keys /validator_keys;
+              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet /config;
+              mkdir -p /data/lighthouse;
+              cp -r /validator_keys/* /data/lighthouse/;
+              chown -R 1000:1000 /data/lighthouse;
+          volumeMounts:
+            - name: data
+              mountPath: /data/lighthouse
+            - name: validators
+              mountPath: /validator_keys
+            - name: config
+              mountPath: /config
+      containers:
+        - name: vc{{ .index }}-lighthouse
+          image: sigp/lighthouse:{{ .VC_VERSION }}
+          imagePullPolicy: Always
+          command:
+            - sh
+            - -ace
+            - |
+              echo "Installing dependencies..."
+              mkdir -p /tmp/apt/lists/partial
+              apt-get update && apt-get install -y curl jq wget
+              
+              echo "Importing validator keys..."
+              mkdir -p /data/lighthouse/.lighthouse/custom/validators
+              
+              for f in /data/lighthouse/keystore-*.json; do
+                echo "Importing key $f"
+                lighthouse account validator import \
+                  --reuse-password \
+                  --keystore "$f" \
+                  --password-file "${f%json}txt" \
+                  --testnet-dir "/config" \
+                  --datadir "/data/lighthouse"
+              done
+              
+              echo "Starting lighthouse validator client..."
+              exec lighthouse validator \
+                --http \
+                --http-address "0.0.0.0" \
+                --http-port "5052" \
+                --http-allow-origin "*" \
+                --unencrypted-http-transport \
+                --beacon-nodes {{ .BEACON_NODE_ENDPOINTS }} \
+                --suggested-fee-recipient {{ $.Values.PROPOSER_DEFAULT_FEE_RECIPIENT }} \
+                --init-slashing-protection \
+                --metrics \
+                --metrics-address "0.0.0.0" \
+                --metrics-allow-origin "*" \
+                --metrics-port "5064" \
+                --use-long-timeouts \
+                --testnet-dir "/config" \
+                --validators-dir=/data/lighthouse \
+                --builder-proposals \
+                --distributed \
+                --debug-level "debug" \
+                --graffiti "Obol DVT" \
+                {{ $.Values.VC_EXTRA_ARGS.lighthouse }}
+          volumeMounts:
+            - name: data
+              mountPath: /data/lighthouse
+            - name: config
+              mountPath: /config
+      volumes:
+        - name: validators
+          emptyDir: {}
+        - name: config
+          emptyDir: {}
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vc{{ .index }}-lighthouse
+  namespace: {{ $.Values.CLUSTER_NAME }}
+  labels:
+    app: vc{{ .index }}-lighthouse
+spec:
+  selector:
+    app: vc{{ .index }}-lighthouse
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 5064
+      targetPort: 5064
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vc{{ .index }}-lighthouse
+  namespace: {{ $.Values.CLUSTER_NAME }}
+  labels:
+    app: vc{{ .index }}-lighthouse
+spec:
+  selector:
+    matchLabels:
+      app: vc{{ .index }}-lighthouse
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 10s
+{{- end }}
+{{- end }}

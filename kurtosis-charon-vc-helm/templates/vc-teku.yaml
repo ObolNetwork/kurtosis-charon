@@ -80,10 +80,13 @@ spec:
               --metrics-interface="0.0.0.0" \
               --metrics-port="8008" \
               --validator-keys="/data/teku/validator_keys:/data/teku/validator_keys" \
+              --validators-external-signer-slashing-protection-enabled=true \
               --validators-graffiti="Obol Distributed Validator" \
               --beacon-node-api-endpoint="http://node{{ .index }}:3600" \
-              --validators-proposer-default-fee-recipient={{ $.Values.PROPOSER_DEFAULT_FEE_RECIPIENT }} \
-              {{ $.Values.VC_EXTRA_ARGS.teku }}
+              --validators-proposer-blinded-blocks-enabled=true \
+              --validators-builder-registration-default-enabled=true \
+              --Xobol-dvt-integration-enabled=true \
+              --validators-proposer-default-fee-recipient={{ $.Values.PROPOSER_DEFAULT_FEE_RECIPIENT }}
           volumeMounts:
             - name: data
               mountPath: /data/teku
