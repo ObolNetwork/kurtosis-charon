@@ -17,7 +17,12 @@ data/
 nethermind/nethermind_db/
 docker-compose.override.yml
 nimbus/node*/
-planprint
+planprint*
 charon-keys/
 testnet/
 prometheus/prometheustmp.yml
+kurtosis-geth-lighthouse/
+kurtosis-geth-nimbus/
+kurtosis-geth-prysm/
+kurtosis-geth-teku/
+kurtosis-geth-lodestar/

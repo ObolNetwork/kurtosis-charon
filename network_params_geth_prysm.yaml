@@ -67,11 +67,12 @@ network_params:
   # max_churn: 8
   ejection_balance: 16000000000
   eth1_follow_distance: 2048
-  min_validator_withdrawability_delay: 256
+  min_validator_withdrawability_delay: 1
   shard_committee_period: 1
   deneb_fork_epoch: 0
-  electra_fork_epoch: 500
-  network_sync_base_url: https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/
+  electra_fork_epoch: 1
+  churn_limit_quotient: 16
+  # network_sync_base_url: https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/
 additional_services:
   - prometheus_grafana
 spamoor_blob_params:

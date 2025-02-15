@@ -82,13 +82,20 @@ spec:
           command:
             - sh
             - -ac
-            - |
+            - >
               echo "Starting S3 copy..." &&
-              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/lighthouse-validators-definitions/node{{ .index }} /data/lighthouse/node{{ .index }} &&
-              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet /opt/lighthouse/network-configs/ &&
-              echo "S3 copy completed" &&
-              ls -la /opt/lighthouse/network-configs/ &&
-              ls -la /data/lighthouse/
+              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/node{{ .index }}/validator_keys /data/lighthouse/validator_keys;
+              aws s3 cp s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/lighthouse-validators-definitions/vc-node-{{ .index }}.yaml /data/lighthouse/validator_definitions.yml;
+              chown -R 1000:1000 /data/lighthouse;
+              echo "S3 copy completed"l
+              ls -la /opt/lighthouse/network-configs/;
+              ls -la /data/lighthouse/;
+              echo "Copying testnet files...";
+              aws s3 ls s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet/;
+              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet/ /opt/lighthouse/network-configs/;
+              echo "S3 copy completed";
+              echo "Contents of /opt/lighthouse/network-configs:";
+              ls -la /opt/lighthouse/network-configs/;
           volumeMounts:
             - name: data
               mountPath: "/data/lighthouse"
@@ -99,8 +106,8 @@ spec:
             - sh
             - -ac
             - |
-              echo "Starting S3 copy..." &&
-              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/node{{ .index }}/validator_keys /validator_keys &&
+              # echo "Starting S3 copy..." &&
+              # aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/node{{ .index }}/validator_keys /validator_keys &&
               echo "Copying testnet files..." &&
               aws s3 ls s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet/ &&
               aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet/ /opt/lighthouse/network-configs/ &&
@@ -115,19 +122,19 @@ spec:
             - name: validators
               mountPath: "/validator_keys"
           {{- end }}
-        - name: import-keys
-          image: sigp/lighthouse:{{ .VC_VERSION }}
-          imagePullPolicy: Always
-          command: ['sh', '/scripts/import-lighthouse-script.sh']
-          volumeMounts:
-            - name: import-script
-              mountPath: "/scripts"
-            - name: validators
-              mountPath: "/validator_keys"
-            - name: network-config
-              mountPath: "/opt/lighthouse/network-configs"
-            - name: data
-              mountPath: "/data/lighthouse"
+        # - name: import-keys
+        #   image: sigp/lighthouse:{{ .VC_VERSION }}
+        #   imagePullPolicy: Always
+        #   command: ['sh', '/scripts/import-lighthouse-script.sh']
+        #   volumeMounts:
+        #     - name: import-script
+        #       mountPath: "/scripts"
+        #     - name: validators
+        #       mountPath: "/validator_keys"
+        #     - name: network-config
+        #       mountPath: "/opt/lighthouse/network-configs"
+        #     - name: data
+        #       mountPath: "/data/lighthouse"
       containers:
         - name: vc{{ .index }}-lighthouse
           image: sigp/lighthouse:{{ .VC_VERSION }}
@@ -136,20 +143,24 @@ spec:
             - sh
             - -ace
             - |
-              lighthouse validator \
-                --beacon-nodes={{ .BEACON_NODE_ENDPOINTS }} \
-                --suggested-fee-recipient {{ $.Values.PROPOSER_DEFAULT_FEE_RECIPIENT }} \
+              lighthouse vc \
+                --http \
+                --http-address "0.0.0.0" \
+                --http-port "5052" \
+                --http-allow-origin "*" \
+                --unencrypted-http-transport \
+                --beacon-nodes "http://node{{ .index }}:3600" \
+                --init-slashing-protection \
                 --metrics \
                 --metrics-address "0.0.0.0" \
                 --metrics-allow-origin "*" \
                 --metrics-port "5064" \
                 --use-long-timeouts \
                 --testnet-dir "/opt/lighthouse/network-configs" \
-                --datadir "/data/lighthouse" \
-                --debug-level debug \
+                --validators-dir=/data/lighthouse \
+                --builder-proposals \
                 --distributed \
-                --init-slashing-protection \
-                {{ $.Values.VC_EXTRA_ARGS.lighthouse }}
+                --graffiti "Obol DVT"
           ports:
             - containerPort: 5064
               name: metrics
