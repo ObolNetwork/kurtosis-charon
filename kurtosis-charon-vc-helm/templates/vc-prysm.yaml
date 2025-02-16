@@ -64,7 +64,7 @@ spec:
             - |
               apt-get update && apt-get install -y curl
               mkdir prysm && cd prysm
-              curl https://raw.githubusercontent.com/prysmaticlabs/prysm/{{ $.Values.PRYSM_VERSION }}/prysm.sh --output prysm.sh && chmod +x prysm.sh
+              curl https://raw.githubusercontent.com/prysmaticlabs/prysm/{{ .VC_VERSION }}/prysm.sh --output prysm.sh && chmod +x prysm.sh
               mkdir -p /prysm-wallet
               echo "prysm-validator-secret" > /wallet-password.txt
               PRYSM_ALLOW_UNVERIFIED_BINARIES=1 ./prysm.sh validator wallet create --accept-terms-of-use --{{ $.Values.NETWORK }} --wallet-password-file=/wallet-password.txt --keymanager-kind=direct --wallet-dir="/prysm-wallet"
@@ -75,22 +75,22 @@ spec:
                 cp "${f%.*}.txt" "${tmpkeys:="/tmpkeys"}"
                 PRYSM_ALLOW_UNVERIFIED_BINARIES=1 ./prysm.sh validator accounts import \
                     --keys-dir="/tmpkeys" \
-                    --{{ $.Values.NETWORK }} --accept-terms-of-use \
+                    --accept-terms-of-use \
                     --account-password-file="${f%.*}.txt" \
                     --wallet-password-file="/wallet-password.txt" \
-                    --wallet-dir="/prysm-wallet" \
-                    --chain-config-file="/config/config.yaml"
+                    --wallet-dir="/prysm-wallet"
                 rm "${tmpkeys:="/tmpkeys"}/$(basename "${f:="/validator_keys/keystore-0.json"}")"
               done
               PRYSM_ALLOW_UNVERIFIED_BINARIES=1 ./prysm.sh validator \
                 --accept-terms-of-use \
-                --{{ $.Values.NETWORK }} \
                 --wallet-dir="/prysm-wallet" \
                 --wallet-password-file="/wallet-password.txt" \
                 --enable-beacon-rest-api \
                 --beacon-rest-api-provider="http://node{{ .index }}:3600" \
-                --enable-builder \
-                --chain-config-file="/config/config.yaml"
+                --beacon-rpc-provider="http://node{{ .index }}:3600" \
+                --beacon-rpc-gateway-provider="http://node{{ .index }}:3600" \
+                --chain-config-file="/config/config.yaml" \
+                --distributed
           volumeMounts:
             - name: validators
               mountPath: "/validator_keys"

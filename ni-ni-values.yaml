@@ -1,6 +1,6 @@
 CLUSTER_PERF: false
-CLUSTER_NAME: kt-kurtosis-geth-nimbus
-NETWORK: holesky                                                                                                                                                 
+CLUSTER_NAME: kt-kurtosis-geth-nimbus-nimbus
+NETWORK: holesky
 TESTNET_GENESIS_TIME_STAMP: "1739631597"
 NODES:
   - index: 0
