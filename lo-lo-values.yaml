@@ -1,5 +1,5 @@
 CLUSTER_PERF: false
-CLUSTER_NAME: kt-kurtosis-geth-lodestar
+CLUSTER_NAME: kt-kurtosis-geth-lodestar-lodestar
 NETWORK: holesky                                                                                                                                                 
 TESTNET_GENESIS_TIME_STAMP: "1739546195"
 NODES:

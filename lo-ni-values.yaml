@@ -1,6 +1,6 @@
 CLUSTER_PERF: false
-CLUSTER_NAME: kt-kurtosis-geth-lodestar
-NETWORK: holesky                                                                                                                                                 
+CLUSTER_NAME: kt-kurtosis-geth-lodestar-nimbus
+NETWORK: holesky
 TESTNET_GENESIS_TIME_STAMP: "1739546195"
 NODES:
   - index: 0
