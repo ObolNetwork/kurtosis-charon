@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 
-if ((BASH_VERSINFO[0] < 5))
-then
-  echo "ERROR: You need at least bash-5.0 to run this script."
-  exit 1
+if ((BASH_VERSINFO[0] < 5)); then
+    echo "ERROR: You need at least bash-5.0 to run this script."
+    exit 1
 fi
 
 # Function to check if a directory exists and delete it
@@ -28,40 +27,40 @@ extract_bn_ip() {
     uuid=$1
     kurtosis_inspect_output=$2
     names=$3
-    local -n ret=$4 
+    local -n ret=$4
     ret=()
 
     for beaconClient in ${names[@]}; do
 
-    # Extract the --enr-address value from the kurtosis service inspect command
-    if [ -n "$uuid" ]; then
-        kurtosis_inspect_output=$(kurtosis service inspect "$uuid" "$beaconClient")
-        echo $kurtosis_inspect_output
-        # if $beaconClient contains "lighthouse" then
-        if [[ $beaconClient == *"lighthouse"* ]]; then
-            enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr-address=/ {print $2}')
-            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}')
-        elif [[ $beaconClient == *"teku"* ]]; then
-            enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-advertised-ip=/ {print $2}')
-            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-api-port=/ {print $2}')
-        elif [[ $beaconClient == *"nimbus"* ]]; then
-            enr_address=$(echo "$kurtosis_inspect_output" | awk -F: '/--nat=extip:/ {print $2}')
-            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-port=/ {print $2}')
-        elif [[ $beaconClient == *"prysm"* ]]; then
-            enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-host-ip=/ {print $2}')
-            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--grpc-gateway-port=/ {print $2}')
-        elif [[ $beaconClient == *"lodestar"* ]]; then
-            enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr.ip=/ {print $2}')
-            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest.port=/ {print $2}')
+        # Extract the --enr-address value from the kurtosis service inspect command
+        if [ -n "$uuid" ]; then
+            kurtosis_inspect_output=$(kurtosis service inspect "$uuid" "$beaconClient")
+            echo $kurtosis_inspect_output
+            # if $beaconClient contains "lighthouse" then
+            if [[ $beaconClient == *"lighthouse"* ]]; then
+                enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr-address=/ {print $2}')
+                enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}')
+            elif [[ $beaconClient == *"teku"* ]]; then
+                enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-advertised-ip=/ {print $2}')
+                enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-api-port=/ {print $2}')
+            elif [[ $beaconClient == *"nimbus"* ]]; then
+                enr_address=$(echo "$kurtosis_inspect_output" | awk -F: '/--nat=extip:/ {print $2}')
+                enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest-port=/ {print $2}')
+            elif [[ $beaconClient == *"prysm"* ]]; then
+                enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--p2p-host-ip=/ {print $2}')
+                enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--grpc-gateway-port=/ {print $2}')
+            elif [[ $beaconClient == *"lodestar"* ]]; then
+                enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr.ip=/ {print $2}')
+                enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest.port=/ {print $2}')
+            fi
+            echo "Beacon node address found: $enr_address:$enr_address_port"
+            ret+=($(echo "$enr_address:$enr_address_port"))
+        else
+            echo "UUID not found."
         fi
-        echo "Beacon node address found: $enr_address:$enr_address_port"
-        ret+=($(echo "$enr_address:$enr_address_port"))
-    else
-        echo "UUID not found."
-    fi
 
     done
-    
+
 }
 
 # Delete the 'keystore-keys' folder if it exists
@@ -74,7 +73,6 @@ rm -rf node*
 rm -rf .charon
 rm .env
 cp .env.sample .env
-
 
 # Delete the 'keystore-secrets' folder if it exists
 delete_directory_if_exists "testnet"
@@ -96,20 +94,20 @@ json_content=""
 
 # Read the file line by line
 while IFS= read -r line; do
-  # Check if the line contains "Starlark code successfully run. Output was:"
-  if [[ "$line" == *"Starlark code successfully run. Output was:"* ]]; then
-    capture_json=true
-    # Start capturing the JSON
-    continue
-  elif [[ $capture_json == true && "$line" == "}" ]]; then
-    json_content+="}"
-    # Stop capturing when we reach the end of the JSON block
-    break
-  elif [[ $capture_json == true ]]; then
-    # Append the line to the JSON content variable
-    json_content+="$line"$'\n'
-  fi
-done < "planprint"
+    # Check if the line contains "Starlark code successfully run. Output was:"
+    if [[ "$line" == *"Starlark code successfully run. Output was:"* ]]; then
+        capture_json=true
+        # Start capturing the JSON
+        continue
+    elif [[ $capture_json == true && "$line" == "}" ]]; then
+        json_content+="}"
+        # Stop capturing when we reach the end of the JSON block
+        break
+    elif [[ $capture_json == true ]]; then
+        # Append the line to the JSON content variable
+        json_content+="$line"$'\n'
+    fi
+done <"planprint"
 
 # Print or use the JSON content variable as needed
 # Use jq to extract the value of validator_keystore_files_artifact_uuid
@@ -121,13 +119,12 @@ beaconClients=$(echo "$json_content" | jq -r '.all_participants[].cl_context.bea
 if [ -n "$uuid" ]; then
     # Run the kurtosis port print command with the extracted UUID and save the output to a variable
     cl_port=$(kurtosis port print "$uuid" "$beaconClient" http)
-    
+
     # Print the output
     echo "Port Print Output: ${cl_port}"
 
-# Print the extracted UUID
-echo "Validator Keystore Files Artifact UUID: $uuidValidator"
-
+    # Print the extracted UUID
+    echo "Validator Keystore Files Artifact UUID: $uuidValidator"
 
     # Check if port is not empty
     if [ -n "${cl_port}" ]; then
@@ -139,10 +136,10 @@ echo "Validator Keystore Files Artifact UUID: $uuidValidator"
         # Use curl to get the JSON response and extract the genesis_time
         url="${cl_port}/eth/v1/beacon/genesis"
         json_response=$(curl -s "$url")
-        
+
         # Extract the genesis_time from the JSON response
         genesis_time=$(echo "$json_response" | jq -r '.data.genesis_time')
-        
+
         # Print the genesis_time
         echo "Genesis Time: $genesis_time"
     else
@@ -228,19 +225,19 @@ if [ -n "$genesis_time" ] && [ -n "$enr_address" ]; then
     grep -q "CHARON_BEACON_NODE_ENDPOINTS=" ./.env
     if [ $? -eq 0 ]; then
         cp ./.env ./.env.tmp
-        sed '/^CHARON_BEACON_NODE_ENDPOINTS=/d' ./.env.tmp > ./.env
+        sed '/^CHARON_BEACON_NODE_ENDPOINTS=/d' ./.env.tmp >./.env
         rm ./.env.tmp
         echo "Removed existing CHARON_BEACON_NODE_ENDPOINTS entry from .env file"
     fi
     # Add the entry to the .env file
-    echo "TESTNET_GENESIS_TIME_STAMP=$genesis_time" >> ./.env
-    echo "BUILDER_API_ENABLED=true" >> ./.env
+    echo "TESTNET_GENESIS_TIME_STAMP=$genesis_time" >>./.env
+    echo "BUILDER_API_ENABLED=true" >>./.env
 
     for i in "${!bnips[@]}"; do
-        echo "BN_$i=${bnips[$i]}" >> ./.env
+        echo "BN_$i=${bnips[$i]}" >>./.env
     done
     # Run the docker command with the extracted genesis_time
-    docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" obolnetwork/charon-local:latest create cluster --fee-recipient-addresses="0x8943545177806ED17B9F23F0a21ee5948eCaa776" --nodes=3 --withdrawal-addresses="0xBc7c960C1097ef1Af0FD32407701465f3c03e407" --name=test --split-existing-keys --split-keys-dir=charon-keys --testnet-chain-id=3151908 --testnet-fork-version="0x10000038" --testnet-genesis-timestamp="$genesis_time" --testnet-name=kurtosis-testnet
+    docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" obolnetwork/charon:electra create cluster --fee-recipient-addresses="0x8943545177806ED17B9F23F0a21ee5948eCaa776" --nodes=3 --withdrawal-addresses="0xBc7c960C1097ef1Af0FD32407701465f3c03e407" --name=test --split-existing-keys --split-keys-dir=charon-keys --testnet-chain-id=3151908 --testnet-fork-version="0x10000038" --testnet-genesis-timestamp="$genesis_time" --testnet-name=kurtosis-testnet
 else
     echo "Genesis Time not found."
 fi
@@ -252,8 +249,8 @@ echo "Network Name: $network_name"
 # Check if a network name was found
 if [ -n "$network_name" ]; then
     echo "Found network: $network_name"
-    # Add the network name to the .env file    
-    echo "NETWORK_NAME=$network_name" >> ./.env
+    # Add the network name to the .env file
+    echo "NETWORK_NAME=$network_name" >>./.env
 else
     echo "Network starting with 'kt-' not found."
 fi
