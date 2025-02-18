@@ -3,9 +3,8 @@
 BUILDER_SELECTION="executiononly"
 
 # If the builder API is enabled, override the builder selection to signal Lodestar to always prefer proposing blinded blocks, but fall back on EL blocks if unavailable.
-if [ "$BUILDER_API_ENABLED" = "true" ];
-then
-  BUILDER_SELECTION="builderalways"
+if [ "$BUILDER_API_ENABLED" = "true" ]; then
+    BUILDER_SELECTION="builderalways"
 fi
 
 DATA_DIR="/opt/data"
@@ -58,5 +57,4 @@ exec node /usr/app/packages/cli/bin/lodestar validator \
     --builder="$BUILDER_API_ENABLED" \
     --builder.selection="$BUILDER_SELECTION" \
     --distributed \
-    --paramsFile="/opt/lodestar/config.yaml" \
-    --useProduceBlockV3=true
+    --paramsFile="/opt/lodestar/config.yaml"
