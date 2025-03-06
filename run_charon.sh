@@ -28,7 +28,7 @@ extract_bn_ip() {
     uuid=$1
     kurtosis_inspect_output=$2
     names=$3
-    local -n ret=$4 
+    local -n ret=$4
     ret=()
 
     for beaconClient in ${names[@]}; do
@@ -61,7 +61,7 @@ extract_bn_ip() {
     fi
 
     done
-    
+
 }
 
 # Delete the 'keystore-keys' folder if it exists
@@ -121,7 +121,7 @@ beaconClients=$(echo "$json_content" | jq -r '.all_participants[].cl_context.bea
 if [ -n "$uuid" ]; then
     # Run the kurtosis port print command with the extracted UUID and save the output to a variable
     cl_port=$(kurtosis port print "$uuid" "$beaconClient" http)
-    
+
     # Print the output
     echo "Port Print Output: ${cl_port}"
 
@@ -139,10 +139,10 @@ echo "Validator Keystore Files Artifact UUID: $uuidValidator"
         # Use curl to get the JSON response and extract the genesis_time
         url="${cl_port}/eth/v1/beacon/genesis"
         json_response=$(curl -s "$url")
-        
+
         # Extract the genesis_time from the JSON response
         genesis_time=$(echo "$json_response" | jq -r '.data.genesis_time')
-        
+
         # Print the genesis_time
         echo "Genesis Time: $genesis_time"
     else
@@ -240,7 +240,7 @@ if [ -n "$genesis_time" ] && [ -n "$enr_address" ]; then
         echo "BN_$i=${bnips[$i]}" >> ./.env
     done
     # Run the docker command with the extracted genesis_time
-    docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" obolnetwork/charon-local:latest create cluster --fee-recipient-addresses="0x8943545177806ED17B9F23F0a21ee5948eCaa776" --nodes=3 --withdrawal-addresses="0xBc7c960C1097ef1Af0FD32407701465f3c03e407" --name=test --split-existing-keys --split-keys-dir=charon-keys --testnet-chain-id=3151908 --testnet-fork-version="0x10000038" --testnet-genesis-timestamp="$genesis_time" --testnet-name=kurtosis-testnet
+    docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" obolnetwork/charon-local:latest create cluster --fee-recipient-addresses="0x8943545177806ED17B9F23F0a21ee5948eCaa776" --nodes=3 --threshold=2 --withdrawal-addresses="0xBc7c960C1097ef1Af0FD32407701465f3c03e407" --name=test --split-existing-keys --split-keys-dir=charon-keys --testnet-chain-id=3151908 --testnet-fork-version="0x10000038" --testnet-genesis-timestamp="$genesis_time" --testnet-name=kurtosis-testnet
 else
     echo "Genesis Time not found."
 fi
@@ -252,7 +252,7 @@ echo "Network Name: $network_name"
 # Check if a network name was found
 if [ -n "$network_name" ]; then
     echo "Found network: $network_name"
-    # Add the network name to the .env file    
+    # Add the network name to the .env file
     echo "NETWORK_NAME=$network_name" >> ./.env
 else
     echo "Network starting with 'kt-' not found."
