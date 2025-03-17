@@ -30,7 +30,7 @@ export $(< ./.env)
 IFS=$OLDIFS
 
 # create lighthouse validators definitions
-mkdir -p .charon/${CLUSTER_NAME}/lighthouse-validators-definitions
+mkdir -p $definitions_dir
 i=0
 INDEX=0
 while [[ $i -lt "$NODES" ]]; do

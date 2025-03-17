@@ -1,33 +1,33 @@
 CLUSTER_PERF: false
-CLUSTER_NAME: kt-charon
+CLUSTER_NAME: kt-kurtosis-geth-lodestar-prysm
 NETWORK: holesky
+TESTNET_GENESIS_TIME_STAMP: "1739818912"
 NODES:
   - index: 0
     name: node0
-    CHARON_VERSION: "v1.1.2"
-    VC_TYPE: 2  # Lodestar
-    VC_VERSION: "v1.20.2"
-    BEACON_NODE_ENDPOINTS: http://cl-1-lighthouse-nethermind.kt-kurtosis-geth-lighthouse.svc.cluster.local:4000
+    CHARON_VERSION: "8e801eb"
+    VC_TYPE: 4  # Prysm
+    VC_VERSION: "v5.3.0"
+    BEACON_NODE_ENDPOINTS: http://cl-1-lodestar-geth.kt-kurtosis-geth-lodestar-prysm.svc.cluster.local:4000
   - index: 1
     name: node1
-    CHARON_VERSION: "v1.1.2"
-    VC_TYPE: 2  # Lodestar
-    VC_VERSION: "v1.20.2"
-    BEACON_NODE_ENDPOINTS: http://cl-2-lighthouse-nethermind.kt-kurtosis-geth-lighthouse.svc.cluster.local:4000
+    CHARON_VERSION: "8e801eb"
+    VC_TYPE: 4  # Prysm
+    VC_VERSION: "v5.3.0"
+    BEACON_NODE_ENDPOINTS: http://cl-2-lodestar-geth.kt-kurtosis-geth-lodestar-prysm.svc.cluster.local:4000
   - index: 2
     name: node2
-    CHARON_VERSION: "v1.1.2"
-    VC_TYPE: 2  # Lodestar
-    VC_VERSION: "v1.20.2"
-    BEACON_NODE_ENDPOINTS: http://cl-3-lighthouse-nethermind.kt-kurtosis-geth-lighthouse.svc.cluster.local:4000
+    CHARON_VERSION: "8e801eb"
+    VC_TYPE: 4  # Prysm
+    VC_VERSION: "v5.3.0"
+    BEACON_NODE_ENDPOINTS: http://cl-3-lodestar-geth.kt-kurtosis-geth-lodestar-prysm.svc.cluster.local:4000
 
-NUM_VALIDATORS: 64
+NUM_VALIDATORS: 256
 PROPOSER_DEFAULT_FEE_RECIPIENT: "0x50Af11554713D43794b2ACDb351EEB363b03f97e"
 CHARON_P2P_RELAYS: "https://0.relay.obol.tech/enr"
 CHARON_BUILDER_API: "true"
 CHARON_BEACON_NODE_TIMEOUT: "4s"
 CHARON_BEACON_NODE_SUBMIT_TIMEOUT: "4s"
-TESTNET_GENESIS_TIME_STAMP: 1737404035
 
 # Additional Args for Each VC Type
 VC_EXTRA_ARGS:

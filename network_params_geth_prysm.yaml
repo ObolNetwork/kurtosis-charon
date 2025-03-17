@@ -7,7 +7,7 @@ participants:
     el_extra_labels: {}
     el_extra_params: []
     el_tolerations: []
-    el_volume_size: 100000
+    el_volume_size: 0
     el_min_cpu: 0
     el_max_cpu: 0
     el_min_mem: 0
@@ -20,7 +20,7 @@ participants:
     cl_extra_labels: {}
     cl_extra_params: []
     cl_tolerations: []
-    cl_volume_size: 100000
+    cl_volume_size: 0
     cl_min_cpu: 0
     cl_max_cpu: 0
     cl_min_mem: 0
@@ -70,9 +70,8 @@ network_params:
   min_validator_withdrawability_delay: 1
   shard_committee_period: 1
   deneb_fork_epoch: 0
-  electra_fork_epoch: 1
+  electra_fork_epoch: 5
   churn_limit_quotient: 16
-  # network_sync_base_url: https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/
 additional_services:
   - prometheus_grafana
 spamoor_blob_params:
@@ -93,26 +92,25 @@ ethereum_metrics_exporter_enabled: false
 parallel_keystore_generation: false
 disable_peer_scoring: false
 persistent: false
-mev_type: null
+mev_type: mock
 mev_params:
-  mock_mev_image: "ethpandaops/rustic-builder:main"
-  # mev_relay_image: flashbots/mev-boost-relay
-  # mev_builder_image: ethpandaops/flashbots-builder:main
-  # mev_builder_cl_image: sigp/lighthouse:latest
-  # mev_boost_image: flashbots/mev-boost
-  # mev_boost_args: ["mev-boost", "--relay-check"]
-  # mev_relay_api_extra_args: []
-  # mev_relay_housekeeper_extra_args: []
-  # mev_relay_website_extra_args: []
-  # mev_builder_extra_args: []
-  # mev_builder_prometheus_config:
-  #   scrape_interval: 15s
-  #   labels: {}
-  # mev_flood_image: flashbots/mev-flood
-  # mev_flood_extra_args: []
-  # mev_flood_seconds_per_bundle: 15
-  # custom_flood_params:
-  #   interval_between_transactions: 1
+  mev_relay_image: flashbots/mev-boost-relay
+  mev_builder_image: ethpandaops/flashbots-builder:main
+  mev_builder_cl_image: sigp/lighthouse:latest
+  mev_boost_image: flashbots/mev-boost
+  mev_boost_args: ["mev-boost", "--relay-check"]
+  mev_relay_api_extra_args: []
+  mev_relay_housekeeper_extra_args: []
+  mev_relay_website_extra_args: []
+  mev_builder_extra_args: []
+  mev_builder_prometheus_config:
+    scrape_interval: 15s
+    labels: {}
+  mev_flood_image: flashbots/mev-flood
+  mev_flood_extra_args: []
+  mev_flood_seconds_per_bundle: 15
+  custom_flood_params:
+    interval_between_transactions: 1
 xatu_sentry_enabled: false
 xatu_sentry_params:
   xatu_sentry_image: ethpandaops/xatu-sentry
