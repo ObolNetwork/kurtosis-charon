@@ -297,7 +297,7 @@ if [ -n "$genesis_time" ] && [ -n "$enr_address" ]; then
         echo "BN_$i=${bnips[$i]}" >> ./.env
     done
     # Run the docker command with the extracted genesis_time
-    docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" obolnetwork/charon:latest create cluster --fee-recipient-addresses="0x8943545177806ED17B9F23F0a21ee5948eCaa776" --nodes=3 --withdrawal-addresses="0xBc7c960C1097ef1Af0FD32407701465f3c03e407" --name=${CLUSTER_NAME} --split-existing-keys --split-keys-dir=charon-keys --testnet-chain-id=3151908 --testnet-fork-version="0x10000038" --testnet-genesis-timestamp="$genesis_time" --testnet-name=kurtosis-testnet
+    docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" obolnetwork/charon:8e801eb create cluster --fee-recipient-addresses="0x8943545177806ED17B9F23F0a21ee5948eCaa776" --nodes=3 --withdrawal-addresses="0xBc7c960C1097ef1Af0FD32407701465f3c03e407" --name=${CLUSTER_NAME} --split-existing-keys --split-keys-dir=charon-keys --testnet-chain-id=3151908 --testnet-fork-version="0x10000038" --testnet-genesis-timestamp="$genesis_time" --testnet-name=kurtosis-testnet
 else
     echo "Genesis Time not found."
 fi
@@ -305,16 +305,18 @@ fi
 echo "NETWORK_NAME=${CLUSTER_NAME}" >> ./.env
 ## Append the CL_NAME to the .env file
 echo "CL_NAME=${CL_NAME}" >> ./.env
-echo "CLUSTER_NAME=${CLUSTER_NAME}" >> ./.env
+echo "CLUSTER_NAME=kt-${CLUSTER_NAME}" >> ./.env
 echo "NODES=3" >> ./.env
 echo "NUM_VALIDATORS=256" >> ./.env
-echo "CHARON_VERSIONS=latest,latest,latest" >> ./.env
-echo "TEKU_VERSION=24.10.3" >> ./.env
-echo "LIGHTHOUSE_VERSION=v5.3.0" >> ./.env
-echo "LODESTAR_VERSION=v1.20.2" >> ./.env
-echo "PRYSM_VERSION=v2.0.0-alpha.3" >> ./.env
+echo "CHARON_VERSIONS=8e801eb,8e801eb,8e801eb" >> ./.env
+echo "TEKU_VERSION=25.2.0" >> ./.env
+echo "LIGHTHOUSE_VERSION=v7.0.0-beta.0" >> ./.env
+echo "LODESTAR_VERSION=v1.27.0" >> ./.env
+echo "PRYSM_VERSION=v5.3.0" >> ./.env
+echo "NIMBUS_VERSION=multiarch-v25.2.0" >> ./.env
 echo "VC_TYPES=2,2,2" >> ./.env
 echo "BEACON_NODE_ADDRESS=host.docker.internal:5052" >> ./.env
+echo "PROPOSER_DEFAULT_FEE_RECIPIENT=0x50Af11554713D43794b2ACDb351EEB363b03f97e" >> ./.env
 
 # the kube ns is the ${CLUSTER_NAME} and the cl name is the ${CL_NAME}
 NAMESPACE="kt-${CLUSTER_NAME}"
@@ -353,6 +355,6 @@ kubectl delete service prometheus -n kt-${CLUSTER_NAME}
 # kubectl get service vc-2-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-2-geth-${CL_NAME}-service.yaml && echo "Saving k8s VC service config file: vc-2-geth-${CL_NAME}-service.yaml"
 # kubectl get service vc-3-geth-${CL_NAME} -n kt-${CLUSTER_NAME} -o yaml > ./${CLUSTER_NAME}/vc-3-geth-${CL_NAME}-service.yaml && echo "Saving k8s VC service config file: vc-3-geth-${CL_NAME}-service.yaml"
 # # Delete all k8s VC pods.
-# kubectl get pods -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs -I {} kubectl delete pod {} -n kt-${CLUSTER_NAME}
+kubectl get pods -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs -I {} kubectl delete pod {} -n kt-${CLUSTER_NAME}
 # # Delete all k8s VC services.
 # kubectl get services -n kt-${CLUSTER_NAME} --no-headers | awk '/^vc-/{print $1}' | xargs -I {} kubectl delete service {} -n kt-${CLUSTER_NAME}

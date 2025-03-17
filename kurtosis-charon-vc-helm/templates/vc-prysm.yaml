@@ -90,7 +90,10 @@ spec:
                 --beacon-rpc-provider="http://node{{ .index }}:3600" \
                 --beacon-rpc-gateway-provider="http://node{{ .index }}:3600" \
                 --chain-config-file="/config/config.yaml" \
-                --distributed
+                --distributed \
+                # --enable-builder \
+                # --suggested-fee-recipient="{{ $.Values.PROPOSER_DEFAULT_FEE_RECIPIENT }}" \
+                # --graffiti=-{{ .index }}-geth-prysm
           volumeMounts:
             - name: validators
               mountPath: "/validator_keys"

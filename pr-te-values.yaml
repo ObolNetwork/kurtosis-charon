@@ -7,7 +7,7 @@ CHARON_P2P_RELAYS: "https://0.relay.obol.tech/enr"
 CHARON_BUILDER_API: "true"
 CHARON_BEACON_NODE_TIMEOUT: "4s"
 CHARON_BEACON_NODE_SUBMIT_TIMEOUT: "4s"
-TESTNET_GENESIS_TIME_STAMP: "1739546195"
+TESTNET_GENESIS_TIME_STAMP: "1739917131"
 
 # Additional Args for Each VC Type
 VC_EXTRA_ARGS:
@@ -19,25 +19,19 @@ VC_EXTRA_ARGS:
 NODES:
   - index: 0
     name: node0
-    CHARON_VERSION: "electra"
+    CHARON_VERSION: "8e801eb"
     VC_TYPE: 0  # Teku
     VC_VERSION: "25.2.0"
-    BEACON_NODE_ENDPOINTS: http://cl-1-prysm-geth.kt-kurtosis-geth-prysm.svc.cluster.local:3500
+    BEACON_NODE_ENDPOINTS: http://cl-1-prysm-geth.kt-kurtosis-geth-prysm-teku.svc.cluster.local:3500
   - index: 1
     name: node1
-    CHARON_VERSION: "electra"
+    CHARON_VERSION: "8e801eb"
     VC_TYPE: 0  # Teku
     VC_VERSION: "25.2.0"
-    BEACON_NODE_ENDPOINTS: http://cl-2-prysm-geth.kt-kurtosis-geth-prysm.svc.cluster.local:3500
+    BEACON_NODE_ENDPOINTS: http://cl-2-prysm-geth.kt-kurtosis-geth-prysm-teku.svc.cluster.local:3500
   - index: 2
     name: node2
-    CHARON_VERSION: "electra"
+    CHARON_VERSION: "8e801eb"
     VC_TYPE: 0  # Teku
     VC_VERSION: "25.2.0"
-    BEACON_NODE_ENDPOINTS: http://cl-3-prysm-geth.kt-kurtosis-geth-prysm.svc.cluster.local:3500
-  - index: 3
-    name: node3
-    CHARON_VERSION: "electra"
-    VC_TYPE: 0  # Teku
-    VC_VERSION: "25.2.0"
-    BEACON_NODE_ENDPOINTS: http://cl-4-prysm-geth.kt-kurtosis-geth-prysm.svc.cluster.local:3500
+    BEACON_NODE_ENDPOINTS: http://cl-3-prysm-geth.kt-kurtosis-geth-prysm-teku.svc.cluster.local:3500

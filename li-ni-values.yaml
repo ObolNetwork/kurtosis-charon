@@ -1,5 +1,5 @@
 CLUSTER_PERF: false
-CLUSTER_NAME: kt-kurtosis-geth-teku-nimbus
+CLUSTER_NAME: kt-kurtosis-geth-lighthouse-nimbus
 NETWORK: holesky
 NUM_VALIDATORS: 256
 PROPOSER_DEFAULT_FEE_RECIPIENT: "0x50Af11554713D43794b2ACDb351EEB363b03f97e"
@@ -7,7 +7,7 @@ CHARON_P2P_RELAYS: "https://0.relay.obol.tech/enr"
 CHARON_BUILDER_API: "true"
 CHARON_BEACON_NODE_TIMEOUT: "4s"
 CHARON_BEACON_NODE_SUBMIT_TIMEOUT: "4s"
-TESTNET_GENESIS_TIME_STAMP: "1739886319"
+TESTNET_GENESIS_TIME_STAMP: "1739546195"
 
 # Additional Args for Each VC Type
 VC_EXTRA_ARGS:
@@ -22,16 +22,16 @@ NODES:
     CHARON_VERSION: "8e801eb"
     VC_TYPE: 3  # Nimbus
     VC_VERSION: "multiarch-v25.2.0"
-    BEACON_NODE_ENDPOINTS: http://cl-1-teku-geth.kt-kurtosis-geth-teku-nimbus.svc.cluster.local:4000
+    BEACON_NODE_ENDPOINTS: http://cl-1-lighthouse-geth.kt-kurtosis-geth-lighthouse-nimbus.svc.cluster.local:4000
   - index: 1
     name: node1
     CHARON_VERSION: "8e801eb"
     VC_TYPE: 3  # Nimbus
     VC_VERSION: "multiarch-v25.2.0"
-    BEACON_NODE_ENDPOINTS: http://cl-2-teku-geth.kt-kurtosis-geth-teku-nimbus.svc.cluster.local:4000
+    BEACON_NODE_ENDPOINTS: http://cl-2-lighthouse-geth.kt-kurtosis-geth-lighthouse-nimbus.svc.cluster.local:4000
   - index: 2
     name: node2
     CHARON_VERSION: "8e801eb"
     VC_TYPE: 3  # Nimbus
     VC_VERSION: "multiarch-v25.2.0"
-    BEACON_NODE_ENDPOINTS: http://cl-3-teku-geth.kt-kurtosis-geth-teku-nimbus.svc.cluster.local:4000
+    BEACON_NODE_ENDPOINTS: http://cl-3-lighthouse-geth.kt-kurtosis-geth-lighthouse-nimbus.svc.cluster.local:4000

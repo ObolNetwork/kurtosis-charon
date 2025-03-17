@@ -21,8 +21,8 @@ planprint*
 charon-keys/
 testnet/
 prometheus/prometheustmp.yml
-kurtosis-geth-lighthouse/
-kurtosis-geth-nimbus/
-kurtosis-geth-prysm/
-kurtosis-geth-teku/
-kurtosis-geth-lodestar/
+kurtosis-geth-lighthouse*/
+kurtosis-geth-nimbus*/
+kurtosis-geth-prysm-prysm/
+kurtosis-geth-teku*/
+kurtosis-geth-lodestar*/

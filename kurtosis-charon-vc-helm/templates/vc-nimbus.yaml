@@ -98,7 +98,8 @@ spec:
               --doppelganger-detection=false \
               --metrics \
               --metrics-address=0.0.0.0 \
-              --payload-builder=true
+              --payload-builder=true \
+              --distributed
           volumeMounts:
             - name: config
               mountPath: /config
