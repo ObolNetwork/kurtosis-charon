@@ -5,19 +5,19 @@ TESTNET_GENESIS_TIME_STAMP: "1739561863"
 NODES:
   - index: 0
     name: node0
-    CHARON_VERSION: "8e801eb"
+    CHARON_VERSION: "v1.3.0-rc3"
     VC_TYPE: 3  # Teku
     VC_VERSION: "23.12.1"
     BEACON_NODE_ENDPOINTS: http://cl-1-lighthouse-geth.kt-kurtosis-geth-lighthouse-teku.svc.cluster.local:4000
   - index: 1
     name: node1
-    CHARON_VERSION: "8e801eb"
+    CHARON_VERSION: "v1.3.0-rc3"
     VC_TYPE: 3  # Teku
     VC_VERSION: "23.12.1"
     BEACON_NODE_ENDPOINTS: http://cl-2-lighthouse-geth.kt-kurtosis-geth-lighthouse-teku.svc.cluster.local:4000
   - index: 2
     name: node2
-    CHARON_VERSION: "8e801eb"
+    CHARON_VERSION: "v1.3.0-rc3"
     VC_TYPE: 3  # Teku
     VC_VERSION: "23.12.1"
     BEACON_NODE_ENDPOINTS: http://cl-3-lighthouse-geth.kt-kurtosis-geth-lighthouse-teku.svc.cluster.local:4000

@@ -8,17 +8,21 @@ NC='\033[0m' # No Color
 
 # AWS credentials configuration
 AWS_CREDENTIALS_CONFIG() {
-    # Load from environment variables
-    if [ -f .env ]; then
+    # Try loading from .env.k8s first
+    if [ -f .env.k8s ]; then
+        source .env.k8s
+        ENV_FILE=".env.k8s"
+    elif [ -f .env ]; then
         source .env
+        ENV_FILE=".env"
     else
-        echo -e "${RED}Warning: .env file not found. Please create one from .env.template${NC}"
+        echo -e "${RED}Error: Neither .env.k8s nor .env found. Please create .env.k8s from .env.k8s.template${NC}"
         exit 1
     fi
 
-    # Verify credentials exist
+    # Verify AWS credentials exist
     if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-        echo -e "${RED}Error: AWS credentials not found in .env file${NC}"
+        echo -e "${RED}Error: AWS credentials not found in ${ENV_FILE}${NC}"
         exit 1
     fi
 }
