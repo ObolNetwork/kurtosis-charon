@@ -19,19 +19,19 @@ VC_EXTRA_ARGS:
 NODES:
   - index: 0
     name: node0
-    CHARON_VERSION: "8e801eb"
+    CHARON_VERSION: "v1.3.0-rc3"
     VC_TYPE: 2  # Lodestar
     VC_VERSION: "v1.27.0"
     BEACON_NODE_ENDPOINTS: http://cl-1-nimbus-geth.kt-kurtosis-geth-nimbus-lodestar.svc.cluster.local:4000
   - index: 1
     name: node1
-    CHARON_VERSION: "8e801eb"
+    CHARON_VERSION: "v1.3.0-rc3"
     VC_TYPE: 2  # Lodestar
     VC_VERSION: "v1.27.0"
     BEACON_NODE_ENDPOINTS: http://cl-2-nimbus-geth.kt-kurtosis-geth-nimbus-lodestar.svc.cluster.local:4000
   - index: 2
     name: node2
-    CHARON_VERSION: "8e801eb"
+    CHARON_VERSION: "v1.3.0-rc3"
     VC_TYPE: 2  # Lodestar
     VC_VERSION: "v1.27.0"
     BEACON_NODE_ENDPOINTS: http://cl-3-nimbus-geth.kt-kurtosis-geth-nimbus-lodestar.svc.cluster.local:4000

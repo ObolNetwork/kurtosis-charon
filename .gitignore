@@ -8,6 +8,7 @@ p2pkey
 keystore*
 prater
 .env
+.env.k8s
 .data
 beaconnode.env.old
 split_keys/
