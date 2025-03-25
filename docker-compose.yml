@@ -15,8 +15,8 @@ x-node-env: &node-env
   CHARON_LOG_FORMAT: ${CHARON_LOG_FORMAT:-console}
   # CHARON_P2P_EXTERNAL_HOSTNAME: ${CHARON_P2P_EXTERNAL_HOSTNAME:-} # Empty default required to avoid warnings.
   CHARON_P2P_RELAYS: ${CHARON_P2P_RELAYS:-https://0.relay.obol.tech}
-  # CHARON_JAEGER_ADDRESS: ${CHARON_JAEGER_ADDRESS-jaeger:6831} # Overriding to empty address allowed
   CHARON_BUILDER_API: ${BUILDER_API_ENABLED:-true}
+  CHARON_OTLP_ADDRESS: ${CHARON_OTLP_ADDRESS:-tempo:4317}
 
 services:
   #       _                                  _ _            _
@@ -31,7 +31,7 @@ services:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node0/charon-enr-private-key
       CHARON_LOCK_FILE: /opt/charon/.charon/cluster/node0/cluster-lock.json
-      CHARON_JAEGER_SERVICE: node0
+      CHARON_OTLP_SERVICE_NAME: node0
       CHARON_P2P_EXTERNAL_HOSTNAME: node0
       CHARON_VALIDATOR_API_ADDRESS: ${CHARON_VALIDATOR_API_ADDRESS:-0.0.0.0:3600}
       CHARON_P2P_TCP_ADDRESS: ${CHARON_P2P_TCP_ADDRESS:-0.0.0.0:3610}
@@ -49,7 +49,7 @@ services:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node1/charon-enr-private-key
       CHARON_LOCK_FILE: /opt/charon/.charon/cluster/node1/cluster-lock.json
-      CHARON_JAEGER_SERVICE: node1
+      CHARON_OTLP_SERVICE_NAME: node1
       CHARON_P2P_EXTERNAL_HOSTNAME: node1
       CHARON_VALIDATOR_API_ADDRESS: ${CHARON_VALIDATOR_API_ADDRESS:-0.0.0.0:3600}
       CHARON_P2P_TCP_ADDRESS: ${CHARON_P2P_TCP_ADDRESS:-0.0.0.0:3610}
@@ -67,7 +67,7 @@ services:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node2/charon-enr-private-key
       CHARON_LOCK_FILE: /opt/charon/.charon/cluster/node2/cluster-lock.json
-      CHARON_JAEGER_SERVICE: node2
+      CHARON_OTLP_SERVICE_NAME: node2
       CHARON_P2P_EXTERNAL_HOSTNAME: node2
       CHARON_VALIDATOR_API_ADDRESS: ${CHARON_VALIDATOR_API_ADDRESS:-0.0.0.0:3600}
       CHARON_P2P_TCP_ADDRESS: ${CHARON_P2P_TCP_ADDRESS:-0.0.0.0:3610}
@@ -379,17 +379,25 @@ services:
     environment:
       PROMETHEUS_REMOTE_WRITE_TOKEN: ${PROMETHEUS_REMOTE_WRITE_TOKEN}
 
-  # grafana:
-  #   image: grafana/grafana:${GRAFANA_VERSION:-9.5.3}
-  #   ports:
-  #     - "3000:3000"
-  #   networks: [ network1 ]
-  #   depends_on: [ prometheus ]
-  #   volumes:
-  #     - ./grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
-  #     - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/datasource.yml
-  #     - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
-  #     - ./grafana/dashboards:/etc/dashboards
+  tempo:
+    image: grafana/tempo:${TEMPO_VERSION:-2.7.1}
+    networks: [network1]
+    user: ":"
+    command: -config.file=/opt/tempo/tempo.yaml
+    volumes:
+      - ./tempo:/opt/tempo
+
+  grafana:
+    image: grafana/grafana:${GRAFANA_VERSION:-9.5.3}
+    ports:
+      - "3000:3000"
+    networks: [ network1 ]
+    depends_on: [ prometheus, tempo ]
+    volumes:
+      - ./grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+      - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/datasource.yml
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./grafana/dashboards:/etc/dashboards
 
   # node-exporter:
   #   image: prom/node-exporter:${NODE_EXPORTER_VERSION:-v1.6.0}

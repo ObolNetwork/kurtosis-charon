@@ -69,21 +69,21 @@ charon:
 	./promtoken.sh
 
 run-charon-lighthouse:
-	docker compose up node0 node1 node2 vc0-lighthouse vc1-lighthouse vc2-lighthouse prometheus -d
+	docker compose up node0 node1 node2 vc0-lighthouse vc1-lighthouse vc2-lighthouse prometheus tempo grafana -d
 
 run-charon-nimbus:
 	mkdir -p data/nimbus/vc{0,1,2}
-	docker compose up node0 node1 node2 vc0-nimbus vc1-nimbus vc2-nimbus prometheus -d
+	docker compose up node0 node1 node2 vc0-nimbus vc1-nimbus vc2-nimbus prometheus tempo grafana -d
 
 run-charon-lodestar:
 	mkdir -p data/lodestar/vc{0,1,2}/{caches,keystores,validator-db}
-	docker compose up node0 node1 node2 vc0-lodestar vc1-lodestar vc2-lodestar prometheus -d
+	docker compose up node0 node1 node2 vc0-lodestar vc1-lodestar vc2-lodestar prometheus tempo grafana -d
 
 run-charon-prysm:
-	docker compose up node0 node1 node2 vc0-prysm vc1-prysm vc2-prysm prometheus -d
+	docker compose up node0 node1 node2 vc0-prysm vc1-prysm vc2-prysm prometheus tempo grafana -d
 
 run-charon-teku:
-	docker compose up node0 node1 node2 vc0-teku vc1-teku vc2-teku prometheus -d
+	docker compose up node0 node1 node2 vc0-teku vc1-teku vc2-teku prometheus tempo grafana -d
 
 exit-lighthouse:
 	./lighthouse/exit.sh 0

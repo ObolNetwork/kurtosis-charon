@@ -75,12 +75,9 @@ network_params:
   electra_fork_epoch: 500
   network_sync_base_url: https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/
 additional_services:
-  - el_forkmon
-  - beacon_metrics_gazer
+  - forkmon
   - dora
   - prometheus_grafana
-tx_spammer_params:
-  tx_spammer_extra_args: []
 spamoor_blob_params:
   spamoor_extra_args: []
 assertoor_params:
