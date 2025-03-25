@@ -6,7 +6,7 @@ x-node-base:
   networks: [network1]
   # network_mode: "host"
   # for nimbus add: --feature-set-enable=json_requests
-  command: "run --testnet-chain-id=3151908 --testnet-fork-version='0x10000038' --testnet-genesis-timestamp=${TESTNET_GENESIS_TIME_STAMP} --testnet-name=testnet --testnet-capella-hard-fork='0x40000038'"
+  command: "run --feature-set-enable=json_requests --testnet-chain-id=3151908 --testnet-fork-version='0x10000038' --testnet-genesis-timestamp=${TESTNET_GENESIS_TIME_STAMP} --testnet-name=testnet --testnet-capella-hard-fork='0x40000038'"
   volumes:
     - ./.charon:/opt/charon/.charon/
 
@@ -160,7 +160,6 @@ services:
       validator-client
       --beacon-node-api-endpoint="http://node0:3600"
       --config-file "/opt/charon/teku/teku-config.yaml"
-      --Xblock-v3-enabled true
       --validators-external-signer-slashing-protection-enabled true
       --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
       --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
@@ -181,7 +180,6 @@ services:
       validator-client
       --beacon-node-api-endpoint=http://node1:3600
       --config-file "/opt/charon/teku/teku-config.yaml"
-      --Xblock-v3-enabled true
       --validators-external-signer-slashing-protection-enabled true
       --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
       --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
@@ -202,7 +200,6 @@ services:
       validator-client
       --beacon-node-api-endpoint=http://node2:3600
       --config-file "/opt/charon/teku/teku-config.yaml"
-      --Xblock-v3-enabled true
       --validators-external-signer-slashing-protection-enabled true
       --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
       --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
