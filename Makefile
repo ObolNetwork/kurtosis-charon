@@ -80,7 +80,7 @@ run-charon-lodestar:
 	docker compose up node0 node1 node2 vc0-lodestar vc1-lodestar vc2-lodestar prometheus -d
 
 run-charon-prysm:
-	docker compose up node0 node1 node2 vc0-prysm vc1-prysm vc2-prysm prometheus -d
+	docker compose up node0 node1 node2 vc0-prysm vc1-prysm vc2-prysm prometheus --build -d
 
 run-charon-teku:
 	docker compose up node0 node1 node2 vc0-teku vc1-teku vc2-teku prometheus -d
