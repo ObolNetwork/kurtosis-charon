@@ -1,25 +1,25 @@
 CLUSTER_PERF: true
 CLUSTER_NAME: kt-kurtosis-geth-lodestar-lighthouse
 NETWORK: holesky                                                                                                                                                 
-TESTNET_GENESIS_TIME_STAMP: "1739894222"
+TESTNET_GENESIS_TIME_STAMP: "1742923138"
 NODES:
   - index: 0
     name: node0
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 1  # lighthouse
-    VC_VERSION: "v7.0.0-beta.0"
+    VC_VERSION: "v7.0.0-beta.4"
     BEACON_NODE_ENDPOINTS: http://cl-1-lodestar-geth.kt-kurtosis-geth-lodestar-lighthouse.svc.cluster.local:4000
   - index: 1
     name: node1
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 1  # lighthouse
-    VC_VERSION: "v7.0.0-beta.0"
+    VC_VERSION: "v7.0.0-beta.4"
     BEACON_NODE_ENDPOINTS: http://cl-2-lodestar-geth.kt-kurtosis-geth-lodestar-lighthouse.svc.cluster.local:4000
   - index: 2
     name: node2
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 1  # lighthouse
-    VC_VERSION: "v7.0.0-beta.0"
+    VC_VERSION: "v7.0.0-beta.4"
     BEACON_NODE_ENDPOINTS: http://cl-3-lodestar-geth.kt-kurtosis-geth-lodestar-lighthouse.svc.cluster.local:4000
 
 NUM_VALIDATORS: 256

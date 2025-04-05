@@ -21,17 +21,17 @@ NODES:
     name: node0
     CHARON_VERSION: "8e801eb"
     VC_TYPE: 2  # Lodestar
-    VC_VERSION: "v1.27.0"
+    VC_VERSION: "v1.28.1"
     BEACON_NODE_ENDPOINTS: http://cl-1-prysm-geth.kt-kurtosis-geth-prysm.svc.cluster.local:3500
   - index: 1
     name: node1
     CHARON_VERSION: "8e801eb"
     VC_TYPE: 2  # Lodestar
-    VC_VERSION: "v1.27.0"
+    VC_VERSION: "v1.28.1"
     BEACON_NODE_ENDPOINTS: http://cl-2-prysm-geth.kt-kurtosis-geth-prysm.svc.cluster.local:3500
   - index: 2
     name: node2
     CHARON_VERSION: "8e801eb"
     VC_TYPE: 2  # Lodestar
-    VC_VERSION: "v1.27.0"
+    VC_VERSION: "v1.28.1"
     BEACON_NODE_ENDPOINTS: http://cl-3-prysm-geth.kt-kurtosis-geth-prysm.svc.cluster.local:3500

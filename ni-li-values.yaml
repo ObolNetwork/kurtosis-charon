@@ -7,7 +7,7 @@ CHARON_P2P_RELAYS: "https://0.relay.obol.tech/enr"
 CHARON_BUILDER_API: "true"
 CHARON_BEACON_NODE_TIMEOUT: "4s"
 CHARON_BEACON_NODE_SUBMIT_TIMEOUT: "4s"
-TESTNET_GENESIS_TIME_STAMP: "1739976000"
+TESTNET_GENESIS_TIME_STAMP: "1743500920"
 
 # Additional Args for Each VC Type
 VC_EXTRA_ARGS:
@@ -19,19 +19,19 @@ VC_EXTRA_ARGS:
 NODES:
   - index: 0
     name: node0
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 1  # Lighthouse
-    VC_VERSION: "v7.0.0-beta.0"
+    VC_VERSION: "v7.0.0-beta.4"
     BEACON_NODE_ENDPOINTS: http://cl-1-nimbus-geth.kt-kurtosis-geth-nimbus-lighthouse.svc.cluster.local:4000
   - index: 1
     name: node1
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 1  # Lighthouse
-    VC_VERSION: "v7.0.0-beta.0"
+    VC_VERSION: "v7.0.0-beta.4"
     BEACON_NODE_ENDPOINTS: http://cl-2-nimbus-geth.kt-kurtosis-geth-nimbus-lighthouse.svc.cluster.local:4000
   - index: 2
     name: node2
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 1  # Lighthouse
-    VC_VERSION: "v7.0.0-beta.0"
+    VC_VERSION: "v7.0.0-beta.4"
     BEACON_NODE_ENDPOINTS: http://cl-3-nimbus-geth.kt-kurtosis-geth-nimbus-lighthouse.svc.cluster.local:4000

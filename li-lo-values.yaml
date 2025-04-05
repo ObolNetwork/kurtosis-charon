@@ -1,32 +1,26 @@
 CLUSTER_PERF: false
 CLUSTER_NAME: kt-kurtosis-geth-lighthouse-lodestar
 NETWORK: holesky                                                                                                                                                 
-TESTNET_GENESIS_TIME_STAMP: "1742252823"
+TESTNET_GENESIS_TIME_STAMP: "1742976445"
 NODES:
   - index: 0
     name: node0
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 2  # lodestar
-    VC_VERSION: "v1.27.0"
+    VC_VERSION: "v1.28.1"
     BEACON_NODE_ENDPOINTS: http://cl-1-lighthouse-geth.kt-kurtosis-geth-lighthouse-lodestar.svc.cluster.local:4000
   - index: 1
     name: node1
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 2  # lodestar
-    VC_VERSION: "v1.27.0"
+    VC_VERSION: "v1.28.1"
     BEACON_NODE_ENDPOINTS: http://cl-2-lighthouse-geth.kt-kurtosis-geth-lighthouse-lodestar.svc.cluster.local:4000
   - index: 2
     name: node2
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 2  # lodestar
-    VC_VERSION: "v1.27.0"
+    VC_VERSION: "v1.28.1"
     BEACON_NODE_ENDPOINTS: http://cl-3-lighthouse-geth.kt-kurtosis-geth-lighthouse-lodestar.svc.cluster.local:4000
-  - index: 3
-    name: node3
-    CHARON_VERSION: "v1.3.0-rc3"
-    VC_TYPE: 2  # lodestar
-    VC_VERSION: "v1.27.0"
-    BEACON_NODE_ENDPOINTS: http://cl-4-lighthouse-geth.kt-kurtosis-geth-lighthouse-lodestar.svc.cluster.local:4000
 
 NUM_VALIDATORS: 256
 PROPOSER_DEFAULT_FEE_RECIPIENT: "0x50Af11554713D43794b2ACDb351EEB363b03f97e"
