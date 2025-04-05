@@ -71,18 +71,18 @@ spec:
             - "--testnet-genesis-timestamp={{ printf "%d" (int $.Values.TESTNET_GENESIS_TIME_STAMP) }}"
             - "--testnet-name=testnet"
             - "--testnet-capella-hard-fork=0x40000038"
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: 3620
-            initialDelaySeconds: 5
-            periodSeconds: 3
-          livenessProbe:
-            httpGet:
-              path: /livez
-              port: 3620
-            initialDelaySeconds: 10
-            periodSeconds: 5
+          # readinessProbe:
+          #   httpGet:
+          #     path: /readyz
+          #     port: 3620
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 3
+          # livenessProbe:
+          #   httpGet:
+          #     path: /livez
+          #     port: 3620
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 5
           envFrom:
             - configMapRef:
                 name: {{ .name }}-config

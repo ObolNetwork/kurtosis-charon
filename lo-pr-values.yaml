@@ -5,21 +5,21 @@ TESTNET_GENESIS_TIME_STAMP: "1740052889"
 NODES:
   - index: 0
     name: node0
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 4  # Prysm
-    VC_VERSION: "v5.3.0"
+    VC_VERSION: "v5.3.1"
     BEACON_NODE_ENDPOINTS: http://cl-1-lodestar-geth.kt-kurtosis-geth-lodestar-prysm.svc.cluster.local:4000
   - index: 1
     name: node1
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 4  # Prysm
-    VC_VERSION: "v5.3.0"
+    VC_VERSION: "v5.3.1"
     BEACON_NODE_ENDPOINTS: http://cl-2-lodestar-geth.kt-kurtosis-geth-lodestar-prysm.svc.cluster.local:4000
   - index: 2
     name: node2
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 4  # Prysm
-    VC_VERSION: "v5.3.0"
+    VC_VERSION: "v5.3.1"
     BEACON_NODE_ENDPOINTS: http://cl-3-lodestar-geth.kt-kurtosis-geth-lodestar-prysm.svc.cluster.local:4000
 
 NUM_VALIDATORS: 256

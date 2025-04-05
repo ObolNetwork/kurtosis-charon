@@ -274,6 +274,25 @@ for keystore_dir in $keystore_directories; do
     fi
 done
 
+# Rename keystore-256 files to keystore-0
+if [ -f "$charon_dir/keystore-256.json" ] && [ -f "$charon_dir/keystore-256.txt" ]; then
+    echo "Renaming keystore-256 files to keystore-0..."
+    mv "$charon_dir/keystore-256.json" "$charon_dir/keystore-0.json"
+    mv "$charon_dir/keystore-256.txt" "$charon_dir/keystore-0.txt"
+    echo "Successfully renamed files"
+else
+    echo "Warning: keystore-256 files not found, skipping rename"
+fi
+
+# if [ -f "$charon_dir/keystore-64.json" ] && [ -f "$charon_dir/keystore-64.txt" ]; then
+#     echo "Renaming keystore-64 files to keystore-0..."
+#     mv "$charon_dir/keystore-64.json" "$charon_dir/keystore-0.json"
+#     mv "$charon_dir/keystore-64.txt" "$charon_dir/keystore-0.txt"
+#     echo "Successfully renamed files"
+# else
+#     echo "Warning: keystore-64 files not found, skipping rename"
+# fi
+
 local bnips
 extract_bn_ip "$uuid" "$kurtosis_inspect_output" "$beaconClients" bnips
 
@@ -297,7 +316,7 @@ if [ -n "$genesis_time" ] && [ -n "$enr_address" ]; then
         echo "BN_$i=${bnips[$i]}" >> ./.env
     done
     # Run the docker command with the extracted genesis_time
-    docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" obolnetwork/charon:v1.3.0-rc3 create cluster --fee-recipient-addresses="0x8943545177806ED17B9F23F0a21ee5948eCaa776" --nodes=4 --withdrawal-addresses="0xBc7c960C1097ef1Af0FD32407701465f3c03e407" --name=${CLUSTER_NAME} --split-existing-keys --split-keys-dir=charon-keys --testnet-chain-id=3151908 --testnet-fork-version="0x10000038" --testnet-genesis-timestamp="$genesis_time" --testnet-name=kurtosis-testnet
+    docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" obolnetwork/charon:v1.3.0 create cluster --fee-recipient-addresses="0x8943545177806ED17B9F23F0a21ee5948eCaa776" --nodes=3 --withdrawal-addresses="0xBc7c960C1097ef1Af0FD32407701465f3c03e407" --name=${CLUSTER_NAME} --split-existing-keys --split-keys-dir=charon-keys --testnet-chain-id=3151908 --testnet-fork-version="0x10000038" --testnet-genesis-timestamp="$genesis_time" --testnet-name=kurtosis-testnet
 else
     echo "Genesis Time not found."
 fi
@@ -308,12 +327,12 @@ echo "CL_NAME=${CL_NAME}" >> ./.env
 echo "CLUSTER_NAME=kt-${CLUSTER_NAME}" >> ./.env    
 echo "NODES=4" >> ./.env
 echo "NUM_VALIDATORS=256" >> ./.env
-echo "CHARON_VERSIONS=v1.3.0-rc3,v1.3.0-rc3,v1.3.0-rc3,v1.3.0-rc3" >> ./.env
+echo "CHARON_VERSIONS=v1.3.0,v1.3.0,v1.3.0,v1.3.0" >> ./.env
 echo "TEKU_VERSION=25.2.0" >> ./.env
-echo "LIGHTHOUSE_VERSION=v7.0.0-beta.0" >> ./.env
-echo "LODESTAR_VERSION=v1.27.0" >> ./.env
+echo "LIGHTHOUSE_VERSION=v7.0.0-beta.4" >> ./.env
+echo "LODESTAR_VERSION=v1.28.1" >> ./.env
 echo "PRYSM_VERSION=v5.3.0" >> ./.env
-echo "NIMBUS_VERSION=multiarch-v25.2.0" >> ./.env
+echo "NIMBUS_VERSION=multiarch-v25.3.1" >> ./.env
 echo "VC_TYPES=2,2,2,2" >> ./.env
 echo "BEACON_NODE_ADDRESS=host.docker.internal:5052" >> ./.env
 echo "PROPOSER_DEFAULT_FEE_RECIPIENT=0x50Af11554713D43794b2ACDb351EEB363b03f97e" >> ./.env

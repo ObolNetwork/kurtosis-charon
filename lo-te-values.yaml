@@ -1,25 +1,25 @@
 CLUSTER_PERF: false
 CLUSTER_NAME: kt-kurtosis-geth-lodestar-teku
 NETWORK: holesky
-TESTNET_GENESIS_TIME_STAMP: "1739902163"
+TESTNET_GENESIS_TIME_STAMP: "1742918233"
 NODES:
   - index: 0
     name: node0
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 0  # Teku
-    VC_VERSION: "25.2.0"
+    VC_VERSION: "25.3.0"
     BEACON_NODE_ENDPOINTS: http://cl-1-lodestar-geth.kt-kurtosis-geth-lodestar-teku.svc.cluster.local:4000
   - index: 1
     name: node1
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 0  # Teku
-    VC_VERSION: "25.2.0"
+    VC_VERSION: "25.3.0"
     BEACON_NODE_ENDPOINTS: http://cl-2-lodestar-geth.kt-kurtosis-geth-lodestar-teku.svc.cluster.local:4000
   - index: 2
     name: node2
-    CHARON_VERSION: "v1.3.0-rc3"
+    CHARON_VERSION: "v1.3.0"
     VC_TYPE: 0  # Teku
-    VC_VERSION: "25.2.0"
+    VC_VERSION: "25.3.0"
     BEACON_NODE_ENDPOINTS: http://cl-3-lodestar-geth.kt-kurtosis-geth-lodestar-teku.svc.cluster.local:4000
 
 NUM_VALIDATORS: 256
