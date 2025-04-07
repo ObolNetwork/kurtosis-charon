@@ -86,7 +86,7 @@ func validateInputs() error {
 			continue
 		}
 		if _, valid := validVCs[vcType]; !valid {
-			return fmt.Errorf("invalid validator type: %s. Valid types are: 0 (teku), 1 (lighthouse), 2 (lodestar), 3 (nimbus)", vcType)
+			return fmt.Errorf("invalid validator type: %s. Valid types are: 0 (teku), 1 (lighthouse), 2 (lodestar), 3 (nimbus), 4 (prysm)", vcType)
 		}
 	}
 

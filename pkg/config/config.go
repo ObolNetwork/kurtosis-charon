@@ -27,9 +27,18 @@ type Config struct {
 	AWSAccessKey string
 	AWSSecretKey string
 
-	// Network configuration
+	// File paths
 	NetworkParamsFile string
 	ValuesFile        string
+	PlanOutputFile    string
+	TestnetDir        string
+	KeystoreDir       string
+	CharonDir         string
+	ClusterDir        string
+
+	// Runtime configuration
+	EnclaveUUID      string
+	GenesisTimestamp string
 }
 
 func NewConfig(executionLayer, consensusLayer, validatorType string) (*Config, error) {
@@ -69,6 +78,13 @@ func NewConfig(executionLayer, consensusLayer, validatorType string) (*Config, e
 		AWSSecretKey:      viper.GetString("AWS_SECRET_ACCESS_KEY"),
 		NetworkParamsFile: networkParamsFile,
 		ValuesFile:        fmt.Sprintf("%s-values.yaml", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
+		PlanOutputFile:    fmt.Sprintf("%s-plan-output.yaml", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
+		TestnetDir:        fmt.Sprintf("%s-testnet", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
+		KeystoreDir:       fmt.Sprintf("%s-keystore", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
+		CharonDir:         fmt.Sprintf("%s-charon", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
+		ClusterDir:        fmt.Sprintf("%s-cluster", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
+		EnclaveUUID:       viper.GetString("ENCLAVE_UUID"),
+		GenesisTimestamp:  viper.GetString("GENESIS_TIMESTAMP"),
 	}
 
 	// Validate required configurations

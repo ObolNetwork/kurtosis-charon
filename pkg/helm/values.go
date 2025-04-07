@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/obol/kurtosis-charon/pkg/config"
 	"github.com/sirupsen/logrus"
@@ -50,7 +49,7 @@ func GenerateValuesFile(cfg *config.Config) error {
 	values := Values{
 		CLUSTER_NAME:               cfg.Namespace,
 		NUM_VALIDATORS:             256,
-		TESTNET_GENESIS_TIME_STAMP: fmt.Sprintf("%d", time.Now().Unix()),
+		TESTNET_GENESIS_TIME_STAMP: cfg.GenesisTimestamp,
 		VC_EXTRA_ARGS: map[string]string{
 			"lighthouse": "",
 			"lodestar":   "--builder=true --builder.selection=builderalways",

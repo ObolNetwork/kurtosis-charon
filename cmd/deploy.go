@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,6 +19,9 @@ var deployCmd = &cobra.Command{
 	Long: `Deploy an Ethereum validator cluster using the specified execution layer,
 consensus layer, and validator client configuration.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		if err := validateInputs(); err != nil {
+			logrus.Fatal(err)
+		}
 		if err := deployCluster(); err != nil {
 			logrus.Fatal(err)
 		}
@@ -97,8 +101,12 @@ func cleanupAndValidate(cfg *config.Config) error {
 		logrus.Warnf("Failed to delete namespace %s: %v", cfg.Namespace, err)
 	}
 
-	// Clean up local folders
+	// Clean up local folders and files
 	dirs := []string{
+		cfg.TestnetDir,
+		cfg.KeystoreDir,
+		cfg.CharonDir,
+		cfg.ClusterDir,
 		".charon",
 		"keystore",
 		"cluster",
@@ -106,6 +114,18 @@ func cleanupAndValidate(cfg *config.Config) error {
 	for _, dir := range dirs {
 		if err := os.RemoveAll(dir); err != nil {
 			logrus.Warnf("Failed to remove directory %s: %v", dir, err)
+		}
+	}
+
+	// Clean up existing files
+	files := []string{
+		cfg.ValuesFile,
+		cfg.PlanOutputFile,
+		fmt.Sprintf("planprint-%s", cfg.EnclaveName),
+	}
+	for _, file := range files {
+		if err := os.Remove(file); err != nil && !os.IsNotExist(err) {
+			logrus.Warnf("Failed to remove file %s: %v", file, err)
 		}
 	}
 
@@ -118,6 +138,7 @@ func cleanupAndValidate(cfg *config.Config) error {
 }
 
 func runKurtosisPlan(cfg *config.Config) error {
+	// Run Kurtosis plan
 	cmd := exec.Command("kurtosis", "run",
 		"--enclave", cfg.EnclaveName,
 		"github.com/ethpandaops/ethereum-package",
@@ -128,27 +149,131 @@ func runKurtosisPlan(cfg *config.Config) error {
 		return fmt.Errorf("failed to run Kurtosis plan: %v\nOutput: %s", err, string(output))
 	}
 
+	// Store the output in a file
+	if err := os.WriteFile(cfg.PlanOutputFile, output, 0644); err != nil {
+		return fmt.Errorf("failed to write plan output: %v", err)
+	}
+
+	// Get enclave UUID
+	cmd = exec.Command("kurtosis", "enclave", "ls")
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to list enclaves: %v", err)
+	}
+
+	// Parse the output to find our enclave
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, cfg.EnclaveName) {
+			fields := strings.Fields(line)
+			if len(fields) > 0 {
+				cfg.EnclaveUUID = fields[0]
+				break
+			}
+		}
+	}
+
+	if cfg.EnclaveUUID == "" {
+		return fmt.Errorf("failed to find enclave UUID for %s", cfg.EnclaveName)
+	}
+
+	// Create testnet directory
+	if err := os.MkdirAll(cfg.TestnetDir, 0755); err != nil {
+		return fmt.Errorf("failed to create testnet directory: %v", err)
+	}
+
+	// Download testnet files
+	cmd = exec.Command("kurtosis", "files", "download",
+		cfg.EnclaveUUID,
+		"el_cl_genesis_data",
+		cfg.TestnetDir)
+
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to download testnet files: %v\nOutput: %s", err, string(output))
+	}
+
+	// Get beacon node port using Kurtosis port print
+	beaconClient := fmt.Sprintf("cl-1-%s-%s", strings.ToLower(cfg.ConsensusLayer), strings.ToLower(cfg.ExecutionLayer))
+	cmd = exec.Command("kurtosis", "port", "print",
+		cfg.EnclaveUUID,
+		beaconClient,
+		"http")
+
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get beacon node port: %v\nOutput: %s", err, string(output))
+	}
+
+	// Extract port from output (format: http://127.0.0.1:PORT)
+	portOutput := strings.TrimSpace(string(output))
+	if !strings.Contains(portOutput, "http://") {
+		return fmt.Errorf("unexpected port print output format: %s", portOutput)
+	}
+
+	// Get genesis timestamp from beacon node using local port
+	cmd = exec.Command("curl", "-s",
+		fmt.Sprintf("%s/eth/v1/beacon/genesis", portOutput))
+
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get genesis timestamp: %v\nOutput: %s", err, string(output))
+	}
+
+	// Parse genesis timestamp from JSON response
+	type GenesisResponse struct {
+		Data struct {
+			GenesisTime string `json:"genesis_time"`
+		} `json:"data"`
+	}
+
+	var genesis GenesisResponse
+	if err := json.Unmarshal(output, &genesis); err != nil {
+		return fmt.Errorf("failed to parse genesis response: %v", err)
+	}
+
+	if genesis.Data.GenesisTime == "" {
+		return fmt.Errorf("genesis timestamp not found in response: %s", string(output))
+	}
+
+	// Store genesis timestamp in config
+	cfg.GenesisTimestamp = genesis.Data.GenesisTime
+	logrus.Infof("Fetched genesis timestamp from beacon node: %s", cfg.GenesisTimestamp)
+
+	// TODO: Create a dedicated function to update specific values in the YAML file
+	// instead of regenerating the entire file. This would be more efficient and
+	// safer when we only need to update certain fields like genesis timestamp.
+	// Current implementation regenerates the entire file which could be problematic
+	// if other values have been manually modified.
+	if err := helm.GenerateValuesFile(cfg); err != nil {
+		return fmt.Errorf("failed to update values file with genesis timestamp: %v", err)
+	}
+	logrus.Infof("Updated values file with genesis timestamp: %s", cfg.GenesisTimestamp)
+
 	logrus.Info("Kurtosis plan completed successfully")
 	return nil
 }
 
 func downloadAndGenerateKeys(cfg *config.Config) error {
-	keystoreDir := "keystore"
+	// Create keystore directory
+	if err := os.MkdirAll(cfg.KeystoreDir, 0755); err != nil {
+		return fmt.Errorf("failed to create keystore directory: %v", err)
+	}
 
 	// Download validator keystores
 	cmd := exec.Command("kurtosis", "files", "download",
-		cfg.EnclaveName,
+		cfg.EnclaveUUID,
 		fmt.Sprintf("1-%s-%s-0-255", strings.ToLower(cfg.ConsensusLayer), cfg.ExecutionLayer),
-		keystoreDir)
+		cfg.KeystoreDir)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to download keystores: %v\nOutput: %s", err, string(output))
 	}
 
-	// Generate charon-keys structure
-	if err := os.MkdirAll(".charon", 0755); err != nil {
-		return fmt.Errorf("failed to create .charon directory: %v", err)
+	// Create charon directory
+	if err := os.MkdirAll(cfg.CharonDir, 0755); err != nil {
+		return fmt.Errorf("failed to create charon directory: %v", err)
 	}
 
 	// TODO: Implement charon command execution for key generation
