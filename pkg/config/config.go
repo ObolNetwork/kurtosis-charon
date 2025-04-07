@@ -16,6 +16,7 @@ type Config struct {
 	ExecutionLayer string
 	ConsensusLayer string
 	ValidatorType  string
+	NumNodes       int
 
 	// Version configurations
 	CharonVersion string
@@ -57,6 +58,15 @@ func NewConfig(executionLayer, consensusLayer, validatorType string) (*Config, e
 		return nil, fmt.Errorf("network params file %s does not exist", networkParamsFile)
 	}
 
+	// Calculate number of nodes from validator types
+	vcTypes := strings.Split(validatorType, ",")
+	numNodes := 0
+	for _, vcType := range vcTypes {
+		if vcType != "" {
+			numNodes++
+		}
+	}
+
 	// Create config
 	cfg := &Config{
 		EnclaveName:    fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", "")),
@@ -64,6 +74,7 @@ func NewConfig(executionLayer, consensusLayer, validatorType string) (*Config, e
 		ExecutionLayer: executionLayer,
 		ConsensusLayer: consensusLayer,
 		ValidatorType:  validatorType,
+		NumNodes:       numNodes,
 		CharonVersion:  viper.GetString("CHARON_VERSION"),
 		VCVersions: map[string]string{
 			"0": viper.GetString("TEKU_VERSION"),       // teku

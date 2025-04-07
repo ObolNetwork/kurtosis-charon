@@ -30,3 +30,8 @@ kurtosis-geth-lodestar*/
 *-values.yaml
 *-values.yaml.tmp
 kc
+*-charon/
+*-cluster/
+*-keystore/
+*-testnet/
+*-plan-output.yaml

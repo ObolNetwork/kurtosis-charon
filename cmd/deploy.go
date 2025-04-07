@@ -3,8 +3,11 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/obol/kurtosis-charon/pkg/config"
@@ -72,20 +75,31 @@ func deployCluster() error {
 		}
 	}
 
-	// Step 4: S3 uploads
+	// Step 4: Run Charon cluster creation
 	if step == 0 || step >= 4 {
-		logrus.Info("Step 4: Uploading to S3")
-		if err := uploadToS3(cfg); err != nil {
-			return fmt.Errorf("S3 upload failed: %v", err)
+		logrus.Info("Step 4: Running Charon cluster creation")
+		if err := runCharonCluster(cfg); err != nil {
+			return fmt.Errorf("Charon cluster creation failed: %v", err)
 		}
 		if step == 4 {
 			return nil
 		}
 	}
 
-	// Step 5: Helm deploy
-	if step == 0 || step == 5 {
-		logrus.Info("Step 5: Deploying with Helm")
+	// Step 5: S3 uploads
+	if step == 0 || step >= 5 {
+		logrus.Info("Step 5: Uploading to S3")
+		if err := uploadToS3(cfg); err != nil {
+			return fmt.Errorf("S3 upload failed: %v", err)
+		}
+		if step == 5 {
+			return nil
+		}
+	}
+
+	// Step 6: Helm deploy
+	if step == 0 || step == 6 {
+		logrus.Info("Step 6: Deploying with Helm")
 		if err := deployWithHelm(cfg); err != nil {
 			return fmt.Errorf("Helm deployment failed: %v", err)
 		}
@@ -195,6 +209,7 @@ func runKurtosisPlan(cfg *config.Config) error {
 
 	// Get beacon node port using Kurtosis port print
 	beaconClient := fmt.Sprintf("cl-1-%s-%s", strings.ToLower(cfg.ConsensusLayer), strings.ToLower(cfg.ExecutionLayer))
+	logrus.Infof("Beacon client for getting genesis timestamp: %s", beaconClient)
 	cmd = exec.Command("kurtosis", "port", "print",
 		cfg.EnclaveUUID,
 		beaconClient,
@@ -205,11 +220,13 @@ func runKurtosisPlan(cfg *config.Config) error {
 		return fmt.Errorf("failed to get beacon node port: %v\nOutput: %s", err, string(output))
 	}
 
-	// Extract port from output (format: http://127.0.0.1:PORT)
-	portOutput := strings.TrimSpace(string(output))
-	if !strings.Contains(portOutput, "http://") {
-		return fmt.Errorf("unexpected port print output format: %s", portOutput)
+	// Extract port from output using regex to match http://IP:PORT pattern
+	re := regexp.MustCompile(`http://[0-9\.]+:[0-9]+`)
+	portOutput := re.FindString(string(output))
+	if portOutput == "" {
+		return fmt.Errorf("failed to extract port from output: %s", string(output))
 	}
+	logrus.Infof("Beacon node port: %s", portOutput)
 
 	// Get genesis timestamp from beacon node using local port
 	cmd = exec.Command("curl", "-s",
@@ -276,10 +293,65 @@ func downloadAndGenerateKeys(cfg *config.Config) error {
 		return fmt.Errorf("failed to create charon directory: %v", err)
 	}
 
-	// TODO: Implement charon command execution for key generation
-	// This will depend on the specific charon command structure
+	// Process keystores
+	index := 0
+	keysDir := filepath.Join(cfg.KeystoreDir, "keys")
+	entries, err := os.ReadDir(keysDir)
+
+	logrus.Infof("Processing keystore directory: %s", keysDir)
+	if err != nil {
+		return fmt.Errorf("failed to read keystore directory: %v", err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		pubkeysDir := filepath.Join(keysDir, entry.Name())
+		logrus.Infof("Processing keystore directory: %s", pubkeysDir)
+
+		// Copy voting-keystore.json to charon-keys with indexed name
+		srcKeystore := filepath.Join(pubkeysDir, "voting-keystore.json")
+		dstKeystore := filepath.Join(cfg.CharonDir, fmt.Sprintf("keystore-%d.json", index))
+		if err := copyFile(srcKeystore, dstKeystore); err != nil {
+			return fmt.Errorf("failed to copy keystore file: %v", err)
+		}
+		logrus.Infof("Copied 'voting-keystore.json' to 'charon-keys' as 'keystore-%d.json'", index)
+
+		// Check for matching secret file
+		secretFile := filepath.Join(cfg.KeystoreDir, "secrets", entry.Name())
+		if _, err := os.Stat(secretFile); err == nil {
+			dstSecret := filepath.Join(cfg.CharonDir, fmt.Sprintf("keystore-%d.txt", index))
+			if err := copyFile(secretFile, dstSecret); err != nil {
+				return fmt.Errorf("failed to copy secret file: %v", err)
+			}
+			logrus.Infof("Copied '%s' from 'keystore-secrets' to 'charon-keys' as 'keystore-%d.txt'", entry.Name(), index)
+		} else {
+			logrus.Warnf("No matching file found in 'keystore-secrets' for '%s'", entry.Name())
+		}
+
+		index++
+	}
 
 	return nil
+}
+
+func copyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	_, err = io.Copy(dstFile, srcFile)
+	return err
 }
 
 func uploadToS3(cfg *config.Config) error {
@@ -307,5 +379,79 @@ func deployWithHelm(cfg *config.Config) error {
 	}
 
 	logrus.Info("Helm deployment completed successfully")
+	return nil
+}
+
+func runCharonCluster(cfg *config.Config) error {
+	// Create cluster directory if it doesn't exist
+	if err := os.MkdirAll(cfg.ClusterDir, 0755); err != nil {
+		return fmt.Errorf("failed to create cluster directory: %v", err)
+	}
+
+	// Get current user's UID and GID
+	uid := os.Getuid()
+	gid := os.Getgid()
+
+	// Get current working directory
+	pwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %v", err)
+	}
+
+	// Build command arguments
+	args := []string{
+		"run",
+		"-u", fmt.Sprintf("%d:%d", uid, gid),
+		"--rm",
+		"-v", fmt.Sprintf("%s:/opt/charon", pwd),
+		fmt.Sprintf("obolnetwork/charon:%s", cfg.CharonVersion),
+		"create", "cluster",
+		"--fee-recipient-addresses=0x8943545177806ED17B9F23F0a21ee5948eCaa776",
+		fmt.Sprintf("--nodes=%d", cfg.NumNodes),
+		"--withdrawal-addresses=0xBc7c960C1097ef1Af0FD32407701465f3c03e407",
+		fmt.Sprintf("--name=%s", cfg.EnclaveName),
+		"--split-existing-keys",
+		fmt.Sprintf("--split-keys-dir=%s", cfg.CharonDir),
+		"--testnet-chain-id=3151908",
+		"--testnet-fork-version=0x10000038",
+		fmt.Sprintf("--testnet-genesis-timestamp=%s", cfg.GenesisTimestamp),
+		"--testnet-name=kurtosis-testnet",
+	}
+
+	// Log the command that will be executed
+	logrus.Infof("Executing Charon command: docker %s", strings.Join(args, " "))
+
+	// Run Charon cluster creation
+	cmd := exec.Command("docker", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to create Charon cluster: %v\nOutput: %s", err, string(output))
+	}
+
+	// Move node folders to cluster directory
+	entries, err := os.ReadDir(pwd)
+	if err != nil {
+		return fmt.Errorf("failed to read current directory: %v", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), "node") {
+			srcPath := filepath.Join(pwd, entry.Name())
+			dstPath := filepath.Join(cfg.ClusterDir, entry.Name())
+
+			// Remove destination if it exists
+			if err := os.RemoveAll(dstPath); err != nil {
+				return fmt.Errorf("failed to remove existing node directory %s: %v", dstPath, err)
+			}
+
+			// Move the directory
+			if err := os.Rename(srcPath, dstPath); err != nil {
+				return fmt.Errorf("failed to move node directory %s to %s: %v", srcPath, dstPath, err)
+			}
+			logrus.Infof("Moved %s to %s", srcPath, dstPath)
+		}
+	}
+
+	logrus.Info("Charon cluster created successfully")
 	return nil
 }
