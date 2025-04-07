@@ -27,3 +27,4 @@ kurtosis-geth-nimbus*/
 kurtosis-geth-prysm-prysm/
 kurtosis-geth-teku*/
 kurtosis-geth-lodestar*/
+*-values.yaml
