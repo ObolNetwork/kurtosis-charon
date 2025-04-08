@@ -1,7 +1,7 @@
 x-node-base:
   # Pegged charon version (update this for each release).
   &node-base
-  image: obolnetwork/charon:v1.3.0
+  image: kaloyantanev/charon:valcache-head
   restart: unless-stopped
   networks: [network1]
   # network_mode: "host"
