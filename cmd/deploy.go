@@ -86,7 +86,7 @@ func deployCluster() error {
 		}
 	}
 
-	// Step 5: Upload to S3
+	// Step 5: S3 uploads
 	if step == 0 || step >= 5 {
 		logrus.Info("Step 5: Uploading to S3")
 		if err := uploadToS3(cfg); err != nil {
@@ -355,12 +355,21 @@ func copyFile(src, dst string) error {
 }
 
 func uploadToS3(cfg *config.Config) error {
+	// Delete existing S3 folder
+	s3Path := fmt.Sprintf("s3://%s/%s", cfg.AWSBucket, cfg.Namespace)
+	cmd := exec.Command("aws", "s3", "rm", "--recursive", s3Path)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		logrus.Warnf("Failed to delete existing S3 folder %s: %v\nOutput: %s", s3Path, err, string(output))
+	} else {
+		logrus.Info("Successfully deleted existing S3 folder")
+	}
 
 	// Upload testnet files to S3 using AWS CLI
-	cmd := exec.Command("aws", "s3", "cp", "--recursive", cfg.TestnetDir,
+	cmd = exec.Command("aws", "s3", "cp", "--recursive", cfg.TestnetDir,
 		fmt.Sprintf("s3://%s/%s/testnet", cfg.AWSBucket, cfg.Namespace))
 
-	output, err := cmd.CombinedOutput()
+	output, err = cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to upload to S3: %v\nOutput: %s", err, string(output))
 	}
