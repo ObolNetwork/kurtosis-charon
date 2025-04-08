@@ -17,6 +17,8 @@ type Config struct {
 	ConsensusLayer string
 	ValidatorType  string
 	NumNodes       int
+	NumValidators  int
+	VCTypes        string
 
 	// Version configurations
 	CharonVersion string
@@ -75,6 +77,8 @@ func NewConfig(executionLayer, consensusLayer, validatorType string) (*Config, e
 		ConsensusLayer: consensusLayer,
 		ValidatorType:  validatorType,
 		NumNodes:       numNodes,
+		NumValidators:  viper.GetInt("NUM_VALIDATORS"),
+		VCTypes:        validatorType,
 		CharonVersion:  viper.GetString("CHARON_VERSION"),
 		VCVersions: map[string]string{
 			"0": viper.GetString("TEKU_VERSION"),       // teku
@@ -92,7 +96,7 @@ func NewConfig(executionLayer, consensusLayer, validatorType string) (*Config, e
 		PlanOutputFile:    fmt.Sprintf("%s-plan-output.yaml", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
 		TestnetDir:        fmt.Sprintf("%s-testnet", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
 		KeystoreDir:       fmt.Sprintf("%s-keystore", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
-		CharonDir:         fmt.Sprintf("%s-charon", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
+		CharonDir:         fmt.Sprintf("%s-charon-keys", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
 		ClusterDir:        fmt.Sprintf("%s-cluster", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
 		EnclaveUUID:       viper.GetString("ENCLAVE_UUID"),
 		GenesisTimestamp:  viper.GetString("GENESIS_TIMESTAMP"),

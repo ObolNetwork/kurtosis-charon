@@ -53,6 +53,8 @@ func GenerateValuesFile(cfg *config.Config) error {
 		VC_EXTRA_ARGS: map[string]string{
 			"lighthouse": "",
 			"lodestar":   "--builder=true --builder.selection=builderalways",
+			"teku":       "--validators-proposer-blinded-blocks-enabled=true --validators-builder-registration-default-enabled=true",
+			"nimbus":     "",
 		},
 		NODES: nodes,
 	}
@@ -64,6 +66,8 @@ TESTNET_GENESIS_TIME_STAMP: "%s"
 VC_EXTRA_ARGS:
   lighthouse: "%s"
   lodestar: "%s"
+  teku: "%s"
+  nimbus: "%s"
 NODES:
 `,
 		values.CLUSTER_NAME,
@@ -71,6 +75,8 @@ NODES:
 		values.TESTNET_GENESIS_TIME_STAMP,
 		values.VC_EXTRA_ARGS["lighthouse"],
 		values.VC_EXTRA_ARGS["lodestar"],
+		values.VC_EXTRA_ARGS["teku"],
+		values.VC_EXTRA_ARGS["nimbus"],
 	)
 
 	// Add nodes with correct indentation

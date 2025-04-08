@@ -452,6 +452,50 @@ func runCharonCluster(cfg *config.Config) error {
 		}
 	}
 
+	// Create .env.k8s file
+	envContent := fmt.Sprintf(`NETWORK_NAME=%s
+CL_NAME=%s
+CLUSTER_NAME=kt-%s
+NODES=%d
+NUM_VALIDATORS=%d
+CHARON_VERSIONS=%s
+TEKU_VERSION=%s
+LIGHTHOUSE_VERSION=%s
+LODESTAR_VERSION=%s
+PRYSM_VERSION=%s
+NIMBUS_VERSION=%s
+VC_TYPES=%s
+BEACON_NODE_ADDRESS=host.docker.internal:5052
+PROPOSER_DEFAULT_FEE_RECIPIENT=0x50Af11554713D43794b2ACDb351EEB363b03f97e
+`,
+		cfg.EnclaveName,
+		cfg.ConsensusLayer,
+		cfg.EnclaveName,
+		cfg.NumNodes,
+		cfg.NumValidators,
+		cfg.CharonVersion,
+		cfg.VCVersions["0"], // teku
+		cfg.VCVersions["1"], // lighthouse
+		cfg.VCVersions["2"], // lodestar
+		cfg.VCVersions["4"], // prysm
+		cfg.VCVersions["3"], // nimbus
+		cfg.VCTypes,
+	)
+
+	envPath := filepath.Join(cfg.ClusterDir, ".env.k8s")
+	if err := os.WriteFile(envPath, []byte(envContent), 0644); err != nil {
+		return fmt.Errorf("failed to create .env.k8s file: %v", err)
+	}
+	logrus.Info("Created .env.k8s file")
+
+	// Delete prometheus service
+	cmd = exec.Command("kubectl", "delete", "service", "prometheus", "-n", fmt.Sprintf("kt-%s", cfg.EnclaveName))
+	if err := cmd.Run(); err != nil {
+		logrus.Warnf("Failed to delete prometheus service: %v", err)
+	} else {
+		logrus.Info("Deleted prometheus service")
+	}
+
 	logrus.Info("Charon cluster created successfully")
 	return nil
 }
