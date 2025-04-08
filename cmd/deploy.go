@@ -86,7 +86,7 @@ func deployCluster() error {
 		}
 	}
 
-	// Step 5: S3 uploads
+	// Step 5: Upload to S3
 	if step == 0 || step >= 5 {
 		logrus.Info("Step 5: Uploading to S3")
 		if err := uploadToS3(cfg); err != nil {
@@ -355,7 +355,27 @@ func copyFile(src, dst string) error {
 }
 
 func uploadToS3(cfg *config.Config) error {
-	// TODO: Implement AWS S3 upload logic using cfg.AWS* fields
+
+	// Upload testnet files to S3 using AWS CLI
+	cmd := exec.Command("aws", "s3", "cp", "--recursive", cfg.TestnetDir,
+		fmt.Sprintf("s3://%s/%s/testnet", cfg.AWSBucket, cfg.Namespace))
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to upload to S3: %v\nOutput: %s", err, string(output))
+	}
+	logrus.Info("Successfully uploaded testnet files to S3")
+
+	// Upload Charon cluster files to S3 using AWS CLI
+	cmd = exec.Command("aws", "s3", "cp", "--recursive", cfg.ClusterDir,
+		fmt.Sprintf("s3://%s/%s", cfg.AWSBucket, cfg.Namespace))
+
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to upload to S3: %v\nOutput: %s", err, string(output))
+	}
+	logrus.Info("Successfully uploaded Charon cluster files to S3")
+
 	return nil
 }
 
