@@ -1,4 +1,4 @@
-.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku clean
+.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku clean build deploy gateway-start gateway-stop engine-restart
 
 # Define the composite step
 geth-lighthouse-charon-lighthouse: geth-lighthouse charon run-charon-lighthouse
@@ -117,3 +117,53 @@ clean:
 	rm -rf charon-keys
 	rm -rf .charon
 	rm -rf data
+
+# Build the binary
+build:
+	go build -o kc main.go
+
+# Start the gateway in the background
+gateway-start:
+	@echo "Starting Kurtosis gateway..."
+	@kurtosis gateway > /dev/null 2>&1 &
+	@echo $$! > .gateway.pid
+	@sleep 2
+	@echo "Gateway started with PID $$(cat .gateway.pid)"
+
+# Stop the gateway
+gateway-stop:
+	@if [ -f .gateway.pid ]; then \
+		echo "Stopping Kurtosis gateway..."; \
+		kill $$(cat .gateway.pid) 2>/dev/null || true; \
+		rm .gateway.pid; \
+		echo "Gateway stopped"; \
+	else \
+		echo "No gateway process found"; \
+	fi
+
+# Restart the Kurtosis engine
+engine-restart:
+	@echo "Restarting Kurtosis engine..."
+	@kurtosis engine restart
+	@sleep 5
+	@echo "Engine restarted"
+
+# Full deployment process
+deploy: clean build engine-restart gateway-start
+	@echo "Starting deployment..."
+	@./kc deploy --el $(el) --cl $(cl) --vc $(vc) --step $(step)
+	@$(MAKE) gateway-stop
+
+# Default target
+all: deploy
+
+# Helper target to ensure clean state
+clean-state:
+	@echo "Cleaning up any existing processes..."
+	@$(MAKE) gateway-stop
+	@$(MAKE) clean
+	@echo "Clean state established"
+
+# Main entry point - this is what users should run
+run-deployment: clean-state deploy
+	@echo "Deployment completed successfully!"
