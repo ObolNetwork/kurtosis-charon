@@ -91,8 +91,8 @@ func validateInputs() error {
 	}
 
 	// Validate step if provided
-	if step != 0 && (step < 1 || step > 5) {
-		return fmt.Errorf("step must be between 1 and 5")
+	if step != 0 && (step < 1 || step > 7) {
+		return fmt.Errorf("step must be between 1 and 7")
 	}
 
 	return nil

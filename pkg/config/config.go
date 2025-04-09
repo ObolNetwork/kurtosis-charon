@@ -25,11 +25,11 @@ type Config struct {
 	VCVersions    map[string]string
 
 	// AWS configuration
-	AWSRegion    string
-	AWSBucket    string
-	AWSAccessKey string
-	AWSSecretKey string
-
+	AWSRegion       string
+	AWSBucket       string
+	AWSAccessKey    string
+	AWSSecretKey    string
+	AWSSessionToken string
 	// File paths
 	NetworkParamsFile string
 	ValuesFile        string
@@ -91,6 +91,7 @@ func NewConfig(executionLayer, consensusLayer, validatorType string) (*Config, e
 		AWSBucket:         viper.GetString("AWS_BUCKET"),
 		AWSAccessKey:      viper.GetString("AWS_ACCESS_KEY_ID"),
 		AWSSecretKey:      viper.GetString("AWS_SECRET_ACCESS_KEY"),
+		AWSSessionToken:   viper.GetString("AWS_SESSION_TOKEN"),
 		NetworkParamsFile: networkParamsFile,
 		ValuesFile:        fmt.Sprintf("%s-values.yaml", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
 		PlanOutputFile:    fmt.Sprintf("%s-plan-output.yaml", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),

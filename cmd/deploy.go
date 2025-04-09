@@ -97,11 +97,36 @@ func deployCluster() error {
 		}
 	}
 
-	// Step 6: Helm deploy
-	if step == 0 || step == 6 {
-		logrus.Info("Step 6: Deploying with Helm")
+	// Step 6: Create AWS secret
+	if step == 0 || step >= 6 {
+		logrus.Info("Step 6: Creating AWS secret")
+		if err := createAWSSecret(cfg); err != nil {
+			return fmt.Errorf("AWS secret creation failed: %v", err)
+		}
+		if step == 6 {
+			return nil
+		}
+	}
+
+	// Step 7: Helm deploy
+	if step == 0 || step >= 7 {
+		logrus.Info("Step 7: Deploying with Helm")
 		if err := deployWithHelm(cfg); err != nil {
 			return fmt.Errorf("Helm deployment failed: %v", err)
+		}
+
+		// Delete the Kurtosis VC pod after Helm deployment
+		podName := fmt.Sprintf("vc-1-%s-%s", strings.ToLower(cfg.ExecutionLayer), strings.ToLower(cfg.ConsensusLayer))
+		cmd := exec.Command("kubectl", "delete", "pod", podName, "-n", fmt.Sprintf("kt-%s", cfg.EnclaveName))
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			logrus.Warnf("Failed to delete pod %s: %v\nOutput: %s", podName, err, string(output))
+		} else {
+			logrus.Infof("Successfully deleted pod %s", podName)
+		}
+
+		if step == 7 {
+			return nil
 		}
 	}
 
@@ -388,15 +413,35 @@ func uploadToS3(cfg *config.Config) error {
 	return nil
 }
 
-func deployWithHelm(cfg *config.Config) error {
-	// Create namespace if it doesn't exist
-	cmd := exec.Command("kubectl", "create", "namespace", cfg.Namespace)
-	if err := cmd.Run(); err != nil {
-		logrus.Warnf("Failed to create namespace %s: %v", cfg.Namespace, err)
+func createAWSSecret(cfg *config.Config) error {
+	// Create or update the AWS credentials secret
+	cmd := exec.Command("kubectl", "create", "secret", "generic", "aws-credentials",
+		"--namespace", cfg.Namespace,
+		"--from-literal=AWS_ACCESS_KEY_ID="+cfg.AWSAccessKey,
+		"--from-literal=AWS_SECRET_ACCESS_KEY="+cfg.AWSSecretKey,
+		"--from-literal=AWS_SESSION_TOKEN="+cfg.AWSSessionToken,
+		"--dry-run=client",
+		"-o", "yaml")
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to create AWS credentials secret: %v\nOutput: %s", err, string(output))
 	}
 
+	// Apply the secret
+	cmd = exec.Command("kubectl", "apply", "-f", "-")
+	cmd.Stdin = strings.NewReader(string(output))
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to apply AWS credentials secret: %v", err)
+	}
+
+	logrus.Info("Successfully created AWS credentials secret")
+	return nil
+}
+
+func deployWithHelm(cfg *config.Config) error {
 	// Deploy with Helm
-	cmd = exec.Command("helm", "upgrade", "--install",
+	cmd := exec.Command("helm", "upgrade", "--install",
 		cfg.EnclaveName,
 		"kurtosis-charon-vc-helm",
 		"--namespace", cfg.Namespace,
