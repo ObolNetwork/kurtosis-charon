@@ -440,6 +440,18 @@ func createAWSSecret(cfg *config.Config) error {
 }
 
 func deployWithHelm(cfg *config.Config) error {
+	// Create Lighthouse validator definitions if VC contains Lighthouse
+	if cfg.HasValidatorClient("1") {
+		logrus.Info("Creating Lighthouse validator definitions...")
+		namespace := fmt.Sprintf("kt-%s-%s-%s", el, cl, vc)
+		cmd := exec.Command("./create-lighthouse-validators-definitions.sh", namespace)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to create Lighthouse validator definitions: %v", err)
+		}
+	}
+
 	// Deploy with Helm
 	cmd := exec.Command("helm", "upgrade", "--install",
 		cfg.EnclaveName,

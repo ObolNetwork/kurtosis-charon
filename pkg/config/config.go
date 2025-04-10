@@ -42,6 +42,9 @@ type Config struct {
 	// Runtime configuration
 	EnclaveUUID      string
 	GenesisTimestamp string
+
+	// ValidatorClients is an array of validator client types (0=teku, 1=lighthouse, 2=lodestar, 3=nimbus, 4=prysm)
+	ValidatorClients []string
 }
 
 func NewConfig(executionLayer, consensusLayer, validatorType string) (*Config, error) {
@@ -67,6 +70,12 @@ func NewConfig(executionLayer, consensusLayer, validatorType string) (*Config, e
 		if vcType != "" {
 			numNodes++
 		}
+	}
+
+	// Parse VC string into array of validator types
+	validatorClients := make([]string, len(vcTypes))
+	for i, vcType := range vcTypes {
+		validatorClients[i] = vcType
 	}
 
 	// Create config
@@ -101,6 +110,7 @@ func NewConfig(executionLayer, consensusLayer, validatorType string) (*Config, e
 		ClusterDir:        fmt.Sprintf("%s-cluster", fmt.Sprintf("%s-%s-%s", executionLayer, consensusLayer, strings.ReplaceAll(validatorType, ",", ""))),
 		EnclaveUUID:       viper.GetString("ENCLAVE_UUID"),
 		GenesisTimestamp:  viper.GetString("GENESIS_TIMESTAMP"),
+		ValidatorClients:  validatorClients,
 	}
 
 	// Validate required configurations
@@ -138,4 +148,14 @@ func (c *Config) GetBeaconNodeEndpoint(index int) string {
 	}
 	return fmt.Sprintf("http://cl-%d-%s-%s.%s.svc.cluster.local:%d",
 		index+1, c.ConsensusLayer, c.ExecutionLayer, c.Namespace, port)
+}
+
+// HasValidatorClient checks if the config has a specific validator client type
+func (c *Config) HasValidatorClient(vcType string) bool {
+	for _, vc := range c.ValidatorClients {
+		if vc == vcType {
+			return true
+		}
+	}
+	return false
 }
