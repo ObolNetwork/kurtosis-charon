@@ -26,7 +26,7 @@ OLDIFS=$IFS
 IFS='
 '
 # export $(< ./envs/${CLUSTER_NAME}.env)
-export $(< ./.env)
+export $(< ./.charon/${CLUSTER_NAME}/.env)
 IFS=$OLDIFS
 
 # create lighthouse validators definitions
