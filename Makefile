@@ -149,7 +149,7 @@ engine-restart:
 	@echo "Engine restarted"
 
 # Full deployment process
-deploy: clean build engine-restart gateway-start
+deploy: build engine-restart gateway-start
 	@echo "Starting deployment..."
 	@./kc deploy --el $(el) --cl $(cl) --vc $(vc) --step $(step)
 	@$(MAKE) gateway-stop
@@ -161,7 +161,6 @@ all: deploy
 clean-state:
 	@echo "Cleaning up any existing processes..."
 	@$(MAKE) gateway-stop
-	@$(MAKE) clean
 	@echo "Clean state established"
 
 # Main entry point - this is what users should run
