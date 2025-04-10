@@ -1,0 +1,31 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+connectors:
+  spanmetrics:
+    histogram:
+      unit: "ms"
+    resource_metrics_key_attributes:
+      - service.name
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:8889
+
+  otlp:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [spanmetrics, otlp]
+
+    metrics:
+      receivers: [spanmetrics]
+      exporters: [prometheus]
