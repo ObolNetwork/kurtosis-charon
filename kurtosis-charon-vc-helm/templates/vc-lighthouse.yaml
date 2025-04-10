@@ -1,28 +1,6 @@
 {{- range .Values.NODES }}
 {{- if eq (int .VC_TYPE) 1 }}
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: vc{{ .index }}-import-script-config
-  namespace: {{ $.Values.CLUSTER_NAME }}
-data:
-  import-lighthouse-script.sh: |
-    #!/bin/sh
-    # Create validator directory
-    mkdir -p /data/lighthouse/.lighthouse/custom/validators
-    
-    for f in /validator_keys/keystore-*.json; do
-      echo "Importing key ${f}"
-      password_file=$(echo "$f" | sed 's/\.json$/.txt/')
-      lighthouse account validator import \
-        --reuse-password \
-        --keystore "${f}" \
-        --password-file "${password_file}" \
-        --testnet-dir "/opt/lighthouse/network-configs" \
-        --datadir "/data/lighthouse"
-    done
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -78,7 +56,6 @@ spec:
                 secretKeyRef:
                   name: aws-credentials
                   key: AWS_SESSION_TOKEN
-          {{- if $.Values.CLUSTER_PERF }}
           command:
             - sh
             - -ac
@@ -101,40 +78,6 @@ spec:
               mountPath: "/data/lighthouse"
             - name: network-config
               mountPath: "/opt/lighthouse/network-configs"
-          {{- else }}
-          command:
-            - sh
-            - -ac
-            - |
-              # echo "Starting S3 copy..." &&
-              # aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/node{{ .index }}/validator_keys /validator_keys &&
-              echo "Copying testnet files..." &&
-              aws s3 ls s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet/ &&
-              aws s3 cp --recursive s3://charon-clusters-config/{{ $.Values.CLUSTER_NAME }}/testnet/ /opt/lighthouse/network-configs/ &&
-              echo "S3 copy completed" &&
-              echo "Contents of /opt/lighthouse/network-configs:" &&
-              ls -la /opt/lighthouse/network-configs/
-          volumeMounts:
-            - name: data
-              mountPath: "/data/lighthouse"
-            - name: network-config
-              mountPath: "/opt/lighthouse/network-configs"
-            - name: validators
-              mountPath: "/validator_keys"
-          {{- end }}
-        # - name: import-keys
-        #   image: sigp/lighthouse:{{ .VC_VERSION }}
-        #   imagePullPolicy: Always
-        #   command: ['sh', '/scripts/import-lighthouse-script.sh']
-        #   volumeMounts:
-        #     - name: import-script
-        #       mountPath: "/scripts"
-        #     - name: validators
-        #       mountPath: "/validator_keys"
-        #     - name: network-config
-        #       mountPath: "/opt/lighthouse/network-configs"
-        #     - name: data
-        #       mountPath: "/data/lighthouse"
       containers:
         - name: vc{{ .index }}-lighthouse
           image: sigp/lighthouse:{{ .VC_VERSION }}
@@ -174,14 +117,6 @@ spec:
           emptyDir: {}
         - name: network-config
           emptyDir: {}
-        {{- if not $.Values.CLUSTER_PERF }}
-        - name: validators
-          emptyDir: {}
-        - name: import-script
-          configMap:
-            name: vc{{ .index }}-import-script-config
-            defaultMode: 0755
-        {{- end }}
 ---
 apiVersion: v1
 kind: Service

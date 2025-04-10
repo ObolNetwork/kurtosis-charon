@@ -556,7 +556,7 @@ PROPOSER_DEFAULT_FEE_RECIPIENT=0x50Af11554713D43794b2ACDb351EEB363b03f97e
 		cfg.VCTypes,
 	)
 
-	envPath := filepath.Join(cfg.ClusterDir, ".env.k8s")
+	envPath := filepath.Join(cfg.ClusterDir, ".env")
 	if err := os.WriteFile(envPath, []byte(envContent), 0644); err != nil {
 		return fmt.Errorf("failed to create .env.k8s file: %v", err)
 	}

@@ -41,7 +41,7 @@ EOF
 
 # Loop to generate services for each node
 for ((i = 0; i < NODES; i++)); do
-    cat << EOF >> docker-compose.yml
+    cat << EOF >> docker-compose-lodestar-import-keystores.yml
   lodestar-node$i:
     image: chainsafe/lodestar:${LODESTAR_VERSION}
     entrypoint: /opt/scripts/import-script.sh
@@ -57,11 +57,11 @@ done
 
 cat docker-compose.yml
 # Run the Docker Compose stack in the background
-docker-compose up
+docker-compose -f docker-compose-lodestar-import-keystores.yml up
 
 # gcloud storage cp -R ${definitions_dir} gs://charon-clusters-config/${CLUSTER_NAME}
 aws s3 cp --recursive ${definitions_dir} s3://charon-clusters-config/${CLUSTER_NAME}/lodestar-validators-definitions
 
 # delete cluster config before exit
 rm -rf ./.charon/${CLUSTER_NAME}
-rm -rf ./docker-compose.yml
+rm -rf ./docker-compose-lodestar-import-keystores.yml
