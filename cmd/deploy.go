@@ -443,8 +443,7 @@ func deployWithHelm(cfg *config.Config) error {
 	// Create Lighthouse validator definitions if VC contains Lighthouse
 	if cfg.HasValidatorClient("1") {
 		logrus.Info("Creating Lighthouse validator definitions...")
-		namespace := fmt.Sprintf("kt-%s-%s-%s", el, cl, vc)
-		cmd := exec.Command("./create-lighthouse-validators-definitions.sh", namespace)
+		cmd := exec.Command("./create-lighthouse-validators-definitions.sh", cfg.Namespace)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
