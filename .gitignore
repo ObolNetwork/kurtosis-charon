@@ -37,3 +37,4 @@ kc
 *-plan-output.yaml
 docker-compose-lodestar-import-keystores.yml
 .charon/
+*.log

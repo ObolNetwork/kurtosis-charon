@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -14,6 +16,7 @@ var (
 	cl      string
 	vc      string
 	step    int
+	version = "0.1.0" // Current version of the application
 	verbose bool
 )
 
@@ -23,10 +26,14 @@ var rootCmd = &cobra.Command{
 	Long: `A CLI tool for deploying Charon clusters using Kurtosis,
 Kubernetes, and Helm. This tool orchestrates the entire deployment process
 from setting up the execution and consensus clients to deploying validators with charon.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if err := validateInputs(); err != nil {
-			logrus.Fatal(err)
+			return err
 		}
+		return initializeLogging()
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		// Main command logic here
 	},
 }
 
@@ -48,6 +55,61 @@ func init() {
 	rootCmd.MarkPersistentFlagRequired("el")
 	rootCmd.MarkPersistentFlagRequired("cl")
 	rootCmd.MarkPersistentFlagRequired("vc")
+}
+
+// initializeLogging sets up the logging configuration
+func initializeLogging() error {
+	// Initialize logging with enclave-specific filename
+	enclaveName := fmt.Sprintf("kt-%s-%s-%s", el, cl, vc)
+	logFileName := fmt.Sprintf("kurtosis-charon-%s.log", enclaveName)
+
+	logFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %v", err)
+	}
+
+	// Configure logrus to write to both file and stdout
+	logrus.SetOutput(io.MultiWriter(os.Stdout, logFile))
+
+	// Set log format to JSON for better Loki compatibility
+	logrus.SetFormatter(&logrus.JSONFormatter{
+		TimestampFormat: time.RFC3339Nano,
+		FieldMap: logrus.FieldMap{
+			logrus.FieldKeyTime:  "timestamp",
+			logrus.FieldKeyLevel: "level",
+			logrus.FieldKeyMsg:   "message",
+		},
+	})
+
+	// Set log level
+	logrus.SetLevel(logrus.InfoLevel)
+
+	// Add common fields for better log correlation
+	logrus.AddHook(&LogHook{
+		Fields: logrus.Fields{
+			"application": "kurtosis-charon",
+			"version":     version,
+			"enclave":     enclaveName,
+		},
+	})
+
+	return nil
+}
+
+// LogHook adds common fields to all log entries
+type LogHook struct {
+	Fields logrus.Fields
+}
+
+func (hook *LogHook) Fire(entry *logrus.Entry) error {
+	for k, v := range hook.Fields {
+		entry.Data[k] = v
+	}
+	return nil
+}
+
+func (hook *LogHook) Levels() []logrus.Level {
+	return logrus.AllLevels
 }
 
 func validateInputs() error {
