@@ -393,8 +393,6 @@ services:
     depends_on: [ prometheus, tempo ]
     volumes:
       - ./otelcollector/otelcollector.yaml:/etc/otelcollector.yaml
-    ports:
-      - "8889:8889"
 
   grafana:
     image: grafana/grafana:${GRAFANA_VERSION:-9.5.3}
