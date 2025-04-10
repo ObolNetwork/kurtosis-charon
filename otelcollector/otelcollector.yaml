@@ -8,10 +8,6 @@ connectors:
   spanmetrics:
     histogram:
       unit: "ms"
-      explicit:
-        buckets: [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000]
-    exemplars:
-      enabled: true
     resource_metrics_key_attributes:
       - service.name
 

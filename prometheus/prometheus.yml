@@ -8,8 +8,8 @@ remote_write:
       credentials: ""
     write_relabel_configs:
       - source_labels: [job]
-        regex: "charon(.*)"
-        action: keep # Keeps charon metrics and drop metrics from other containers.
+        regex: "charon(.*)|otelcollector"
+        action: keep # Keeps charon and otelcollector metrics and drops metrics from other containers.
 
 scrape_configs:
   - job_name: "charon-0"
