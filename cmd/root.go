@@ -50,7 +50,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&cl, "cl", "c", "", "Consensus layer client (e.g. nimbus, lighthouse)")
 	rootCmd.PersistentFlags().StringVarP(&vc, "vc", "v", "", "Validator client type encoding (e.g. 0,0,1,2 for two Teku, one Lighthouse, and one Lodestar)")
 	rootCmd.PersistentFlags().IntVar(&step, "step", 0, "Run steps up to this number (1-7). If not specified, runs all steps.")
-	rootCmd.PersistentFlags().StringVar(&skip, "skip", "", "Comma-separated list of steps to skip (e.g. 2,3)")
+	rootCmd.PersistentFlags().StringVar(&skip, "skip", "0", "Comma-separated list of steps to skip (e.g. 2,3)")
 	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "Enable verbose logging")
 
 	// Required flags
