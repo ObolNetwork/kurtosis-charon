@@ -23,7 +23,7 @@ A CLI tool for deploying Charon clusters using Kurtosis, Kubernetes, and Helm. T
 
 ## Prerequisites
 
-- Go 1.16 or later
+- Go 1.21 or later
 - Kubernetes cluster
 - Helm
 - AWS CLI configured
