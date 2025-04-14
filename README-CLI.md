@@ -94,19 +94,22 @@ There are two ways to run the deployment:
 #### 2. Using Make
 ```bash
 # Basic deployment
-make run-deployment el=<execution-layer> cl=<consensus-layer> vc=<validator-counts>
+make deploy-k8s el=<execution-layer> cl=<consensus-layer> vc=<validator-counts>
 
 # Example: Deploy Geth with Lighthouse and 2,2,4,4 validators
-make run-deployment el=geth cl=lighthouse vc=2,2,4,4
+make deploy-k8s el=geth cl=lighthouse vc=2,2,4,4
 
 # Skip specific steps
-make run-deployment el=geth cl=lighthouse vc=2,2,4,4 skip=1,2,3,4,5,6
+make deploy-k8s el=geth cl=lighthouse vc=2,2,4,4 skip=1,2,3,4,5,6
 
 # Run only specific step
-make run-deployment el=geth cl=lighthouse vc=2,2,4,4 step=7
+make deploy-k8s el=geth cl=lighthouse vc=2,2,4,4 step=7
 
 # Skip steps and run specific step
-make run-deployment el=geth cl=lighthouse vc=2,2,4,4 step=7 skip=1,2,3,4,5,6
+make deploy-k8s el=geth cl=lighthouse vc=2,2,4,4 step=7 skip=1,2,3,4,5,6
+
+# Run all 25 combinations of CL and VC deployments
+make deploy-k8s-all
 ```
 
 ### Available Options
@@ -116,6 +119,42 @@ make run-deployment el=geth cl=lighthouse vc=2,2,4,4 step=7 skip=1,2,3,4,5,6
 - `--vc` or `vc`: Validator Counts (comma-separated list, e.g., "2,2,4,4")
 - `--skip` or `skip`: Steps to skip (comma-separated list, e.g., "1,2,3")
 - `--step` or `step`: Specific step to run (1-7)
+
+### Deployment Combinations
+
+The tool supports all possible combinations of Consensus Layer (CL) and Validator Client (VC) deployments:
+
+1. **Consensus Layer Clients (5)**
+   - Lighthouse
+   - Lodestar
+   - Nimbus
+   - Teku
+   - Prysm
+
+2. **Validator Client Types (5)**
+   - 0: Teku
+   - 1: Lighthouse
+   - 2: Lodestar
+   - 3: Nimbus
+   - 4: Prysm
+
+3. **Combination Examples**
+   Single VC type:
+   - Lighthouse CL with all Lighthouse VCs: `make run-deployment el=geth cl=lighthouse vc=1,1,1,1`
+   - Lodestar CL with all Lodestar VCs: `make run-deployment el=geth cl=lodestar vc=2,2,2,2`
+   - Nimbus CL with all Nimbus VCs: `make run-deployment el=geth cl=nimbus vc=3,3,3,3`
+   - Teku CL with all Teku VCs: `make run-deployment el=geth cl=teku vc=0,0,0,0`
+   - Prysm CL with all Prysm VCs: `make run-deployment el=geth cl=prysm vc=4,4,4,4`
+
+   Multiple VC types:
+   - Lighthouse CL with all Lighthouse VCs: `make run-deployment el=geth cl=lighthouse vc=1,1,2,2`
+   - Lodestar CL with all Lodestar VCs: `make run-deployment el=geth cl=lodestar vc=2,2,3,3`
+   - etc
+
+To run all 25 possible combinations in sequence, use:
+```bash
+make deploy-k8s-all
+```
 
 ### Deployment Steps
 

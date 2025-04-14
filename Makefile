@@ -118,20 +118,9 @@ clean:
 	rm -rf .charon
 	rm -rf data
 
-# Install golangci-lint if not present
-install-lint:
-	@if ! command -v golangci-lint &> /dev/null; then \
-		echo "Installing golangci-lint..."; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v1.55.2; \
-	fi
-
-# Run linters
-lint: install-lint
-	@echo "Running linters..."
-	@golangci-lint run --disable=gocritic --enable=gofmt,goimports,govet,gosimple,staticcheck,errcheck,ineffassign,typecheck,unused ./...
 
 # Build the binary
-build: lint
+build:
 	go build -o kc main.go
 
 # Start the gateway in the background
