@@ -16,6 +16,7 @@ var (
 	cl      string
 	vc      string
 	step    int
+	skip    string
 	version = "0.1.0" // Current version of the application
 	verbose bool
 )
@@ -48,7 +49,8 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&el, "el", "e", "", "Execution layer client (e.g. geth, nethermind)")
 	rootCmd.PersistentFlags().StringVarP(&cl, "cl", "c", "", "Consensus layer client (e.g. nimbus, lighthouse)")
 	rootCmd.PersistentFlags().StringVarP(&vc, "vc", "v", "", "Validator client type encoding (e.g. 0,0,1,2 for two Teku, one Lighthouse, and one Lodestar)")
-	rootCmd.PersistentFlags().IntVar(&step, "step", 0, "Run steps up to this number (1-5). If not specified, runs all steps.")
+	rootCmd.PersistentFlags().IntVar(&step, "step", 0, "Run steps up to this number (1-7). If not specified, runs all steps.")
+	rootCmd.PersistentFlags().StringVar(&skip, "skip", "", "Comma-separated list of steps to skip (e.g. 2,3)")
 	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "Enable verbose logging")
 
 	// Required flags
@@ -60,7 +62,7 @@ func init() {
 // initializeLogging sets up the logging configuration
 func initializeLogging() error {
 	// Initialize logging with enclave-specific filename
-	enclaveName := fmt.Sprintf("kt-%s-%s-%s", el, cl, vc)
+	enclaveName := fmt.Sprintf("kt-%s-%s-%s", el, cl, strings.ReplaceAll(vc, ",", ""))
 	logFileName := fmt.Sprintf("kurtosis-charon-%s.log", enclaveName)
 
 	logFile, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)

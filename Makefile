@@ -151,7 +151,7 @@ engine-restart:
 # Full deployment process
 deploy: build engine-restart gateway-start
 	@echo "Starting deployment..."
-	@./kc deploy --el $(el) --cl $(cl) --vc $(vc) --step $(step)
+	@./kc deploy --el $(el) --cl $(cl) --vc $(vc) --step $(step) --skip $(skip)
 	@$(MAKE) gateway-stop
 
 # Default target

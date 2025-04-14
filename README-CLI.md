@@ -1,6 +1,6 @@
 # Kurtosis Charon CLI
 
-A CLI tool for deploying Charon validator clusters using Kurtosis, Kubernetes, and Helm. This tool orchestrates the entire deployment process from setting up execution and consensus clients to deploying validators with Charon.
+A CLI tool for deploying Charon clusters using Kurtosis, Kubernetes, and Helm. This tool orchestrates the entire deployment process from setting up the execution and consensus clients to deploying validators with Charon.
 
 ## Features
 
@@ -48,7 +48,8 @@ kurtosis cluster set cloud
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+# Clone the repository
+git clone https://github.com/obol/kurtosis-charon.git
 cd kurtosis-charon
 ```
 
@@ -62,7 +63,7 @@ go build -o kc main.go
 ### Basic Deployment
 
 ```bash
-./kc deploy --el geth --cl lighthouse --vc 2,2,1,1 --step 7
+./kc deploy --el geth --cl lighthouse --vc 2,2,1,1 --step 7 --skip 3
 ```
 
 This command will:
@@ -73,41 +74,76 @@ This command will:
 
 ### Command Options
 
-- `--el, -e`: Execution layer client (geth, nethermind)
-- `--cl, -c`: Consensus layer client (nimbus, lighthouse, lodestar, prysm, teku)
+- `--el, -e`: Execution layer client (e.g., geth, nethermind)
+- `--cl, -c`: Consensus layer client (e.g., nimbus, lighthouse)
 - `--vc, -v`: Validator client type encoding (e.g., 0,0,1,2 for two Teku, one Lighthouse, and one Lodestar)
 - `--step`: Run steps up to this number (1-7). If not specified, runs all steps.
+- `--skip`: Comma-separated list of steps to skip (e.g., 2,3)
 - `--verbose`: Enable verbose logging
 
-### Validator Client Types
+### Step Control
 
-- `0`: Teku
-- `1`: Lighthouse
-- `2`: Lodestar
-- `3`: Nimbus
-- `4`: Prysm
+You can control the deployment process in several ways:
 
-## Deployment Steps
+1. Run all steps:
+```bash
+kurtosis-charon deploy --el geth --cl lighthouse --vc 2,2,1,1
+```
 
-1. **Environment Setup**
-   - Initialize Kurtosis engine
-   - Start Kurtosis gateway
-   - Configure AWS credentials
+2. Run up to a specific step:
+```bash
+kurtosis-charon deploy --el geth --cl lighthouse --vc 2,2,1,1 --step 4
+```
 
-2. **Cluster Creation**
-   - Create Kubernetes namespace
-   - Deploy execution and consensus clients
-   - Set up validator clients
+3. Skip specific steps (note: step 1 cannot be skipped as it is required for configuration):
+```bash
+kurtosis-charon deploy --el geth --cl lighthouse --vc 2,2,1,1 --skip 2,3,5
+```
 
-3. **Charon Configuration**
-   - Generate cluster configuration
-   - Create validator keys
-   - Set up S3 storage
+4. Run from a step and skip others (note: step 1 cannot be skipped):
+```bash
+kurtosis-charon deploy --el geth --cl lighthouse --vc 2,2,1,1 --step 4 --skip 5,6
+```
 
-4. **Helm Deployment**
-   - Deploy Charon nodes
-   - Configure validator clients
-   - Set up monitoring
+### Deployment Steps
+
+The deployment process consists of 7 steps:
+
+1. **Cleanup and Validation** (Required - cannot be skipped)
+   - Cleans up old Kubernetes namespaces
+   - Removes local folders and files
+   - Generates Helm values file
+   - Validates configuration
+
+2. **Kurtosis Cluster Deployment**
+   - Deploy execution and consensus clients using Kurtosis
+   - Store the output of the Kurtosis plan in a file
+   - Get the enclave UUID
+   - Download testnet folder from enclave
+   - Get the genesis timestamp from the Beacon Node
+   - Update the values file with the genesis timestamp
+
+3. **Key Generation**
+   - Download validator keys from the first VC instance
+   - Generate new validator keys
+   - Set up key storage and permissions
+
+4. **Charon Setup**
+   - Run Charon cli to create cluster configuration
+   - Generate .env file
+
+5. **S3 Upload**
+   - Upload testnet configurations to S3
+   - Upload Charon cluster files to S3
+   - Clean up local temporary files
+
+6. **AWS Secret Creation**
+   - Create AWS secret in Kubernetes namespace
+
+7. **Helm Deployment**
+   - Create Lighthouse validator definitions if VC contains Lighthouse
+   - Deploy Charon nodes using Helm
+   - Delete first VC pod to prevent conflicts
 
 ## Logging
 
@@ -130,23 +166,38 @@ Log files are created in the format:
 kurtosis-charon-kt-<el>-<cl>-<vc>.log
 ```
 
-Example:
-```
-kurtosis-charon-kt-geth-lighthouse-2,2,1,1.log
+```json
+{
+  "application": "kurtosis-charon",
+  "version": "0.1.0",
+  "enclave": "kt-geth-lighthouse-2,2,1,1",
+  "timestamp": "2024-03-21T12:34:56.789Z",
+  "level": "info",
+  "message": "Step 1: Performing cleanup and validation"
+}
 ```
 
 ## Development
 
+### Prerequisites
+
+- Go 1.21 or later
+- Docker
+- Kubernetes
+- Helm
+- AWS CLI
+- Kurtosis CLI
+
 ### Building
 
 ```bash
-go build -o kc main.go
+make build
 ```
 
 ### Testing
 
 ```bash
-go test ./...
+make test
 ```
 
 ## Contributing

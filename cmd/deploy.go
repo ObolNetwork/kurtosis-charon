@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/obol/kurtosis-charon/pkg/config"
@@ -42,8 +43,23 @@ func deployCluster() error {
 		return fmt.Errorf("failed to create config: %v", err)
 	}
 
+	// Parse skipped steps
+	skippedSteps := make(map[int]bool)
+	if skip != "" {
+		for _, s := range strings.Split(skip, ",") {
+			stepNum, err := strconv.Atoi(strings.TrimSpace(s))
+			if err != nil {
+				return fmt.Errorf("invalid skip step number: %v", err)
+			}
+			if stepNum < 1 || stepNum > 7 {
+				return fmt.Errorf("skip step number must be between 1 and 7")
+			}
+			skippedSteps[stepNum] = true
+		}
+	}
+
 	// Step 1: Cleanup and validation
-	if step == 0 || step >= 1 {
+	if step == 0 || step >= 1 && !skippedSteps[1] {
 		logrus.Info("Step 1: Performing cleanup and validation")
 		if err := cleanupAndValidate(cfg); err != nil {
 			return fmt.Errorf("cleanup and validation failed: %v", err)
@@ -51,10 +67,12 @@ func deployCluster() error {
 		if step == 1 {
 			return nil
 		}
+	} else if skippedSteps[1] {
+		logrus.Info("Skipping step 1: Cleanup and validation")
 	}
 
 	// Step 2: Run Kurtosis plan
-	if step == 0 || step >= 2 {
+	if (step == 0 || step >= 2) && !skippedSteps[2] {
 		logrus.Info("Step 2: Running Kurtosis plan")
 		if err := runKurtosisPlan(cfg); err != nil {
 			return fmt.Errorf("Kurtosis plan failed: %v", err)
@@ -62,10 +80,18 @@ func deployCluster() error {
 		if step == 2 {
 			return nil
 		}
+	} else if skippedSteps[2] {
+		logrus.Info("Skipping step 2: Running Kurtosis plan")
+		// Even when skipping step 2, we need to fetch the enclave details
+		if err := fetchEnclaveDetails(cfg, FetchEnclaveOptions{
+			SkipTestnetDownload: true,
+		}); err != nil {
+			return fmt.Errorf("failed to fetch enclave details: %v", err)
+		}
 	}
 
 	// Step 3: Download and generate keys
-	if step == 0 || step >= 3 {
+	if (step == 0 || step >= 3) && !skippedSteps[3] {
 		logrus.Info("Step 3: Downloading and generating keys")
 		if err := downloadAndGenerateKeys(cfg); err != nil {
 			return fmt.Errorf("key generation failed: %v", err)
@@ -73,10 +99,12 @@ func deployCluster() error {
 		if step == 3 {
 			return nil
 		}
+	} else if skippedSteps[3] {
+		logrus.Info("Skipping step 3: Downloading and generating keys")
 	}
 
 	// Step 4: Run Charon cluster creation
-	if step == 0 || step >= 4 {
+	if (step == 0 || step >= 4) && !skippedSteps[4] {
 		logrus.Info("Step 4: Running Charon cluster creation")
 		if err := runCharonCluster(cfg); err != nil {
 			return fmt.Errorf("Charon cluster creation failed: %v", err)
@@ -84,10 +112,12 @@ func deployCluster() error {
 		if step == 4 {
 			return nil
 		}
+	} else if skippedSteps[4] {
+		logrus.Info("Skipping step 4: Running Charon cluster creation")
 	}
 
 	// Step 5: S3 uploads
-	if step == 0 || step >= 5 {
+	if (step == 0 || step >= 5) && !skippedSteps[5] {
 		logrus.Info("Step 5: Uploading to S3")
 		if err := uploadToS3(cfg); err != nil {
 			return fmt.Errorf("S3 upload failed: %v", err)
@@ -95,10 +125,12 @@ func deployCluster() error {
 		if step == 5 {
 			return nil
 		}
+	} else if skippedSteps[5] {
+		logrus.Info("Skipping step 5: Uploading to S3")
 	}
 
 	// Step 6: Create AWS secret
-	if step == 0 || step >= 6 {
+	if (step == 0 || step >= 6) && !skippedSteps[6] {
 		logrus.Info("Step 6: Creating AWS secret")
 		if err := createAWSSecret(cfg); err != nil {
 			return fmt.Errorf("AWS secret creation failed: %v", err)
@@ -106,10 +138,12 @@ func deployCluster() error {
 		if step == 6 {
 			return nil
 		}
+	} else if skippedSteps[6] {
+		logrus.Info("Skipping step 6: Creating AWS secret")
 	}
 
 	// Step 7: Helm deploy
-	if step == 0 || step >= 7 {
+	if (step == 0 || step >= 7) && !skippedSteps[7] {
 		logrus.Info("Step 7: Deploying with Helm")
 		if err := deployWithHelm(cfg); err != nil {
 			return fmt.Errorf("Helm deployment failed: %v", err)
@@ -128,6 +162,8 @@ func deployCluster() error {
 		if step == 7 {
 			return nil
 		}
+	} else if skippedSteps[7] {
+		logrus.Info("Skipping step 7: Deploying with Helm")
 	}
 
 	return nil
@@ -193,104 +229,12 @@ func runKurtosisPlan(cfg *config.Config) error {
 		return fmt.Errorf("failed to write plan output: %v", err)
 	}
 
-	// Get enclave UUID
-	cmd = exec.Command("kurtosis", "enclave", "ls")
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to list enclaves: %v", err)
+	// Fetch enclave details with testnet download
+	if err := fetchEnclaveDetails(cfg, FetchEnclaveOptions{
+		SkipTestnetDownload: false,
+	}); err != nil {
+		return fmt.Errorf("failed to fetch enclave details: %v", err)
 	}
-
-	// Parse the output to find our enclave
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
-		if strings.Contains(line, cfg.EnclaveName) {
-			fields := strings.Fields(line)
-			if len(fields) > 0 {
-				cfg.EnclaveUUID = fields[0]
-				break
-			}
-		}
-	}
-
-	if cfg.EnclaveUUID == "" {
-		return fmt.Errorf("failed to find enclave UUID for %s", cfg.EnclaveName)
-	}
-
-	// Create testnet directory
-	if err := os.MkdirAll(cfg.TestnetDir, 0755); err != nil {
-		return fmt.Errorf("failed to create testnet directory: %v", err)
-	}
-
-	// Download testnet files
-	cmd = exec.Command("kurtosis", "files", "download",
-		cfg.EnclaveUUID,
-		"el_cl_genesis_data",
-		cfg.TestnetDir)
-
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to download testnet files: %v\nOutput: %s", err, string(output))
-	}
-
-	// Get beacon node port using Kurtosis port print
-	beaconClient := fmt.Sprintf("cl-1-%s-%s", strings.ToLower(cfg.ConsensusLayer), strings.ToLower(cfg.ExecutionLayer))
-	logrus.Infof("Beacon client for getting genesis timestamp: %s", beaconClient)
-	cmd = exec.Command("kurtosis", "port", "print",
-		cfg.EnclaveUUID,
-		beaconClient,
-		"http")
-
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to get beacon node port: %v\nOutput: %s", err, string(output))
-	}
-
-	// Extract port from output using regex to match http://IP:PORT pattern
-	re := regexp.MustCompile(`http://[0-9\.]+:[0-9]+`)
-	portOutput := re.FindString(string(output))
-	if portOutput == "" {
-		return fmt.Errorf("failed to extract port from output: %s", string(output))
-	}
-	logrus.Infof("Beacon node port: %s", portOutput)
-
-	// Get genesis timestamp from beacon node using local port
-	cmd = exec.Command("curl", "-s",
-		fmt.Sprintf("%s/eth/v1/beacon/genesis", portOutput))
-
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to get genesis timestamp: %v\nOutput: %s", err, string(output))
-	}
-
-	// Parse genesis timestamp from JSON response
-	type GenesisResponse struct {
-		Data struct {
-			GenesisTime string `json:"genesis_time"`
-		} `json:"data"`
-	}
-
-	var genesis GenesisResponse
-	if err := json.Unmarshal(output, &genesis); err != nil {
-		return fmt.Errorf("failed to parse genesis response: %v", err)
-	}
-
-	if genesis.Data.GenesisTime == "" {
-		return fmt.Errorf("genesis timestamp not found in response: %s", string(output))
-	}
-
-	// Store genesis timestamp in config
-	cfg.GenesisTimestamp = genesis.Data.GenesisTime
-	logrus.Infof("Fetched genesis timestamp from beacon node: %s", cfg.GenesisTimestamp)
-
-	// TODO: Create a dedicated function to update specific values in the YAML file
-	// instead of regenerating the entire file. This would be more efficient and
-	// safer when we only need to update certain fields like genesis timestamp.
-	// Current implementation regenerates the entire file which could be problematic
-	// if other values have been manually modified.
-	if err := helm.GenerateValuesFile(cfg); err != nil {
-		return fmt.Errorf("failed to update values file with genesis timestamp: %v", err)
-	}
-	logrus.Infof("Updated values file with genesis timestamp: %s", cfg.GenesisTimestamp)
 
 	logrus.Info("Kurtosis plan completed successfully")
 	return nil
@@ -582,5 +526,124 @@ PROPOSER_DEFAULT_FEE_RECIPIENT=0x50Af11554713D43794b2ACDb351EEB363b03f97e
 	}
 
 	logrus.Info("Charon cluster created successfully")
+	return nil
+}
+
+// FetchEnclaveOptions defines options for fetching enclave details
+type FetchEnclaveOptions struct {
+	SkipTestnetDownload bool
+	// Add more options here as needed
+}
+
+// fetchEnclaveDetails fetches necessary details from the enclave
+func fetchEnclaveDetails(cfg *config.Config, opts ...FetchEnclaveOptions) error {
+	// Default options
+	options := FetchEnclaveOptions{}
+	if len(opts) > 0 {
+		options = opts[0]
+	}
+
+	// Get enclave UUID
+	cmd := exec.Command("kurtosis", "enclave", "ls")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to list enclaves: %v", err)
+	}
+
+	// Parse the output to find our enclave
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, cfg.EnclaveName) {
+			fields := strings.Fields(line)
+			if len(fields) > 0 {
+				cfg.EnclaveUUID = fields[0]
+				break
+			}
+		}
+	}
+
+	if cfg.EnclaveUUID == "" {
+		return fmt.Errorf("failed to find enclave UUID for %s", cfg.EnclaveName)
+	}
+
+	// Download testnet files if not skipped
+	if !options.SkipTestnetDownload {
+		// Create testnet directory
+		if err := os.MkdirAll(cfg.TestnetDir, 0755); err != nil {
+			return fmt.Errorf("failed to create testnet directory: %v", err)
+		}
+
+		// Download testnet files
+		cmd = exec.Command("kurtosis", "files", "download",
+			cfg.EnclaveUUID,
+			"el_cl_genesis_data",
+			cfg.TestnetDir)
+
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to download testnet files: %v\nOutput: %s", err, string(output))
+		}
+		logrus.Info("Successfully downloaded testnet files")
+	} else {
+		logrus.Info("Skipping testnet files download as requested")
+	}
+
+	// Get beacon node port using Kurtosis port print
+	beaconClient := fmt.Sprintf("cl-1-%s-%s", strings.ToLower(cfg.ConsensusLayer), strings.ToLower(cfg.ExecutionLayer))
+	logrus.Infof("Beacon client for getting genesis timestamp: %s", beaconClient)
+	cmd = exec.Command("kurtosis", "port", "print",
+		cfg.EnclaveUUID,
+		beaconClient,
+		"http")
+
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get beacon node port: %v\nOutput: %s", err, string(output))
+	}
+
+	// Extract port from output using regex to match http://IP:PORT pattern
+	re := regexp.MustCompile(`http://[0-9\.]+:[0-9]+`)
+	portOutput := re.FindString(string(output))
+	if portOutput == "" {
+		return fmt.Errorf("failed to extract port from output: %s", string(output))
+	}
+	logrus.Infof("Beacon node port: %s", portOutput)
+
+	// Get genesis timestamp from beacon node using local port
+	cmd = exec.Command("curl", "-s",
+		fmt.Sprintf("%s/eth/v1/beacon/genesis", portOutput))
+
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get genesis timestamp: %v\nOutput: %s", err, string(output))
+	}
+
+	// Parse genesis timestamp from JSON response
+	type GenesisResponse struct {
+		Data struct {
+			GenesisTime string `json:"genesis_time"`
+		} `json:"data"`
+	}
+
+	var genesis GenesisResponse
+	if err := json.Unmarshal(output, &genesis); err != nil {
+		return fmt.Errorf("failed to parse genesis response: %v", err)
+	}
+
+	if genesis.Data.GenesisTime == "" {
+		return fmt.Errorf("genesis timestamp not found in response: %s", string(output))
+	}
+
+	cfg.GenesisTimestamp = genesis.Data.GenesisTime
+
+	// TODO: Create a dedicated function to update specific values in the YAML file
+	// instead of regenerating the entire file. This would be more efficient and
+	// safer when we only need to update certain fields like genesis timestamp.
+	// Current implementation regenerates the entire file which could be problematic
+	// if other values have been manually modified.
+	if err := helm.GenerateValuesFile(cfg); err != nil {
+		return fmt.Errorf("failed to update values file with genesis timestamp: %v", err)
+	}
+	logrus.Infof("Updated values file with genesis timestamp: %s", cfg.GenesisTimestamp)
 	return nil
 }
