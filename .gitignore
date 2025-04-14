@@ -38,3 +38,4 @@ kc
 docker-compose-lodestar-import-keystores.yml
 .charon/
 *.log
+example-charts/
