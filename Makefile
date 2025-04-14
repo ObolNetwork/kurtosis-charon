@@ -1,4 +1,4 @@
-.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku clean build deploy gateway-start gateway-stop engine-restart lint
+.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku clean build deploy gateway-start gateway-stop engine-restart lint run-all-k8s
 
 # Define the composite step
 geth-lighthouse-charon-lighthouse: geth-lighthouse charon run-charon-lighthouse
@@ -160,12 +160,6 @@ engine-restart:
 	@sleep 5
 	@echo "Engine restarted"
 
-# Full deployment process
-deploy: build engine-restart gateway-start
-	@echo "Starting deployment..."
-	@./kc deploy --el $(el) --cl $(cl) --vc $(vc) --step $(step) --skip $(skip)
-	@$(MAKE) gateway-stop
-
 # Default target
 all: deploy
 
@@ -176,7 +170,7 @@ clean-state:
 	@echo "Clean state established"
 
 # Main entry point - this is what users should run
-run-deployment: clean
+deploy-k8s: build engine-restart gateway-start
 	@echo "Starting deployment..."
 	@if [ -z "$(skip)" ] && [ -z "$(step)" ]; then \
 		./kc deploy --el $(el) --cl $(cl) --vc $(vc); \
@@ -187,3 +181,86 @@ run-deployment: clean
 	else \
 		./kc deploy --el $(el) --cl $(cl) --vc $(vc) --step $(step) --skip $(skip); \
 	fi
+	@make clean-state
+
+# Run all 25 combinations of CL and VC deployments
+deploy-k8s-all:
+	@echo "Running all 25 combinations of CL and VC deployments..."
+	@echo "1. Lighthouse (1,1,1,1)"
+	@make deploy-k8s el=geth cl=lighthouse vc=1,1,1,1
+	@make clean-state
+	@echo "2. Lighthouse (2,2,2,2)"
+	@make deploy-k8s el=geth cl=lighthouse vc=2,2,2,2
+	@make clean-state
+	@echo "3. Lighthouse (3,3,3,3)"
+	@make deploy-k8s el=geth cl=lighthouse vc=3,3,3,3
+	@make clean-state
+	@echo "4. Lighthouse (4,4,4,4)"
+	@make deploy-k8s el=geth cl=lighthouse vc=4,4,4,4
+	@make clean-state
+	@echo "5. Lighthouse (0,0,0,0)"
+	@make deploy-k8s el=geth cl=lighthouse vc=0,0,0,0
+	@make clean-state
+
+	@echo "6. Lodestar (1,1,1,1)"
+	@make deploy-k8s el=geth cl=lodestar vc=1,1,1,1
+	@make clean-state
+	@echo "7. Lodestar (2,2,2,2)"
+	@make deploy-k8s el=geth cl=lodestar vc=2,2,2,2
+	@make clean-state
+	@echo "8. Lodestar (3,3,3,3)"
+	@make deploy-k8s el=geth cl=lodestar vc=3,3,3,3
+	@make clean-state
+	@echo "9. Lodestar (4,4,4,4)"
+	@make deploy-k8s el=geth cl=lodestar vc=4,4,4,4
+	@make clean-state
+	@echo "10. Lodestar (0,0,0,0)"
+	@make deploy-k8s el=geth cl=lodestar vc=0,0,0,0
+
+	@echo "11. Nimbus (1,1,1,1)"
+	@make deploy-k8s el=geth cl=nimbus vc=1,1,1,1
+	@make clean-state
+	@echo "12. Nimbus (2,2,2,2)"
+	@make deploy-k8s el=geth cl=nimbus vc=2,2,2,2
+	@make clean-state
+	@echo "13. Nimbus (3,3,3,3)"
+	@make deploy-k8s el=geth cl=nimbus vc=3,3,3,3
+	@make clean-state
+	@echo "14. Nimbus (4,4,4,4)"
+	@make deploy-k8s el=geth cl=nimbus vc=4,4,4,4
+	@make clean-state
+	@echo "15. Nimbus (0,0,0,0)"
+	@make deploy-k8s el=geth cl=nimbus vc=0,0,0,0
+	@make clean-state
+
+	@echo "16. Teku (1,1,1,1)"
+	@make deploy-k8s el=geth cl=teku vc=1,1,1,1
+	@make clean-state
+	@echo "17. Teku (2,2,2,2)"
+	@make deploy-k8s el=geth cl=teku vc=2,2,2,2
+	@make clean-state
+	@echo "18. Teku (3,3,3,3)"
+	@make deploy-k8s el=geth cl=teku vc=3,3,3,3
+	@make clean-state
+	@echo "19. Teku (4,4,4,4)"
+	@make deploy-k8s el=geth cl=teku vc=4,4,4,4
+	@make clean-state
+	@echo "20. Teku (0,0,0,0)"
+	@make deploy-k8s el=geth cl=teku vc=0,0,0,0
+	@make clean-state
+	@echo "21. Prysm (1,1,1,1)"
+	@make deploy-k8s el=geth cl=prysm vc=1,1,1,1
+	@make clean-state
+	@echo "22. Prysm (2,2,2,2)"
+	@make deploy-k8s el=geth cl=prysm vc=2,2,2,2
+	@make clean-state
+	@echo "23. Prysm (3,3,3,3)"
+	@make deploy-k8s el=geth cl=prysm vc=3,3,3,3
+	@make clean-state
+	@echo "24. Prysm (4,4,4,4)"
+	@make deploy-k8s el=geth cl=prysm vc=4,4,4,4
+	@make clean-state
+	@echo "25. Prysm (0,0,0,0)"
+	@make deploy-k8s el=geth cl=prysm vc=0,0,0,0
+	@make clean-state
+	@echo "All combinations completed!"
