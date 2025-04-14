@@ -164,5 +164,14 @@ clean-state:
 	@echo "Clean state established"
 
 # Main entry point - this is what users should run
-run-deployment: clean-state deploy
-	@echo "Deployment completed successfully!"
+run-deployment: clean
+	@echo "Starting deployment..."
+	@if [ -z "$(SKIP)" ] && [ -z "$(STEP)" ]; then \
+		./kc deploy --el $(el) --cl $(cl) --vc $(vc); \
+	elif [ -z "$(SKIP)" ]; then \
+		./kc deploy --el $(el) --cl $(cl) --vc $(vc) --step $(STEP); \
+	elif [ -z "$(STEP)" ]; then \
+		./kc deploy --el $(el) --cl $(cl) --vc $(vc) --skip $(SKIP); \
+	else \
+		./kc deploy --el $(el) --cl $(cl) --vc $(vc) --step $(STEP) --skip $(SKIP); \
+	fi
