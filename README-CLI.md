@@ -60,50 +60,62 @@ go build -o kc main.go
 
 ## Usage
 
-### Basic Deployment
+### Prerequisites
+- Go 1.21 or later
+- Docker and Docker Compose
+- Kurtosis CLI
+- Make (for Make-based deployment)
 
+### Building the CLI
 ```bash
-./kc deploy --el geth --cl lighthouse --vc 2,2,1,1 --step 7 --skip 3
+# Build the binary
+make build
 ```
 
-This command will:
-- Deploy a Geth execution client
-- Deploy a Lighthouse consensus client
-- Deploy charon with 4 validators (2 Teku, 2 Lighthouse)
-- Run all deployment steps (1-7)
+### Running the Deployment
 
-### Command Options
+There are two ways to run the deployment:
 
-- `--el, -e`: Execution layer client (e.g., geth, nethermind)
-- `--cl, -c`: Consensus layer client (e.g., nimbus, lighthouse)
-- `--vc, -v`: Validator client type encoding (e.g., 0,0,1,2 for two Teku, one Lighthouse, and one Lodestar)
-- `--step`: Run steps up to this number (1-7). If not specified, runs all steps.
-- `--skip`: Comma-separated list of steps to skip (e.g., 2,3)
-- `--verbose`: Enable verbose logging
-
-### Step Control
-
-You can control the deployment process in several ways:
-
-1. Run all steps:
+#### 1. Using the kc Binary Directly
 ```bash
-kurtosis-charon deploy --el geth --cl lighthouse --vc 2,2,1,1
+# Basic deployment
+./kc deploy --el <execution-layer> --cl <consensus-layer> --vc <validator-counts>
+
+# Example: Deploy Geth with Lighthouse and 2,2,4,4 validators
+./kc deploy --el geth --cl lighthouse --vc 2,2,4,4
+
+# Skip specific steps
+./kc deploy --el geth --cl lighthouse --vc 2,2,4,4 --skip 1,2,3,4,5,6
+
+# Run only specific step
+./kc deploy --el geth --cl lighthouse --vc 2,2,4,4 --step 7
 ```
 
-2. Run up to a specific step:
+#### 2. Using Make
 ```bash
-kurtosis-charon deploy --el geth --cl lighthouse --vc 2,2,1,1 --step 4
+# Basic deployment
+make run-deployment el=<execution-layer> cl=<consensus-layer> vc=<validator-counts>
+
+# Example: Deploy Geth with Lighthouse and 2,2,4,4 validators
+make run-deployment el=geth cl=lighthouse vc=2,2,4,4
+
+# Skip specific steps
+make run-deployment el=geth cl=lighthouse vc=2,2,4,4 skip=1,2,3,4,5,6
+
+# Run only specific step
+make run-deployment el=geth cl=lighthouse vc=2,2,4,4 step=7
+
+# Skip steps and run specific step
+make run-deployment el=geth cl=lighthouse vc=2,2,4,4 step=7 skip=1,2,3,4,5,6
 ```
 
-3. Skip specific steps (note: step 1 cannot be skipped as it is required for configuration):
-```bash
-kurtosis-charon deploy --el geth --cl lighthouse --vc 2,2,1,1 --skip 2,3,5
-```
+### Available Options
 
-4. Run from a step and skip others (note: step 1 cannot be skipped):
-```bash
-kurtosis-charon deploy --el geth --cl lighthouse --vc 2,2,1,1 --step 4 --skip 5,6
-```
+- `--el` or `el`: Execution Layer Client (geth, nethermind, besu)
+- `--cl` or `cl`: Consensus Layer Client (lighthouse, lodestar, nimbus, prysm, teku)
+- `--vc` or `vc`: Validator Counts (comma-separated list, e.g., "2,2,4,4")
+- `--skip` or `skip`: Steps to skip (comma-separated list, e.g., "1,2,3")
+- `--step` or `step`: Specific step to run (1-7)
 
 ### Deployment Steps
 

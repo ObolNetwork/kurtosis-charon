@@ -1,4 +1,4 @@
-.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku clean build deploy gateway-start gateway-stop engine-restart
+.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku clean build deploy gateway-start gateway-stop engine-restart lint
 
 # Define the composite step
 geth-lighthouse-charon-lighthouse: geth-lighthouse charon run-charon-lighthouse
@@ -118,8 +118,20 @@ clean:
 	rm -rf .charon
 	rm -rf data
 
+# Install golangci-lint if not present
+install-lint:
+	@if ! command -v golangci-lint &> /dev/null; then \
+		echo "Installing golangci-lint..."; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin v1.55.2; \
+	fi
+
+# Run linters
+lint: install-lint
+	@echo "Running linters..."
+	@golangci-lint run --disable=gocritic --enable=gofmt,goimports,govet,gosimple,staticcheck,errcheck,ineffassign,typecheck,unused ./...
+
 # Build the binary
-build:
+build: lint
 	go build -o kc main.go
 
 # Start the gateway in the background
@@ -166,12 +178,12 @@ clean-state:
 # Main entry point - this is what users should run
 run-deployment: clean
 	@echo "Starting deployment..."
-	@if [ -z "$(SKIP)" ] && [ -z "$(STEP)" ]; then \
+	@if [ -z "$(skip)" ] && [ -z "$(step)" ]; then \
 		./kc deploy --el $(el) --cl $(cl) --vc $(vc); \
-	elif [ -z "$(SKIP)" ]; then \
-		./kc deploy --el $(el) --cl $(cl) --vc $(vc) --step $(STEP); \
-	elif [ -z "$(STEP)" ]; then \
-		./kc deploy --el $(el) --cl $(cl) --vc $(vc) --skip $(SKIP); \
+	elif [ -z "$(skip)" ]; then \
+		./kc deploy --el $(el) --cl $(cl) --vc $(vc) --step $(step); \
+	elif [ -z "$(step)" ]; then \
+		./kc deploy --el $(el) --cl $(cl) --vc $(vc) --skip $(skip); \
 	else \
-		./kc deploy --el $(el) --cl $(cl) --vc $(vc) --step $(STEP) --skip $(SKIP); \
+		./kc deploy --el $(el) --cl $(cl) --vc $(vc) --step $(step) --skip $(skip); \
 	fi
