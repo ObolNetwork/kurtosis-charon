@@ -31,7 +31,7 @@ services:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node0/charon-enr-private-key
       CHARON_LOCK_FILE: /opt/charon/.charon/cluster/node0/cluster-lock.json
-      CHARON_OTLP_SERVICE_NAME: node0
+      CHARON_OTLP_SERVICE_NAME: kurtosis-node0
       CHARON_P2P_EXTERNAL_HOSTNAME: node0
       CHARON_VALIDATOR_API_ADDRESS: ${CHARON_VALIDATOR_API_ADDRESS:-0.0.0.0:3600}
       CHARON_P2P_TCP_ADDRESS: ${CHARON_P2P_TCP_ADDRESS:-0.0.0.0:3610}
@@ -49,7 +49,7 @@ services:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node1/charon-enr-private-key
       CHARON_LOCK_FILE: /opt/charon/.charon/cluster/node1/cluster-lock.json
-      CHARON_OTLP_SERVICE_NAME: node1
+      CHARON_OTLP_SERVICE_NAME: kurtosis-node1
       CHARON_P2P_EXTERNAL_HOSTNAME: node1
       CHARON_VALIDATOR_API_ADDRESS: ${CHARON_VALIDATOR_API_ADDRESS:-0.0.0.0:3600}
       CHARON_P2P_TCP_ADDRESS: ${CHARON_P2P_TCP_ADDRESS:-0.0.0.0:3610}
@@ -67,7 +67,7 @@ services:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node2/charon-enr-private-key
       CHARON_LOCK_FILE: /opt/charon/.charon/cluster/node2/cluster-lock.json
-      CHARON_OTLP_SERVICE_NAME: node2
+      CHARON_OTLP_SERVICE_NAME: kurtosis-node2
       CHARON_P2P_EXTERNAL_HOSTNAME: node2
       CHARON_VALIDATOR_API_ADDRESS: ${CHARON_VALIDATOR_API_ADDRESS:-0.0.0.0:3600}
       CHARON_P2P_TCP_ADDRESS: ${CHARON_P2P_TCP_ADDRESS:-0.0.0.0:3610}
@@ -393,6 +393,8 @@ services:
     depends_on: [ prometheus, tempo ]
     volumes:
       - ./otelcollector/otelcollector.yaml:/etc/otelcollector.yaml
+    environment:
+      TEMPO_REMOTE_BASIC_AUTH: ${TEMPO_REMOTE_BASIC_AUTH}
 
   grafana:
     image: grafana/grafana:${GRAFANA_VERSION:-9.5.3}

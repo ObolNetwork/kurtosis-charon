@@ -15,16 +15,21 @@ exporters:
   prometheus:
     endpoint: 0.0.0.0:8889
 
-  otlp:
+  otlp/local-tempo:
     endpoint: tempo:4317
     tls:
       insecure: true
+
+  otlp/remote-tempo:
+    endpoint: "tempo.monitoring.gcp.obol.tech:443"
+    headers:
+      Authorization: "Basic ${TEMPO_REMOTE_BASIC_AUTH}"
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [spanmetrics, otlp]
+      exporters: [spanmetrics, otlp/local-tempo, otlp/remote-tempo]
 
     metrics:
       receivers: [spanmetrics]
