@@ -78,8 +78,6 @@ additional_services:
   - prometheus_grafana
 tx_fuzz_params:
   tx_fuzz_extra_args: []
-spamoor_blob_params:
-  spamoor_extra_args: []
 assertoor_params:
   image: ""
   run_stability_check: true
