@@ -14,7 +14,7 @@ participants:
     el_max_mem: 0
     # CL
     cl_type: nimbus
-    cl_image: statusim/nimbus-eth2:multiarch-v25.3.1
+    cl_image: statusim/nimbus-eth2:multiarch-v25.4.0
     cl_log_level: ""
     cl_extra_env_vars: {}
     cl_extra_labels: {}

@@ -14,7 +14,7 @@ participants:
     el_max_mem: 0
 # CL
     cl_type: lighthouse
-    cl_image: sigp/lighthouse:v7.0.0-beta.4
+    cl_image: sigp/lighthouse:v7.0.0
     cl_log_level: ""
     cl_extra_env_vars: {}
     cl_extra_labels: {}
