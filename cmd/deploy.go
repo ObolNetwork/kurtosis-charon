@@ -176,6 +176,24 @@ func cleanupAndValidate(cfg *config.Config) error {
 		logrus.Warnf("Failed to delete namespace %s: %v", cfg.Namespace, err)
 	}
 
+	// Clean up Kurtosis cluster roles
+	cmd = exec.Command("kubectl", "delete", "$(kubectl", "get", "clusterrole", "-o", "name", "|", "grep", "'kurtosis')")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		logrus.Warnf("Failed to delete Kurtosis cluster roles: %v\nOutput: %s", err, string(output))
+	} else {
+		logrus.Info("Successfully deleted Kurtosis cluster roles")
+	}
+
+	// Clean up Kurtosis cluster role bindings
+	cmd = exec.Command("kubectl", "delete", "$(kubectl", "get", "clusterrolebindings", "-o", "name", "|", "grep", "'kurtosis')")
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		logrus.Warnf("Failed to delete Kurtosis cluster role bindings: %v\nOutput: %s", err, string(output))
+	} else {
+		logrus.Info("Successfully deleted Kurtosis cluster role bindings")
+	}
+
 	// Clean up local folders and files
 	dirs := []string{
 		cfg.TestnetDir,
