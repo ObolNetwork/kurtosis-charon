@@ -156,10 +156,17 @@ all: deploy
 clean-state:
 	@echo "Cleaning up any existing processes..."
 	@$(MAKE) gateway-stop
+	@echo "Cleaning up Kurtosis namespaces..."
+	@kubectl get namespace -o name | grep 'kurtosis-engine' | xargs -r kubectl delete
+	@kubectl get namespace -o name | grep 'kurtosis-logs-aggregator' | xargs -r kubectl delete
+	@kubectl get namespace -o name | grep 'kurtosis-logs-collector' | xargs -r kubectl delete
+	@echo "Cleaning up Kurtosis cluster roles and bindings..."
+	@kubectl get clusterrole -o name | grep 'kurtosis' | xargs -r kubectl delete
+	@kubectl get clusterrolebindings -o name | grep 'kurtosis' | xargs -r kubectl delete
 	@echo "Clean state established"
 
 # Main entry point - this is what users should run
-deploy-k8s: build engine-restart gateway-start
+deploy-k8s: build clean-state engine-restart gateway-start
 	@echo "Starting deployment..."
 	@if [ -z "$(skip)" ] && [ -z "$(step)" ]; then \
 		./kc deploy --el $(el) --cl $(cl) --vc $(vc); \
