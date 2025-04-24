@@ -31,6 +31,12 @@ geth-prysm-charon-teku: geth-prysm charon run-charon-teku
 geth-prysm-charon-nimbus: geth-prysm charon run-charon-nimbus
 geth-prysm-charon-prysm: geth-prysm charon run-charon-prysm
 
+geth-grandine-charon-lighthouse: geth-grandine charon run-charon-lighthouse
+geth-grandine-charon-lodestar: geth-grandine charon run-charon-lodestar
+geth-grandine-charon-teku: geth-grandine charon run-charon-teku
+geth-grandine-charon-nimbus: geth-grandine charon run-charon-nimbus
+geth-grandine-charon-prysm: geth-grandine charon run-charon-prysm
+
 geth-lighthouse:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_lighthouse.yaml > planprint
@@ -62,6 +68,12 @@ geth-teku:
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_teku.yaml > planprint
 	@echo "Waiting for 60 seconds... don't skip the wait"
 	@sleep 60
+
+geth-grandine:
+	rm -f planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_grandine.yaml > planprint
+	@echo "Waiting for 60 seconds... don't skip the wait"
+	@sleep 10
 
 charon:
 	mkdir -p data

@@ -76,8 +76,8 @@ additional_services:
   - forkmon
   - dora
   - prometheus_grafana
-spamoor_blob_params:
-  spamoor_extra_args: []
+spamoor_params:
+  extra_args: []
 assertoor_params:
   image: ""
   run_stability_check: true

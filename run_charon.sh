@@ -53,6 +53,9 @@ extract_bn_ip() {
         elif [[ $beaconClient == *"lodestar"* ]]; then
             enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr.ip=/ {print $2}')
             enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--rest.port=/ {print $2}')
+        elif [[ $beaconClient == *"grandine"* ]]; then
+            enr_address=$(echo "$kurtosis_inspect_output" | awk -F= '/--enr-address=/ {print $2}')
+            enr_address_port=$(echo "$kurtosis_inspect_output" | awk -F= '/--http-port=/ {print $2}')
         fi
         echo "Beacon node address found: $enr_address:$enr_address_port"
         ret+=($(echo "$enr_address:$enr_address_port"))
