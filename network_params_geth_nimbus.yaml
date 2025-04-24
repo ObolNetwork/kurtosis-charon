@@ -70,7 +70,7 @@ network_params:
   min_validator_withdrawability_delay: 256
   shard_committee_period: 1
   deneb_fork_epoch: 0
-  electra_fork_epoch: 500
+  electra_fork_epoch: 5
   # network_sync_base_url: https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/
 # additional_services:
 #   - prometheus_grafana
