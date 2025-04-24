@@ -73,7 +73,7 @@ geth-grandine:
 	rm -f planprint
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params_geth_grandine.yaml > planprint
 	@echo "Waiting for 60 seconds... don't skip the wait"
-	@sleep 60
+	@sleep 10
 
 charon:
 	mkdir -p data
