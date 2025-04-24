@@ -184,105 +184,80 @@ deploy-k8s-all:
 	@echo "Running all 25 combinations of CL and VC deployments..."
 	@echo "1. Lighthouse (1,1,1,1)"
 	@make deploy-k8s el=geth cl=lighthouse vc=1,1,1,1
-	@make clean-state
 	@sleep 30
 	@echo "2. Lighthouse (2,2,2,2)"
 	@make deploy-k8s el=geth cl=lighthouse vc=2,2,2,2
-	@make clean-state
 	@sleep 30
 	@echo "3. Lighthouse (3,3,3,3)"
 	@make deploy-k8s el=geth cl=lighthouse vc=3,3,3,3
-	@make clean-state
 	@sleep 30
 	@echo "4. Lighthouse (4,4,4,4)"
 	@make deploy-k8s el=geth cl=lighthouse vc=4,4,4,4
-	@make clean-state
 	@sleep 30
 	@echo "5. Lighthouse (0,0,0,0)"
 	@make deploy-k8s el=geth cl=lighthouse vc=0,0,0,0
-	@make clean-state
 	@sleep 30
 
 	@echo "6. Lodestar (1,1,1,1)"
 	@make deploy-k8s el=geth cl=lodestar vc=1,1,1,1
-	@make clean-state
 	@sleep 30
 	@echo "7. Lodestar (2,2,2,2)"
 	@make deploy-k8s el=geth cl=lodestar vc=2,2,2,2
-	@make clean-state
 	@sleep 30
 	@echo "8. Lodestar (3,3,3,3)"
 	@make deploy-k8s el=geth cl=lodestar vc=3,3,3,3
-	@make clean-state
 	@sleep 30
 	@echo "9. Lodestar (4,4,4,4)"
 	@make deploy-k8s el=geth cl=lodestar vc=4,4,4,4
-	@make clean-state
 	@sleep 30
 	@echo "10. Lodestar (0,0,0,0)"
 	@make deploy-k8s el=geth cl=lodestar vc=0,0,0,0
-	@make clean-state
 	@sleep 30
 
 	@echo "11. Nimbus (1,1,1,1)"
 	@make deploy-k8s el=geth cl=nimbus vc=1,1,1,1
-	@make clean-state
 	@sleep 30
 	@echo "12. Nimbus (2,2,2,2)"
 	@make deploy-k8s el=geth cl=nimbus vc=2,2,2,2
-	@make clean-state
 	@sleep 30
 	@echo "13. Nimbus (3,3,3,3)"
 	@make deploy-k8s el=geth cl=nimbus vc=3,3,3,3
-	@make clean-state
 	@sleep 30
 	@echo "14. Nimbus (4,4,4,4)"
 	@make deploy-k8s el=geth cl=nimbus vc=4,4,4,4
-	@make clean-state
 	@sleep 30
 	@echo "15. Nimbus (0,0,0,0)"
 	@make deploy-k8s el=geth cl=nimbus vc=0,0,0,0
-	@make clean-state
 	@sleep 30
 
 	@echo "16. Teku (1,1,1,1)"
 	@make deploy-k8s el=geth cl=teku vc=1,1,1,1
-	@make clean-state
 	@sleep 30
 	@echo "17. Teku (2,2,2,2)"
 	@make deploy-k8s el=geth cl=teku vc=2,2,2,2
-	@make clean-state
 	@sleep 30
 	@echo "18. Teku (3,3,3,3)"
 	@make deploy-k8s el=geth cl=teku vc=3,3,3,3
-	@make clean-state
 	@sleep 30
 	@echo "19. Teku (4,4,4,4)"
 	@make deploy-k8s el=geth cl=teku vc=4,4,4,4
-	@make clean-state
 	@sleep 30
 	@echo "20. Teku (0,0,0,0)"
 	@make deploy-k8s el=geth cl=teku vc=0,0,0,0
-	@make clean-state
 	@sleep 30
 
 	@echo "21. Prysm (1,1,1,1)"
 	@make deploy-k8s el=geth cl=prysm vc=1,1,1,1
-	@make clean-state
 	@sleep 30
 	@echo "22. Prysm (2,2,2,2)"
 	@make deploy-k8s el=geth cl=prysm vc=2,2,2,2
-	@make clean-state
 	@sleep 30
 	@echo "23. Prysm (3,3,3,3)"
 	@make deploy-k8s el=geth cl=prysm vc=3,3,3,3
-	@make clean-state
 	@sleep 30
 	@echo "24. Prysm (4,4,4,4)"
 	@make deploy-k8s el=geth cl=prysm vc=4,4,4,4
-	@make clean-state
 	@sleep 30
 	@echo "25. Prysm (0,0,0,0)"
 	@make deploy-k8s el=geth cl=prysm vc=0,0,0,0
-	@make clean-state
 	@echo "All combinations completed!"
