@@ -166,7 +166,7 @@ clean-state:
 	@echo "Clean state established"
 
 # Main entry point - this is what users should run
-deploy-k8s: build clean-state gateway-start
+deploy-k8s: build clean-state engine-restart gateway-start
 	@echo "Starting deployment..."
 	@if [ -z "$(skip)" ] && [ -z "$(step)" ]; then \
 		./kc deploy --el $(el) --cl $(cl) --vc $(vc); \
