@@ -1,0 +1,67 @@
+name: kurtosis-charon
+
+x-teku-base: &teku-base
+  image: consensys/teku:${VC_VERSION}
+  networks: [network1]
+  restart: unless-stopped
+  user: "${UID}:${GID}"
+
+x-teku-volume-run: &teku-volume-run ./teku:/opt/charon/teku
+x-teku-volume-config: &teku-volume-config ./testnet/config.yaml:/opt/teku/config.yaml
+
+services:
+  vc0-teku:
+    <<: *teku-base
+    depends_on: [node0]
+    command: |
+      validator-client
+      --beacon-node-api-endpoint="http://node0:3600"
+      --config-file "/opt/charon/teku/teku-config.yaml"
+      --validators-external-signer-slashing-protection-enabled true
+      --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
+      --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
+      --Xobol-dvt-integration-enabled true
+      --logging=DEBUG
+    volumes:
+      - *teku-volume-run
+      - *teku-volume-config
+      - .charon/cluster/node0/validator_keys:/opt/charon/validator_keys
+
+  vc1-teku:
+    <<: *teku-base
+    depends_on: [node1]
+    command: |
+      validator-client
+      --beacon-node-api-endpoint="http://node1:3600"
+      --config-file "/opt/charon/teku/teku-config.yaml"
+      --validators-external-signer-slashing-protection-enabled true
+      --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
+      --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
+      --Xobol-dvt-integration-enabled true
+      --logging=DEBUG
+    volumes:
+      - *teku-volume-run
+      - *teku-volume-config
+      - .charon/cluster/node1/validator_keys:/opt/charon/validator_keys
+
+  vc2-teku:
+    <<: *teku-base
+    depends_on: [node2]
+    command: |
+      validator-client
+      --beacon-node-api-endpoint="http://node2:3600"
+      --config-file "/opt/charon/teku/teku-config.yaml"
+      --validators-external-signer-slashing-protection-enabled true
+      --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
+      --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
+      --Xobol-dvt-integration-enabled true
+      --logging=DEBUG
+    volumes:
+      - *teku-volume-run
+      - *teku-volume-config
+      - .charon/cluster/node2/validator_keys:/opt/charon/validator_keys
+
+networks:
+  network1:
+    name: ${NETWORK_NAME}
+    external: true

@@ -6,7 +6,6 @@ deleteDatasources:
   - name: Loki
     orgId: 1
 
-
 datasources:
   - name: Prometheus
     type: prometheus

@@ -1,4 +1,6 @@
-FROM gcr.io/prysmaticlabs/prysm/validator:v5.1.0 as prysm-validator
+ARG VERSION
+
+FROM gcr.io/prysmaticlabs/prysm/validator:${VERSION} as prysm-validator
 
 FROM debian:buster-slim
 COPY --from=prysm-validator /app/cmd/validator/validator validator

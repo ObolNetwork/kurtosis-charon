@@ -1,0 +1,11 @@
+participants:
+  - el_type: geth
+    el_image: ethereum/client-go:${EL_VERSION}
+    cl_type: lighthouse
+    cl_image: sigp/lighthouse:${CL_VERSION}
+    cl_extra_params: ["--state-cache-size=128"]
+    use_separate_vc: true
+    count: 3
+    prometheus_config:
+      scrape_interval: 15s
+      labels: {}

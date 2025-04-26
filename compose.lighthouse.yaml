@@ -1,0 +1,53 @@
+name: kurtosis-charon
+
+x-lighthouse-base: &lighthouse-base
+  image: sigp/lighthouse:${VC_VERSION}
+  entrypoint: /opt/lighthouse/run.sh
+  networks: [network1]
+  restart: unless-stopped
+  user: "${UID}:${GID}"
+
+x-lighthouse-volume-run: &lighthouse-volume-run ./lighthouse/run.sh:/opt/lighthouse/run.sh
+x-lighthouse-volume-config: &lighthouse-volume-config ./testnet:/opt/lighthouse/network-configs
+
+x-lighthouse-env: &lighthouse-env
+  METRICS_PORT: "5065"
+
+services:
+  vc0-lighthouse:
+    <<: *lighthouse-base
+    depends_on: [node0]
+    environment:
+      <<: *lighthouse-env
+      LIGHTHOUSE_BEACON_NODE_ADDRESS: http://node0:3600
+    volumes:
+      - *lighthouse-volume-run
+      - *lighthouse-volume-config
+      - .charon/cluster/node0/validator_keys:/opt/charon/keys
+
+  vc1-lighthouse:
+    <<: *lighthouse-base
+    depends_on: [node1]
+    environment:
+      <<: *lighthouse-env
+      LIGHTHOUSE_BEACON_NODE_ADDRESS: http://node1:3600
+    volumes:
+      - *lighthouse-volume-run
+      - *lighthouse-volume-config
+      - .charon/cluster/node1/validator_keys:/opt/charon/keys
+
+  vc2-lighthouse:
+    <<: *lighthouse-base
+    depends_on: [node2]
+    environment:
+      <<: *lighthouse-env
+      LIGHTHOUSE_BEACON_NODE_ADDRESS: http://node2:3600
+    volumes:
+      - *lighthouse-volume-run
+      - *lighthouse-volume-config
+      - .charon/cluster/node2/validator_keys:/opt/charon/keys
+
+networks:
+  network1:
+    name: ${NETWORK_NAME}
+    external: true

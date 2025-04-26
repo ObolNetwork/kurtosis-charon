@@ -1,0 +1,11 @@
+participants:
+  - el_type: geth
+    el_image: ethereum/client-go:${EL_VERSION}
+    cl_type: teku
+    cl_image: consensys/teku:${CL_VERSION}
+    cl_extra_params: ["--validators-graffiti-client-append-format=DISABLED"]
+    use_separate_vc: true
+    count: 3
+    prometheus_config:
+      scrape_interval: 15s
+      labels: {}
