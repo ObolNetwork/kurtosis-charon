@@ -24,3 +24,9 @@ fi
 
 envsubst <"network_params.yaml" >"network_params.yaml.tmp"
 mv "network_params.yaml.tmp" "network_params.yaml"
+
+if [[ "$CL_TYPE" == "nimbus" ]]; then
+  if ! [ -f .env ]; then
+    echo "CHARON_EXTRA_RUN_ARGS=--feature-set-enable=json_requests" >>./.env
+  fi
+fi

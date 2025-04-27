@@ -4,8 +4,7 @@ x-node-base: &node-base
   image: obolnetwork/charon:${CHARON_VERSION}
   restart: unless-stopped
   networks: [network1]
-  # for nimbus add: --feature-set-enable=json_requests
-  command: "run --testnet-chain-id=3151908 --testnet-fork-version='0x10000038' --testnet-genesis-timestamp=${TESTNET_GENESIS_TIME_STAMP} --testnet-name=testnet --testnet-capella-hard-fork='0x40000038'"
+  command: "run --testnet-chain-id=3151908 --testnet-fork-version='0x10000038' --testnet-genesis-timestamp=${TESTNET_GENESIS_TIME_STAMP} --testnet-name=testnet --testnet-capella-hard-fork='0x40000038' ${CHARON_EXTRA_RUN_ARGS:-}"
   volumes:
     - ./.charon:/opt/charon/.charon/
   user: "${DUID:-}:${DGID:-}" # Used by docker-in-docker as it's based on linux
