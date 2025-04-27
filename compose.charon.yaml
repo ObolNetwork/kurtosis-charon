@@ -88,5 +88,5 @@ services:
 
 networks:
   network1:
-    # name: ${NETWORK_NAME}
-    # external: true
+    name: ${NETWORK_NAME}
+    external: true
