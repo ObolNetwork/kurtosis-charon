@@ -8,7 +8,7 @@ x-lodestar-base: &lodestar-base
   user: "${DUID:-}:${DGID:-}" # Used by docker-in-docker as it's based on linux
 
 x-lodestar-env: &lodestar-env
-  BUILDER_API_ENABLED: ${BUILDER_API_ENABLED:-true}
+  BUILDER_API_ENABLED: true
 
 x-lodestar-volume-run: &lodestar-volume-run ./lodestar/run.sh:/opt/lodestar/run.sh
 x-lodestar-volume-config: &lodestar-volume-config ./testnet/config.yaml:/opt/lodestar/config.yaml

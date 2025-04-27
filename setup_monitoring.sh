@@ -5,6 +5,7 @@ if ((BASH_VERSINFO[0] < 5)); then
   exit 1
 fi
 
+# Load .env if it exists.
 if ! [ -f .env ]; then
   echo ".env does not exist, using supplied env variables."
 else
@@ -12,21 +13,23 @@ else
   export $(xargs <.env)
 fi
 
-# Check if EXTERNAL_MONITORING environment variable is set
+# If EXTERNAL_MONITORING is not set, read ./deployments/env/charon.env.
 if [ -z "$EXTERNAL_MONITORING" ]; then
   dir="./deployments/env/charon.env"
   echo "EXTERNAL_MONITORING is unset, reading from ${dir}"
   export $(xargs <$dir)
 fi
 
-# Check if PROMETHEUS_REMOTE_WRITE_TOKEN environment variable is set
+# Error if EXTERNAL_MONITORING is true and PROMETHEUS_REMOTE_WRITE_TOKEN is not set.
 if "$EXTERNAL_MONITORING" && [ -z "$PROMETHEUS_REMOTE_WRITE_TOKEN" ]; then
   echo "PROMETHEUS_REMOTE_WRITE_TOKEN environment variable is not set for external monitoring."
   exit 1
 fi
 
+# Copy the generic prometheus.yml to prometheustmp.yml.
 cp prometheus/prometheus.yml prometheus/prometheustmp.yml
 
+# If EXTERNAL_MONITORING, add the Obol remote_write config.
 if "$EXTERNAL_MONITORING"; then
   echo "remote_write:
   - url: https://vm.monitoring.gcp.obol.tech/write

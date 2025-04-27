@@ -18,8 +18,8 @@ services:
       --beacon-node-api-endpoint="http://node0:3600"
       --config-file "/opt/charon/teku/teku-config.yaml"
       --validators-external-signer-slashing-protection-enabled true
-      --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
-      --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
+      --validators-proposer-blinded-blocks-enabled true
+      --validators-builder-registration-default-enabled true
       --Xobol-dvt-integration-enabled true
       --logging=DEBUG
     volumes:
@@ -35,8 +35,8 @@ services:
       --beacon-node-api-endpoint="http://node1:3600"
       --config-file "/opt/charon/teku/teku-config.yaml"
       --validators-external-signer-slashing-protection-enabled true
-      --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
-      --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
+      --validators-proposer-blinded-blocks-enabled true
+      --validators-builder-registration-default-enabled true
       --Xobol-dvt-integration-enabled true
       --logging=DEBUG
     volumes:
@@ -52,8 +52,8 @@ services:
       --beacon-node-api-endpoint="http://node2:3600"
       --config-file "/opt/charon/teku/teku-config.yaml"
       --validators-external-signer-slashing-protection-enabled true
-      --validators-proposer-blinded-blocks-enabled ${BUILDER_API_ENABLED:-true}
-      --validators-builder-registration-default-enabled ${BUILDER_API_ENABLED:-true}
+      --validators-proposer-blinded-blocks-enabled true
+      --validators-builder-registration-default-enabled true
       --Xobol-dvt-integration-enabled true
       --logging=DEBUG
     volumes:
