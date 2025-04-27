@@ -17,6 +17,14 @@ sleep 10
 ./setup_monitoring.sh
 ./setup_vc.sh
 
+if ! grep -q DUID ./.env; then
+  echo "DUID=$(id -u)" >>./.env
+fi
+
+if ! grep -q DGID ./.env; then
+  echo "DGID=$(id -g)" >>./.env
+fi
+
 # Reload .env as new variables from previous commands are added to it
 export $(xargs <.env)
 

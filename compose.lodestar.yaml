@@ -5,7 +5,7 @@ x-lodestar-base: &lodestar-base
   networks: [network1]
   restart: unless-stopped
   entrypoint: /opt/lodestar/run.sh
-  user: "${UID}:${GID}"
+  user: "${DUID:-}:${DGID:-}" # Used by docker-in-docker as it's based on linux
 
 x-lodestar-env: &lodestar-env
   BUILDER_API_ENABLED: ${BUILDER_API_ENABLED:-true}

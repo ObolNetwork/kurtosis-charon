@@ -8,7 +8,7 @@ x-prysm-base: &prysm-base
   platform: "linux/amd64"
   networks: [network1]
   restart: unless-stopped
-  user: "${UID}:${GID}"
+  user: "${DUID:-}:${DGID:-}" # Used by docker-in-docker as it's based on linux
 
 x-prysm-volume-run: &prysm-volume-run ./prysm/run.sh:/home/prysm/run.sh
 x-prysm-volume-config: &prysm-volume-config ./testnet/config.yaml:/home/data/config.yaml

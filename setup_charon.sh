@@ -224,14 +224,6 @@ else
     echo "Network starting with 'kt-' not found."
 fi
 
-if ! grep -q UID ./.env; then
-    echo "UID=$(id -u)" >>./.env
-fi
-
-if ! grep -q GID ./.env; then
-    echo "GID=$(id -g)" >>./.env
-fi
-
 # Find first VC and kill it
 echo Killing first VC that was started by Kurtosis
 docker kill $(docker container ls -f "NAME=vc-1-*" --format '{{.Names}}')
