@@ -33,6 +33,4 @@ exec lighthouse validator \
   --testnet-dir "/opt/lighthouse/network-configs" \
   --builder-proposals \
   --distributed \
-  --debug-level "debug" \
-  --produce-block-v3
-
+  --debug-level "debug"
