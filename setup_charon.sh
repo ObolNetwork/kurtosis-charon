@@ -176,9 +176,6 @@ done
 
 extract_bn_ip "$uuid" "$kurtosis_inspect_output" "$beaconClients" bnips
 
-# Remove any existing node* folders
-rm -rf node*
-
 if ! test -f ./.env; then
     touch ./.env
 fi
@@ -225,9 +222,12 @@ else
 fi
 
 # Find first VC and kill it
-echo Killing first VC that was started by Kurtosis
+echo "Killing first VC that was started by Kurtosis"
 docker kill $(docker container ls -f "NAME=vc-1-*" --format '{{.Names}}')
 
 mkdir -p ./.charon/cluster
 cp -r node* ./.charon/cluster
 rm -rf node*
+
+lock_hash=$(cat ".charon/cluster/node0/cluster-lock.json" | jq -r '.lock_hash')
+echo "Cluster lock hash ${lock_hash}"

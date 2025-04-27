@@ -38,44 +38,36 @@ geth-grandine-charon-nimbus: geth-grandine charon run-charon-nimbus
 geth-grandine-charon-prysm: geth-grandine charon run-charon-prysm
 
 geth-lighthouse:
-	rm -f planprint
 	CL_TYPE=lighthouse ./setup_el_cl.sh
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
 geth-nimbus:
-	@echo "WARNING: Nimbus BN requires Charon to enable feature json_requests"
-	@read -p "Press enter to continue"
-	rm -f planprint
 	CL_TYPE=nimbus ./setup_el_cl.sh
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
 geth-lodestar:
-	rm -f planprint
 	CL_TYPE=lodestar ./setup_el_cl.sh
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
 geth-prysm:
-	rm -f planprint
 	CL_TYPE=prysm ./setup_el_cl.sh
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 60 seconds... don't skip the wait"
 	@sleep 60
 
 geth-teku:
-	rm -f planprint
 	CL_TYPE=teku ./setup_el_cl.sh
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 60 seconds... don't skip the wait"
 	@sleep 60
 
 geth-grandine:
-	rm -f planprint
 	CL_TYPE=grandine ./setup_el_cl.sh
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 10 seconds... don't skip the wait"
@@ -126,7 +118,7 @@ exit-teku:
 	./teku/exit.sh 2
 
 clean:
-	-docker compose down
+	-docker compose -f compose.charon.yaml -f compose.lighthouse.yaml -f compose.lodestar.yaml -f compose.nimbus.yaml -f compose.prysm.yaml -f compose.teku.yaml down
 	-kurtosis enclave stop local-eth-testnet
 	-kurtosis enclave rm local-eth-testnet
 	rm -rf node*
