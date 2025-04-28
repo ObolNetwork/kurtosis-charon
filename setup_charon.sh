@@ -38,6 +38,8 @@ extract_bn_ip() {
                 bn_port=$(echo "$kurtosis_inspect_output" | sed -n -e 's/^.*http-port=//p' | sed 's/ .*//')
             elif [[ $beaconClient == *"lodestar"* ]]; then
                 bn_port=$(echo "$kurtosis_inspect_output" | sed -n -e 's/^.*rest.port=//p' | sed 's/ .*//')
+            elif [[ $beaconClient == *"grandine"* ]]; then
+                bn_port=$(echo "$kurtosis_inspect_output" | sed -n -e 's/^.*http-port=//p' | sed 's/ .*//')
             fi
             echo "Beacon node address found: $bn_ip:$bn_port"
             ret+=($(echo "$bn_ip:$bn_port"))
