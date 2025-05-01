@@ -36,7 +36,7 @@ def parse_lifetime_arg(value: str) -> int:
                 raise ValueError()
             num, unit = match.groups()
             minutes = int(num) * (60 if unit == 'h' else 1)
-        if not (10 <= minutes <= 480):
+        if not (60 <= minutes <= 480):
             raise ValueError()
         return minutes
     except ValueError:
@@ -230,7 +230,7 @@ def terminate_instances(tag_values):
 def main():
     parser = argparse.ArgumentParser(description="Launch or terminate Kurtosis EC2 test fleet.")
     parser.add_argument("--branch", default="main", help="Git branch to clone (default: main)")
-    parser.add_argument("--lifetime", default="10", help="Shutdown after time (default: 120 e.g. 90m, 2h)")
+    parser.add_argument("--lifetime", default="120", help="Shutdown after time (default: 120 e.g. 90m, 2h)")
     parser.add_argument("--env-dir", default=DEFAULT_ENV_DIR, help="Directory of combos .env files")
     parser.add_argument("--terminate", action="store_true", help="Terminate matching EC2 instances")
     args = parser.parse_args()
