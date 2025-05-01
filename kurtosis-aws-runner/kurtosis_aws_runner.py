@@ -76,7 +76,7 @@ def get_combos(env_dir):
 def generate_user_data(combo, branch, shutdown_minutes, monitoring_token):
     return f"""#!/bin/bash
 set -euxo pipefail
-sleep 10
+sleep 20
 
 # Schedule shutdown early
 nohup bash -c "sleep {shutdown_minutes}m && /sbin/shutdown -h now" >/home/ubuntu/shutdown.log 2>&1 &
