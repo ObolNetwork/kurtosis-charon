@@ -73,7 +73,7 @@ def get_combos(env_dir):
     return [f"{el_client}-{cl_client}-charon-{vc_client}" for el_client in el for cl_client in cl for vc_client in vc]
 
 
-def generate_user_data(combo, branch, shutdown_minutes):
+def generate_user_data(combo, branch, shutdown_minutes, monitoring_token):
     return f"""#!/bin/bash
 set -euxo pipefail
 sleep 10
@@ -96,6 +96,7 @@ su - ubuntu <<'EOF'
 cd /home/ubuntu
 git clone -b {branch} {GIT_REPO}
 cd kurtosis-charon
+echo "PROMETHEUS_REMOTE_WRITE_TOKEN={monitoring_token}" >> deployments/env/charon.env
 make {combo} || true
 EOF
 """
@@ -118,7 +119,7 @@ def instance_exists(tag_value):
         safe_exit(f"Error checking existing instances: {e}")
 
 
-def launch_instance(combo, ami_id, branch, shutdown_minutes):
+def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token):
     tag = instance_tag(combo)
     if instance_exists(tag):
         print(f"⚠️  Skipping existing instance: {tag}")
@@ -133,7 +134,7 @@ def launch_instance(combo, ami_id, branch, shutdown_minutes):
             InstanceMarketOptions={"MarketType": "spot"},
             SubnetId=SUBNET_ID,
             SecurityGroupIds=[SECURITY_GROUP_ID],
-            UserData=generate_user_data(combo, branch, shutdown_minutes),
+            UserData=generate_user_data(combo, branch, shutdown_minutes, monitoring_token),
             BlockDeviceMappings=[{
                 "DeviceName": "/dev/sda1",
                 "Ebs": {
@@ -235,6 +236,7 @@ def main():
     parser.add_argument("--branch", default="main", help="Git branch to clone (default: main)")
     parser.add_argument("--lifetime", default="120", help="Shutdown after time (default: 120 e.g. 90m, 2h)")
     parser.add_argument("--env-dir", default=DEFAULT_ENV_DIR, help="Directory of combos .env files")
+    parser.add_argument("--monitoring-token", required=True, help="Monitoring token for Prometheus remote write")
     parser.add_argument("--terminate", action="store_true", help="Terminate matching EC2 instances")
     args = parser.parse_args()
 
@@ -260,7 +262,7 @@ def main():
     launched_ids = []
     id_to_tag = {}
     for combo in combos:
-        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes)
+        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token)
         if iid:
             launched_ids.append(iid)
             id_to_tag[iid] = tag
