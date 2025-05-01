@@ -77,6 +77,10 @@ def generate_user_data(combo, branch, shutdown_minutes):
     return f"""#!/bin/bash
 set -euxo pipefail
 sleep 10
+
+# Schedule shutdown early
+nohup bash -c "sleep {shutdown_minutes}m && /sbin/shutdown -h now" >/home/ubuntu/shutdown.log 2>&1 &
+
 apt-get update -y
 apt-get install -y apt-transport-https ca-certificates curl software-properties-common git make jq gettext bash
 curl -fsSL https://get.docker.com | sh
@@ -87,14 +91,13 @@ chmod +x /usr/local/bin/docker-compose
 echo "deb [trusted=yes] https://apt.fury.io/kurtosis-tech/ /" > /etc/apt/sources.list.d/kurtosis.list
 apt update -y
 apt install -y kurtosis-cli
+
 su - ubuntu <<'EOF'
 cd /home/ubuntu
 git clone -b {branch} {GIT_REPO}
 cd kurtosis-charon
-make {combo}
+make {combo} || true
 EOF
-# Schedule shutdown after {shutdown_minutes} minutes using nohup + sleep
-nohup bash -c "sleep {shutdown_minutes}m && shutdown -h now" >/dev/null 2>&1 &
 """
 
 
