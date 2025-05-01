@@ -62,11 +62,15 @@ def get_combos(env_dir):
         files = os.listdir(env_dir)
     except FileNotFoundError:
         safe_exit(f"Environment directory not found: {env_dir}")
+
+    el = sorted({f.split('_')[1].split('.')[0] for f in files if f.startswith("el_")})
     cl = sorted({f.split('_')[1].split('.')[0] for f in files if f.startswith("cl_")})
     vc = sorted({f.split('_')[1].split('.')[0] for f in files if f.startswith("vc_")})
-    if not cl or not vc:
-        safe_exit("Missing cl_*.env or vc_*.env files in the environment directory.")
-    return [f"geth-{cl_client}-charon-{vc_client}" for cl_client in cl for vc_client in vc]
+
+    if not el or not cl or not vc:
+        safe_exit("Missing el_*.env, cl_*.env, or vc_*.env files in the environment directory.")
+
+    return [f"{el_client}-{cl_client}-charon-{vc_client}" for el_client in el for cl_client in cl for vc_client in vc]
 
 
 def generate_user_data(combo, branch, shutdown_minutes):
