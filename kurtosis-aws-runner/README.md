@@ -1,4 +1,4 @@
-# Kurtosis Fleet Launcher
+# Kurtosis AWS Runner
 
 This Python script automates the launch of a fleet of EC2 spot instances, each running a different test combination of validator, execution and consensus clients with Charon.
 
@@ -21,9 +21,9 @@ The launcher supports:
 
 Clone the repository:
 ```
-git clone https://github.com/your-org/kurtosis-charon.git
+git clone https://github.com/ObolNetwork/kurtosis-charon.git
 
-cd kurtosis-charon/tools/fleet_launcher
+cd kurtosis-charon/kurtosis-aws-runner
 ```
 Create and activate a Python virtual environment:
 ```
@@ -43,7 +43,7 @@ Ensure your AWS credentials are set.
 
 Run the launcher with the following command:
 ```
-python kurtosis_fleet_launcher.py --branch feat/release-combo-test --lifetime 60
+python kurtosis_aws_runner.py --branch feat/release-combo-test --lifetime 60
 ```
 This will:
 - Find all EL/CL/VC combinations (e.g., Teku/Lodestar, Lighthouse/Nimbus)
