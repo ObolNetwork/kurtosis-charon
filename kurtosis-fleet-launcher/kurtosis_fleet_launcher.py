@@ -93,7 +93,8 @@ git clone -b {branch} {GIT_REPO}
 cd kurtosis-charon
 make {combo}
 EOF
-shutdown -h +{shutdown_minutes}
+# Schedule shutdown after {shutdown_minutes} minutes using nohup + sleep
+nohup bash -c "sleep {shutdown_minutes}m && shutdown -h now" >/dev/null 2>&1 &
 """
 
 
@@ -211,7 +212,7 @@ def terminate_instances(tag_values):
                    headers=["Name", "IP", "State"]))
 
     confirm = input("Terminate these instances? [y/N]: ").strip().lower()
-    if confirm != 'y':
+    if confirm not in ("y", "yes"):
         print("✋ Termination cancelled.")
         return
 
@@ -245,7 +246,8 @@ def main():
     print(f"🔍 Found {len(combos)} combinations:")
     for c in combos:
         print(f"  - {c}")
-    if input(f"\nLaunch {len(combos)} EC2 instances? [y/N]: ").strip().lower() != 'y':
+    confirm = input(f"\nLaunch {len(combos)} EC2 instances? [y/N]: ").strip().lower()
+    if confirm not in ("y", "yes"):
         print("✋ Launch cancelled.")
         return
 
