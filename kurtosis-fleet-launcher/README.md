@@ -64,6 +64,7 @@ Proceed to launch 2 EC2 instances? [y/N]:
 
 The following flags are supported:
 ```
+--monitoring-token Obol central monitoring token
 --branch           Git branch of the kurtosis-charon repo to test (default: main)
 --lifetime         Shutdown time in minutes before the EC2 instance is terminated (default: 60)
 --env-dir          The path to the env directory to load the combos config (default: ../deployments/env)
