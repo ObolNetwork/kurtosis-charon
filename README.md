@@ -23,7 +23,7 @@ On MacOS, use `brew` as following:
 ```shell
 brew install kurtosis-tech/tap/kurtosis-cli
 brew install jq
-brew install envsubst
+brew install gettext
 brew install bash
 ```
 
@@ -91,7 +91,7 @@ If you do not have token and/or do not want to supply the metrics from the run t
 4. Run the combination.
 
 > [!Note]
-> Running docker in priviliged is required. Unfortunately, there is no way around it when running docker-in-docker. Read more [here](https://www.docker.com/blog/docker-can-now-run-within-docker/). If this raises any concerns to you, we advise on running it the regular way, as seen under [Usage - local](#usage---local).
+> Running the docker container in privileged mode is required. Unfortunately, there is no way around it when running docker-in-docker. Read more [here](https://www.docker.com/blog/docker-can-now-run-within-docker/). If this raises any concerns to you, we advise on running it locally, as seen under [Usage - local](#usage---local).
 
 ```shell
 docker run --privileged --env-file=.env obolnetwork/kurtosis-charon
