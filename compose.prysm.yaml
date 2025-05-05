@@ -1,0 +1,50 @@
+name: kurtosis-charon
+
+x-prysm-base: &prysm-base
+  build:
+    context: prysm
+    args:
+      VERSION: ${VC_VERSION}
+  platform: "linux/amd64"
+  networks: [network1]
+  restart: unless-stopped
+  user: "${DUID:-}:${DGID:-}" # Used by docker-in-docker as it's based on linux
+
+x-prysm-volume-run: &prysm-volume-run ./prysm/run.sh:/home/prysm/run.sh
+x-prysm-volume-config: &prysm-volume-config ./testnet/config.yaml:/home/data/config.yaml
+
+services:
+  vc0-prysm:
+    <<: *prysm-base
+    depends_on: [node0]
+    environment:
+      BEACON_NODE_ADDRESS: "http://node0:3600"
+    volumes:
+      - *prysm-volume-run
+      - *prysm-volume-config
+      - .charon/cluster/node0/validator_keys:/home/charon/validator_keys
+
+  vc1-prysm:
+    <<: *prysm-base
+    depends_on: [node1]
+    environment:
+      BEACON_NODE_ADDRESS: "http://node1:3600"
+    volumes:
+      - *prysm-volume-run
+      - *prysm-volume-config
+      - .charon/cluster/node1/validator_keys:/home/charon/validator_keys
+
+  vc2-prysm:
+    <<: *prysm-base
+    depends_on: [node2]
+    environment:
+      BEACON_NODE_ADDRESS: "http://node2:3600"
+    volumes:
+      - *prysm-volume-run
+      - *prysm-volume-config
+      - .charon/cluster/node2/validator_keys:/home/charon/validator_keys
+
+networks:
+  network1:
+    name: ${NETWORK_NAME}
+    external: true

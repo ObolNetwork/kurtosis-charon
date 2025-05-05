@@ -1,0 +1,56 @@
+name: kurtosis-charon
+
+x-lodestar-base: &lodestar-base
+  image: chainsafe/lodestar:${VC_VERSION}
+  networks: [network1]
+  restart: unless-stopped
+  entrypoint: /opt/lodestar/run.sh
+  user: "${DUID:-}:${DGID:-}" # Used by docker-in-docker as it's based on linux
+
+x-lodestar-env: &lodestar-env
+  BUILDER_API_ENABLED: true
+
+x-lodestar-volume-run: &lodestar-volume-run ./lodestar/run.sh:/opt/lodestar/run.sh
+x-lodestar-volume-config: &lodestar-volume-config ./testnet/config.yaml:/opt/lodestar/config.yaml
+
+services:
+  vc0-lodestar:
+    <<: *lodestar-base
+    depends_on: [node0]
+    environment:
+      <<: *lodestar-env
+      BEACON_NODE_ADDRESS: "http://node0:3600"
+    volumes:
+      - *lodestar-volume-run
+      - *lodestar-volume-config
+      - .charon/cluster/node0/validator_keys:/home/charon/validator_keys
+      - ./data/lodestar/vc0:/opt/data
+
+  vc1-lodestar:
+    <<: *lodestar-base
+    depends_on: [node1]
+    environment:
+      <<: *lodestar-env
+      BEACON_NODE_ADDRESS: "http://node1:3600"
+    volumes:
+      - *lodestar-volume-run
+      - *lodestar-volume-config
+      - .charon/cluster/node1/validator_keys:/home/charon/validator_keys
+      - ./data/lodestar/vc1:/opt/data
+
+  vc2-lodestar:
+    <<: *lodestar-base
+    depends_on: [node2]
+    environment:
+      <<: *lodestar-env
+      BEACON_NODE_ADDRESS: "http://node2:3600"
+    volumes:
+      - *lodestar-volume-run
+      - *lodestar-volume-config
+      - .charon/cluster/node2/validator_keys:/home/charon/validator_keys
+      - ./data/lodestar/vc2:/opt/data
+
+networks:
+  network1:
+    name: ${NETWORK_NAME}
+    external: true
