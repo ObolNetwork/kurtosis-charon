@@ -4,7 +4,7 @@ participants:
     cl_type: lodestar
     cl_image: chainsafe/lodestar:${CL_VERSION}
     use_separate_vc: true
-    count: 3
+    count: 10
     prometheus_config:
       scrape_interval: 15s
       labels: {}
