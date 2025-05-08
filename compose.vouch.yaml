@@ -1,7 +1,7 @@
 name: kurtosis-charon
 
 x-vouch-base: &vouch-base
-  image: attestant/vouch:1.10.1
+  image: attestant/vouch:${VC_VERSION}
   entrypoint: /opt/vouch/run.sh
   networks: [ network1 ]
   restart: unless-stopped
