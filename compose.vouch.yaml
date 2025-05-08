@@ -1,0 +1,44 @@
+name: kurtosis-charon
+
+x-vouch-base: &vouch-base
+  image: attestant/vouch:${VC_VERSION}
+  entrypoint: /opt/vouch/run.sh
+  networks: [ network1 ]
+  restart: unless-stopped
+  user: "${DUID:-}:${DGID:-}" # Used by docker-in-docker as it's based on linux
+
+
+x-vouch-volume-run: &vouch-volume-run ./vouch/run.sh:/opt/vouch/run.sh
+
+services:
+  vc0-vouch:
+    <<: *vouch-base
+    depends_on: [node0]
+    environment:
+      BEACON_NODE_ADDRESS: http://node0:3600
+    volumes:
+      - *vouch-volume-run
+      - .charon/cluster/node0/validator_keys:/home/charon/validator_keys
+
+  vc1-vouch:
+    <<: *vouch-base
+    depends_on: [node1]
+    environment:
+      BEACON_NODE_ADDRESS: http://node1:3600
+    volumes:
+      - *vouch-volume-run
+      - .charon/cluster/node1/validator_keys:/home/charon/validator_keys
+
+  vc2-vouch:
+    <<: *vouch-base
+    depends_on: [node2]
+    environment:
+      BEACON_NODE_ADDRESS: http://node2:3600
+    volumes:
+      - *vouch-volume-run
+      - .charon/cluster/node2/validator_keys:/home/charon/validator_keys
+
+networks:
+  network1:
+    name: ${NETWORK_NAME}
+    external: true

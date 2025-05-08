@@ -1,4 +1,4 @@
-.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku clean
+.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku geth-grandine charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku run-charon-vouch clean
 
 # Define the composite step
 geth-lighthouse-charon-lighthouse: geth-lighthouse charon run-charon-lighthouse
@@ -6,36 +6,42 @@ geth-lighthouse-charon-lodestar: geth-lighthouse charon run-charon-lodestar
 geth-lighthouse-charon-teku: geth-lighthouse charon run-charon-teku
 geth-lighthouse-charon-nimbus: geth-lighthouse charon run-charon-nimbus
 geth-lighthouse-charon-prysm: geth-lighthouse charon run-charon-prysm
+geth-lighthouse-charon-vouch: geth-lighthouse charon run-charon-vouch
 
 geth-lodestar-charon-lighthouse: geth-lodestar charon run-charon-lighthouse
 geth-lodestar-charon-lodestar: geth-lodestar charon run-charon-lodestar
 geth-lodestar-charon-teku: geth-lodestar charon run-charon-teku
 geth-lodestar-charon-nimbus: geth-lodestar charon run-charon-nimbus
 geth-lodestar-charon-prysm: geth-lodestar charon run-charon-prysm
+geth-lodestar-charon-vouch: geth-lodestar charon run-charon-vouch
 
 geth-teku-charon-lighthouse: geth-teku charon run-charon-lighthouse
 geth-teku-charon-lodestar: geth-teku charon run-charon-lodestar
 geth-teku-charon-teku: geth-teku charon run-charon-teku
 geth-teku-charon-nimbus: geth-teku charon run-charon-nimbus
 geth-teku-charon-prysm: geth-teku charon run-charon-prysm
+geth-teku-charon-vouch: geth-teku charon run-charon-vouch
 
 geth-nimbus-charon-lighthouse: geth-nimbus charon run-charon-lighthouse
 geth-nimbus-charon-lodestar: geth-nimbus charon run-charon-lodestar
 geth-nimbus-charon-teku: geth-nimbus charon run-charon-teku
 geth-nimbus-charon-nimbus: geth-nimbus charon run-charon-nimbus
 geth-nimbus-charon-prysm: geth-nimbus charon run-charon-prysm
+geth-nimbus-charon-vouch: geth-nimbus charon run-charon-vouch
 
 geth-prysm-charon-lighthouse: geth-prysm charon run-charon-lighthouse
 geth-prysm-charon-lodestar: geth-prysm charon run-charon-lodestar
 geth-prysm-charon-teku: geth-prysm charon run-charon-teku
 geth-prysm-charon-nimbus: geth-prysm charon run-charon-nimbus
 geth-prysm-charon-prysm: geth-prysm charon run-charon-prysm
+geth-prysm-charon-vouch: geth-prysm charon run-charon-vouch
 
 geth-grandine-charon-lighthouse: geth-grandine charon run-charon-lighthouse
 geth-grandine-charon-lodestar: geth-grandine charon run-charon-lodestar
 geth-grandine-charon-teku: geth-grandine charon run-charon-teku
 geth-grandine-charon-nimbus: geth-grandine charon run-charon-nimbus
 geth-grandine-charon-prysm: geth-grandine charon run-charon-prysm
+geth-grandine-charon-vouch: geth-grandine charon run-charon-vouch
 
 geth-lighthouse:
 	CL_TYPE=lighthouse ./setup_el_cl.sh
@@ -96,6 +102,10 @@ run-charon-prysm:
 run-charon-teku:
 	VC_TYPE=teku ./setup_vc.sh
 	docker compose --env-file ".env" -f ./compose.charon.yaml -f ./compose.teku.yaml up -d
+
+run-charon-vouch:
+	VC_TYPE=vouch ./setup_vc.sh
+	docker compose --env-file ".env" -f ./compose.charon.yaml -f ./compose.vouch.yaml up -d
 
 exit-lighthouse:
 	./lighthouse/exit.sh 0
