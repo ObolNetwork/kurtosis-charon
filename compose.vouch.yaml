@@ -15,7 +15,7 @@ services:
     <<: *vouch-base
     depends_on: [node0]
     environment:
-      VOUCH_BEACON_NODE_ADDRESS: http://node0:3600
+      BEACON_NODE_ADDRESS: http://node0:3600
     volumes:
       - *vouch-volume-run
       - .charon/cluster/node0/validator_keys:/home/charon/validator_keys
@@ -24,7 +24,7 @@ services:
     <<: *vouch-base
     depends_on: [node1]
     environment:
-      VOUCH_BEACON_NODE_ADDRESS: http://node1:3600
+      BEACON_NODE_ADDRESS: http://node1:3600
     volumes:
       - *vouch-volume-run
       - .charon/cluster/node1/validator_keys:/home/charon/validator_keys
@@ -33,7 +33,7 @@ services:
     <<: *vouch-base
     depends_on: [node2]
     environment:
-      VOUCH_BEACON_NODE_ADDRESS: http://node2:3600
+      BEACON_NODE_ADDRESS: http://node2:3600
     volumes:
       - *vouch-volume-run
       - .charon/cluster/node2/validator_keys:/home/charon/validator_keys
