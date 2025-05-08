@@ -36,7 +36,7 @@ for keystore_file in /home/charon/validator_keys/keystore-*.json; do
 done
 
 yq_accounts=$(printf "      - %s\n" "${accounts_list[@]}")
-echo -n $account_passphrase >> /opt/vouch/account_passphrase.txt
+echo -n "$account_passphrase" >> /opt/vouch/account_passphrase.txt
 
 cat > ~/.vouch.yml <<EOF
 beacon-node-address: $BEACON_NODE_ADDRESS
