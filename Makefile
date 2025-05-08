@@ -104,7 +104,8 @@ run-charon-teku:
 	docker compose --env-file ".env" -f ./compose.charon.yaml -f ./compose.teku.yaml up -d
 
 run-charon-vouch:
-	docker compose up node0 node1 node2 vc0-vouch vc1-vouch vc2-vouch otelcollector prometheus tempo grafana -d
+	VC_TYPE=vouch ./setup_vc.sh
+	docker compose --env-file ".env" -f ./compose.charon.yaml -f ./compose.vouch.yaml up -d
 
 exit-lighthouse:
 	./lighthouse/exit.sh 0
