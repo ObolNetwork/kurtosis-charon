@@ -42,7 +42,7 @@ extract_bn_ip() {
                 bn_port=$(echo "$kurtosis_inspect_output" | sed -n -e 's/^.*http-port=//p' | sed 's/ .*//')
             fi
             echo "Beacon node address found: $bn_ip:$bn_port"
-            ret+=($(echo "$bn_ip:$bn_port"))
+            ret+=($(echo "http://$bn_ip:$bn_port"))
         else
             echo "UUID not found."
         fi
