@@ -11,8 +11,11 @@ from tabulate import tabulate
 KEY_NAME = "kurtosis-fleet"
 SECURITY_GROUP_ID = "sg-0e208fd6ad761cafc"
 SUBNET_ID = "subnet-07d83bab8a2b8cd7d"
-INSTANCE_TYPE = "c6a.xlarge"
-VOLUME_SIZE = 100
+DEFAULT_INSTANCE_TYPE = "c6a.xlarge"
+VOLUME_SIZE = 50
+VOLUME_TYPE = "gp3"
+VOLUME_IOPS = 6000  # optimized for Charon test runs
+VOLUME_THROUGHPUT = 250  # MB/s
 BASE_TAG = "kurtosis-fleet"
 DEFAULT_ENV_DIR = "../deployments/env"
 GIT_REPO = "https://github.com/ObolNetwork/kurtosis-charon.git"
@@ -119,36 +122,39 @@ def instance_exists(tag_value):
         safe_exit(f"Error checking existing instances: {e}")
 
 
-def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token):
+def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, instance_type, on_demand):
     tag = instance_tag(combo)
     if instance_exists(tag):
         print(f"⚠️  Skipping existing instance: {tag}")
         return None, None
+
+    params = {
+        "ImageId": ami_id,
+        "InstanceType": instance_type,
+        "KeyName": KEY_NAME,
+        "MinCount": 1,
+        "MaxCount": 1,
+        "SubnetId": SUBNET_ID,
+        "SecurityGroupIds": [SECURITY_GROUP_ID],
+        "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token),
+        "BlockDeviceMappings": [{
+            "DeviceName": "/dev/sda1",
+            "Ebs": {
+                "VolumeSize": VOLUME_SIZE,
+                "VolumeType": VOLUME_TYPE,
+                "Iops": VOLUME_IOPS,
+                "Throughput": VOLUME_THROUGHPUT,
+                "DeleteOnTermination": True
+            }
+        }],
+        "TagSpecifications": [{"ResourceType": "instance", "Tags": [{"Key": "Name", "Value": tag}]}],
+        "InstanceInitiatedShutdownBehavior": "terminate"
+    }
+    if not on_demand:
+        params["InstanceMarketOptions"] = {"MarketType": "spot"}
+
     try:
-        resp = ec2.run_instances(
-            ImageId=ami_id,
-            InstanceType=INSTANCE_TYPE,
-            KeyName=KEY_NAME,
-            MinCount=1,
-            MaxCount=1,
-            InstanceMarketOptions={"MarketType": "spot"},
-            SubnetId=SUBNET_ID,
-            SecurityGroupIds=[SECURITY_GROUP_ID],
-            UserData=generate_user_data(combo, branch, shutdown_minutes, monitoring_token),
-            BlockDeviceMappings=[{
-                "DeviceName": "/dev/sda1",
-                "Ebs": {
-                    "VolumeSize": VOLUME_SIZE,
-                    "VolumeType": "gp3",
-                    "DeleteOnTermination": True
-                }
-            }],
-            TagSpecifications=[{
-                "ResourceType": "instance",
-                "Tags": [{"Key": "Name", "Value": tag}]
-            }],
-            InstanceInitiatedShutdownBehavior="terminate"
-        )
+        resp = ec2.run_instances(**params)
         instance = resp["Instances"][0]
         return instance["InstanceId"], tag
     except Exception as e:
@@ -212,8 +218,7 @@ def terminate_instances(tag_values):
         return
 
     print("\n📋 Instances to terminate:\n")
-    print(tabulate([[v["name"], v["ip"], v["state"]] for v in instance_map.values()],
-                   headers=["Name", "IP", "State"]))
+    print(tabulate([[v["name"], v["ip"], v["state"]] for v in instance_map.values()], headers=["Name", "IP", "State"]))
 
     confirm = input("Terminate these instances? [y/N]: ").strip().lower()
     if confirm not in ("y", "yes"):
@@ -236,17 +241,23 @@ def main():
     parser.add_argument("--branch", default="main", help="Git branch to clone (default: main)")
     parser.add_argument("--lifetime", default="120", help="Shutdown after time (default: 120 e.g. 90m, 2h)")
     parser.add_argument("--env-dir", default=DEFAULT_ENV_DIR, help="Directory of combos .env files")
-    parser.add_argument("--monitoring-token", required=True, help="Monitoring token for Prometheus remote write")
+    parser.add_argument("--monitoring-token", help="Monitoring token for Prometheus remote write")
     parser.add_argument("--terminate", action="store_true", help="Terminate matching EC2 instances")
+    parser.add_argument("--on-demand", action="store_true", help="Use On-Demand EC2 instances (default is Spot)")
+    parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help="EC2 instance type (default: c6a.xlarge)")
     args = parser.parse_args()
 
-    shutdown_minutes = parse_lifetime_arg(args.lifetime)
     combos = get_combos(args.env_dir)
     tag_values = [instance_tag(c) for c in combos]
 
     if args.terminate:
         terminate_instances(tag_values)
         return
+
+    if not args.monitoring_token:
+        safe_exit("Missing required --monitoring-token (unless using --terminate)")
+
+    shutdown_minutes = parse_lifetime_arg(args.lifetime)
 
     print(f"🔍 Found {len(combos)} combinations:")
     for c in combos:
@@ -257,12 +268,13 @@ def main():
         return
 
     ami_id = get_latest_ubuntu_ami()
-    print(f"\n🚀 Launching with AMI {ami_id}, branch '{args.branch}', shutdown in {shutdown_minutes}m\n")
+    print(f"\n🚀 Launching with AMI {ami_id}, branch '{args.branch}', shutdown in {shutdown_minutes}m")
+    print(f"📌 Instance type: {args.instance_type}, On-Demand: {args.on_demand}\n")
 
     launched_ids = []
     id_to_tag = {}
     for combo in combos:
-        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token)
+        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, args.instance_type, args.on_demand)
         if iid:
             launched_ids.append(iid)
             id_to_tag[iid] = tag
