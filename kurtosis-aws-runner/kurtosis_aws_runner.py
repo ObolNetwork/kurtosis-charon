@@ -76,7 +76,7 @@ def get_combos(env_dir):
     return [f"{el_client}-{cl_client}-charon-{vc_client}" for el_client in el for cl_client in cl for vc_client in vc]
 
 
-def generate_user_data(combo, branch, shutdown_minutes, monitoring_token):
+def generate_user_data(combo, branch, shutdown_minutes, monitoring_token, ami_id):
     return f"""#!/bin/bash
 set -euxo pipefail
 sleep 20
@@ -100,6 +100,7 @@ cd /home/ubuntu
 git clone -b {branch} {GIT_REPO}
 cd kurtosis-charon
 echo "PROMETHEUS_REMOTE_WRITE_TOKEN={monitoring_token}" >> deployments/env/charon.env
+echo "CLUSTER_NAME={ami_id}" >> deployments/env/charon.env
 make {combo} || true
 EOF
 """
@@ -136,7 +137,7 @@ def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, i
         "MaxCount": 1,
         "SubnetId": SUBNET_ID,
         "SecurityGroupIds": [SECURITY_GROUP_ID],
-        "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token),
+        "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token, ami_id),
         "BlockDeviceMappings": [{
             "DeviceName": "/dev/sda1",
             "Ebs": {
