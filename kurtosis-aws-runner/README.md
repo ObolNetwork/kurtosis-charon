@@ -60,6 +60,11 @@ Example prompt:
 
 Proceed to launch 2 EC2 instances? [y/N]:
 ```
+
+Run the launcher with the following command to terminate the instances prior to the life time:
+```
+python kurtosis_aws_runner.py --terminate
+```
 ---
 
 ## Configuration
@@ -93,7 +98,3 @@ To debug a running instance:
    docker logs <container-id>
    ```
 ---
-
-
-./venv/bin/python kurtosis_aws_runner.py --on-demand --monitoring-token 1243
-./venv/bin/python kurtosis_aws_runner.py --terminate
