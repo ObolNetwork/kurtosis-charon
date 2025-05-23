@@ -12,7 +12,10 @@ KEY_NAME = "kurtosis-fleet"
 SECURITY_GROUP_ID = "sg-0e208fd6ad761cafc"
 SUBNET_ID = "subnet-07d83bab8a2b8cd7d"
 DEFAULT_INSTANCE_TYPE = "c6a.xlarge"
-VOLUME_SIZE = 500
+VOLUME_SIZE = 50
+VOLUME_TYPE = "gp3"
+VOLUME_IOPS = 6000  # optimized for Charon test runs
+VOLUME_THROUGHPUT = 250  # MB/s
 BASE_TAG = "kurtosis-fleet"
 DEFAULT_ENV_DIR = "../deployments/env"
 GIT_REPO = "https://github.com/ObolNetwork/kurtosis-charon.git"
@@ -136,7 +139,13 @@ def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, i
         "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token),
         "BlockDeviceMappings": [{
             "DeviceName": "/dev/sda1",
-            "Ebs": {"VolumeSize": VOLUME_SIZE, "VolumeType": "gp3", "DeleteOnTermination": True}
+            "Ebs": {
+                "VolumeSize": VOLUME_SIZE,
+                "VolumeType": VOLUME_TYPE,
+                "Iops": VOLUME_IOPS,
+                "Throughput": VOLUME_THROUGHPUT,
+                "DeleteOnTermination": True
+            }
         }],
         "TagSpecifications": [{"ResourceType": "instance", "Tags": [{"Key": "Name", "Value": tag}]}],
         "InstanceInitiatedShutdownBehavior": "terminate"
