@@ -241,19 +241,23 @@ def main():
     parser.add_argument("--branch", default="main", help="Git branch to clone (default: main)")
     parser.add_argument("--lifetime", default="120", help="Shutdown after time (default: 120 e.g. 90m, 2h)")
     parser.add_argument("--env-dir", default=DEFAULT_ENV_DIR, help="Directory of combos .env files")
-    parser.add_argument("--monitoring-token", required=True, help="Monitoring token for Prometheus remote write")
+    parser.add_argument("--monitoring-token", help="Monitoring token for Prometheus remote write")
     parser.add_argument("--terminate", action="store_true", help="Terminate matching EC2 instances")
     parser.add_argument("--on-demand", action="store_true", help="Use On-Demand EC2 instances (default is Spot)")
     parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help="EC2 instance type (default: c6a.xlarge)")
     args = parser.parse_args()
 
-    shutdown_minutes = parse_lifetime_arg(args.lifetime)
     combos = get_combos(args.env_dir)
     tag_values = [instance_tag(c) for c in combos]
 
     if args.terminate:
         terminate_instances(tag_values)
         return
+
+    if not args.monitoring_token:
+        safe_exit("Missing required --monitoring-token (unless using --terminate)")
+
+    shutdown_minutes = parse_lifetime_arg(args.lifetime)
 
     print(f"🔍 Found {len(combos)} combinations:")
     for c in combos:

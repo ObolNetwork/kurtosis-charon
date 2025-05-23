@@ -93,3 +93,7 @@ To debug a running instance:
    docker logs <container-id>
    ```
 ---
+
+
+./venv/bin/python kurtosis_aws_runner.py --on-demand --monitoring-token 1243
+./venv/bin/python kurtosis_aws_runner.py --terminate
