@@ -3,10 +3,12 @@
 This Python script automates the launch of a fleet of EC2 spot instances, each running a different test combination of validator, execution and consensus clients with Charon.
 
 The launcher supports:
-- Run the tests for a branch (e.g., `feat/release-test`)
+- Running tests for a specified branch (e.g., `feat/release-test`)
 - Specifying combinations of EL/CL/VC clients to test against Charon
 - Launching each combination on a separate EC2 instance
 - Automatic shutdown of instances after a defined lifetime
+- Optional use of On-Demand EC2 instances
+- Customizable EC2 instance type per launch
 
 ---
 
@@ -43,7 +45,7 @@ Ensure your AWS credentials are set.
 
 Run the launcher with the following command:
 ```
-python kurtosis_aws_runner.py --branch feat/release-combo-test --lifetime 60
+python kurtosis_aws_runner.py --branch feat/release-combo-test --lifetime 60 --monitoring-token <YOUR_TOKEN>
 ```
 This will:
 - Find all EL/CL/VC combinations (e.g., Teku/Lodestar, Lighthouse/Nimbus)
@@ -64,12 +66,17 @@ Proceed to launch 2 EC2 instances? [y/N]:
 
 The following flags are supported:
 ```
---monitoring-token Obol central monitoring token
---branch           Git branch of the kurtosis-charon repo to test (default: main)
---lifetime         Shutdown time in minutes before the EC2 instance is terminated (default: 60)
---env-dir          The path to the env directory to load the combos config (default: ../deployments/env)
---terminate        Terminates the instances (it creates the instances list from the env combos directory)
+--monitoring-token  Obol central monitoring token (required)
+--branch            Git branch of the kurtosis-charon repo to test (default: main)
+--lifetime          Shutdown time in minutes before the EC2 instance is terminated (default: 60)
+--env-dir           The path to the env directory to load the combos config (default: ../deployments/env)
+--terminate         Terminates the instances (uses combos from the env directory to find instances)
+--on-demand         Use On-Demand EC2 instances instead of Spot instances
+--instance-type     EC2 instance type to launch (default: c6a.xlarge)
 ```
+
+**Note**: The default EBS volume size is 50 GB.
+
 ---
 
 ## Debugging
@@ -77,7 +84,12 @@ The following flags are supported:
 To debug a running instance:
 1. Find the instance ID in the AWS console (tagged with the test combo name).
 2. SSH into the instance:
+   ```
    ssh -i ~/.ssh/your-key.pem ubuntu@<public-ip>
-3. Check the Docker containers logs
-
+   ```
+3. Check the Docker container logs:
+   ```
+   docker ps
+   docker logs <container-id>
+   ```
 ---
