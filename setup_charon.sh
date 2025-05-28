@@ -42,7 +42,7 @@ extract_bn_ip() {
                 bn_port=$(echo "$kurtosis_inspect_output" | sed -n -e 's/^.*http-port=//p' | sed 's/ .*//')
             fi
             echo "Beacon node address found: $bn_ip:$bn_port"
-            ret+=($(echo "$bn_ip:$bn_port"))
+            ret+=($(echo "http://$bn_ip:$bn_port"))
         else
             echo "UUID not found."
         fi
@@ -202,9 +202,11 @@ if [ -n "$genesis_time" ]; then
         echo "BN_$i=${bnips[$i]}" >>./.env
     done
 
+    CLUSTER_NAME=${CLUSTER_NAME:-"test"}
+
     # Create charon cluster.
     docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" obolnetwork/charon:"${CHARON_VERSION}" create cluster \
-        --name=test \
+        --name="$CLUSTER_NAME" \
         --nodes=3 \
         --fee-recipient-addresses="0x8943545177806ED17B9F23F0a21ee5948eCaa776" \
         --withdrawal-addresses="0xBc7c960C1097ef1Af0FD32407701465f3c03e407" \
