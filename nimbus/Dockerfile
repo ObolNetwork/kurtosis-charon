@@ -1,6 +1,6 @@
 ARG VERSION
 
-FROM statusim/nimbus-eth2:${VERSION} as nimbusbn
+FROM statusim/nimbus-eth2:${VERSION} AS nimbusbn
 
 FROM statusim/nimbus-validator-client:${VERSION}
 
