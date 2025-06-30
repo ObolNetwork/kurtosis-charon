@@ -4,6 +4,7 @@ import re
 import sys
 import time
 import argparse
+import uuid
 from botocore.exceptions import ClientError, BotoCoreError
 from tabulate import tabulate
 
@@ -76,7 +77,7 @@ def get_combos(env_dir):
     return [f"{el_client}-{cl_client}-charon-{vc_client}" for el_client in el for cl_client in cl for vc_client in vc]
 
 
-def generate_user_data(combo, branch, shutdown_minutes, monitoring_token, ami_id):
+def generate_user_data(combo, branch, shutdown_minutes, monitoring_token, cluster_name):
     return f"""#!/bin/bash
 set -euxo pipefail
 sleep 20
@@ -100,7 +101,7 @@ cd /home/ubuntu
 git clone -b {branch} {GIT_REPO}
 cd kurtosis-charon
 echo "PROMETHEUS_REMOTE_WRITE_TOKEN={monitoring_token}" >> deployments/env/charon.env
-echo "CLUSTER_NAME={ami_id}" >> deployments/env/charon.env
+echo "CLUSTER_NAME={cluster_name}" >> deployments/env/charon.env
 make {combo} || true
 EOF
 """
@@ -123,7 +124,7 @@ def instance_exists(tag_value):
         safe_exit(f"Error checking existing instances: {e}")
 
 
-def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, instance_type, on_demand):
+def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, instance_type, on_demand, cluster_name):
     tag = instance_tag(combo)
     if instance_exists(tag):
         print(f"⚠️  Skipping existing instance: {tag}")
@@ -137,7 +138,7 @@ def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, i
         "MaxCount": 1,
         "SubnetId": SUBNET_ID,
         "SecurityGroupIds": [SECURITY_GROUP_ID],
-        "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token, ami_id),
+        "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token, cluster_name),
         "BlockDeviceMappings": [{
             "DeviceName": "/dev/sda1",
             "Ebs": {
@@ -269,13 +270,14 @@ def main():
         return
 
     ami_id = get_latest_ubuntu_ami()
-    print(f"\n🚀 Launching with AMI {ami_id}, branch '{args.branch}', shutdown in {shutdown_minutes}m")
+    cluster_name = str(uuid.uuid4())
+    print(f"\n🚀 Launching with AMI {ami_id}, cluster name {cluster_name}, branch '{args.branch}', shutdown in {shutdown_minutes}m")
     print(f"📌 Instance type: {args.instance_type}, On-Demand: {args.on_demand}\n")
 
     launched_ids = []
     id_to_tag = {}
     for combo in combos:
-        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, args.instance_type, args.on_demand)
+        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, args.instance_type, args.on_demand, cluster_name)
         if iid:
             launched_ids.append(iid)
             id_to_tag[iid] = tag
