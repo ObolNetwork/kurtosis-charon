@@ -1,0 +1,12 @@
+participants:
+  - el_type: geth
+    el_image: ethereum/client-go:${EL_VERSION}
+    cl_type: grandine
+    cl_image: sifrai/grandine:${CL_VERSION}
+    use_separate_vc: true
+    vc_type: lighthouse
+    vc_image: sigp/lighthouse:v7.0.0
+    count: 3
+    prometheus_config:
+      scrape_interval: 15s
+      labels: {}

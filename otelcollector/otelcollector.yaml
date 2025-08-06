@@ -1,0 +1,36 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+connectors:
+  spanmetrics:
+    histogram:
+      unit: "ms"
+    resource_metrics_key_attributes:
+      - service.name
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:8889
+
+  otlp/local-tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  otlp/remote-tempo:
+    endpoint: "tempo.monitoring.gcp.obol.tech:443"
+    headers:
+      Authorization: "Basic ${TEMPO_REMOTE_BASIC_AUTH}"
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [spanmetrics, otlp/local-tempo, otlp/remote-tempo]
+
+    metrics:
+      receivers: [spanmetrics]
+      exporters: [prometheus]

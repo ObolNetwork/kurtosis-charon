@@ -22,3 +22,4 @@ planprint
 charon-keys/
 testnet/
 prometheus/prometheustmp.yml
+network_params.yaml
