@@ -1,8 +1,9 @@
 participants:
   - el_type: geth
-    el_image: ethereum/client-go:${EL_VERSION}
+    el_image: docker.ethquokkaops.io/dh/ethpandaops/geth:${EL_VERSION}
     cl_type: lighthouse
-    cl_image: sigp/lighthouse:${CL_VERSION}
+    cl_image: docker.ethquokkaops.io/dh/ethpandaops/lighthouse:${CL_VERSION}
+    supernode: true
     cl_extra_params: []
     use_separate_vc: true
     count: 3

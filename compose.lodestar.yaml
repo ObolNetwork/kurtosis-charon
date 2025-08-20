@@ -1,7 +1,7 @@
 name: kurtosis-charon
 
 x-lodestar-base: &lodestar-base
-  image: chainsafe/lodestar:${VC_VERSION}
+  image: docker.ethquokkaops.io/dh/ethpandaops/lodestar:${VC_VERSION}
   networks: [network1]
   restart: unless-stopped
   entrypoint: /opt/lodestar/run.sh
