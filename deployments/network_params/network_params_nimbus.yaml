@@ -3,6 +3,7 @@ participants:
     el_image: docker.ethquokkaops.io/dh/ethpandaops/geth:${EL_VERSION}
     cl_type: nimbus
     cl_image: docker.ethquokkaops.io/dh/ethpandaops/nimbus-eth2:${CL_VERSION}
+    supernode: true
     use_separate_vc: true
     count: 3
     prometheus_config:

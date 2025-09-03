@@ -3,6 +3,7 @@ participants:
     el_image: docker.ethquokkaops.io/dh/ethpandaops/geth:${EL_VERSION}
     cl_type: grandine
     cl_image: docker.ethquokkaops.io/dh/ethpandaops/grandine:${CL_VERSION}
+    supernode: true
     use_separate_vc: true
     vc_type: lighthouse
     vc_image: sigp/lighthouse:v7.0.0

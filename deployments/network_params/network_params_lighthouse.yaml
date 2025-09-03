@@ -4,7 +4,6 @@ participants:
     cl_type: lighthouse
     cl_image: docker.ethquokkaops.io/dh/ethpandaops/lighthouse:${CL_VERSION}
     supernode: true
-    cl_extra_params: []
     use_separate_vc: true
     count: 3
     prometheus_config:
