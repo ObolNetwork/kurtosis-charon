@@ -1,6 +1,6 @@
 ARG VERSION
 
-FROM gcr.io/prysmaticlabs/prysm/validator:${VERSION} AS prysm-validator
+FROM docker.ethquokkaops.io/dh/ethpandaops/prysm-validator:${VERSION} AS prysm-validator
 
 FROM debian:buster-slim
 COPY --from=prysm-validator /app/cmd/validator/validator validator

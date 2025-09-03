@@ -1,8 +1,8 @@
 participants:
   - el_type: geth
-    el_image: ethereum/client-go:${EL_VERSION}
+    el_image: docker.ethquokkaops.io/dh/ethpandaops/geth:${EL_VERSION}
     cl_type: grandine
-    cl_image: sifrai/grandine:${CL_VERSION}
+    cl_image: docker.ethquokkaops.io/dh/ethpandaops/grandine:${CL_VERSION}
     use_separate_vc: true
     vc_type: lighthouse
     vc_image: sigp/lighthouse:v7.0.0

@@ -1,8 +1,8 @@
 participants:
   - el_type: geth
-    el_image: ethereum/client-go:${EL_VERSION}
+    el_image: docker.ethquokkaops.io/dh/ethpandaops/geth:${EL_VERSION}
     cl_type: lodestar
-    cl_image: chainsafe/lodestar:${CL_VERSION}
+    cl_image: docker.ethquokkaops.io/dh/ethpandaops/lodestar:${CL_VERSION}
     use_separate_vc: true
     count: 3
     prometheus_config:
