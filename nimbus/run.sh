@@ -21,7 +21,7 @@ for f in /home/validator_keys/keystore-*.json; do
 
   # Import keystore with the password.
   echo "$password" | \
-  /home/user/nimbus_beacon_node deposits import \
+  /home/user/nimbus-eth2/build/nimbus_beacon_node deposits import \
   --data-dir=/home/user/data/${NODE} \
   /home/validator_keys/tmpkeys
 
@@ -36,7 +36,7 @@ rm -r ${tmpkeys}
 echo "Imported all keys"
 
 # Now run nimbus VC
-exec /home/user/nimbus_validator_client \
+exec /home/user/nimbus-eth2/build/nimbus_validator_client \
   --data-dir=/home/user/data/"${NODE}" \
   --beacon-node="http://$NODE:3600" \
   --doppelganger-detection=false \
