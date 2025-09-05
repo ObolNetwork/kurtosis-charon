@@ -45,37 +45,37 @@ geth-grandine-charon-vouch: geth-grandine charon run-charon-vouch
 
 geth-lighthouse:
 	CL_TYPE=lighthouse ./setup_el_cl.sh
-	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
+	kurtosis run --image-download always --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
 geth-nimbus:
 	CL_TYPE=nimbus ./setup_el_cl.sh
-	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
+	kurtosis run --image-download always --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
 geth-lodestar:
 	CL_TYPE=lodestar ./setup_el_cl.sh
-	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
+	kurtosis run --image-download always --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
 geth-prysm:
 	CL_TYPE=prysm ./setup_el_cl.sh
-	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
+	kurtosis run --image-download always --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 60 seconds... don't skip the wait"
 	@sleep 60
 
 geth-teku:
 	CL_TYPE=teku ./setup_el_cl.sh
-	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
+	kurtosis run --image-download always --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 60 seconds... don't skip the wait"
 	@sleep 60
 
 geth-grandine:
 	CL_TYPE=grandine ./setup_el_cl.sh
-	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
+	kurtosis run --image-download always --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 10 seconds... don't skip the wait"
 	@sleep 10
 
