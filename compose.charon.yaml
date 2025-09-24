@@ -1,7 +1,7 @@
 name: kurtosis-charon
 
 x-node-base: &node-base
-  image: obolnetwork/charon:${CHARON_VERSION}
+  image: kaloyantanev/charon:${CHARON_VERSION}
   restart: unless-stopped
   networks: [network1]
   command: "run --testnet-chain-id=3151908 --testnet-fork-version='0x10000038' --testnet-genesis-timestamp=${TESTNET_GENESIS_TIME_STAMP} --testnet-name=testnet --testnet-capella-hard-fork='0x40000038' ${CHARON_EXTRA_RUN_ARGS:-}"
@@ -19,6 +19,7 @@ x-node-env: &node-env
   CHARON_P2P_TCP_ADDRESS: 0.0.0.0:3610
   CHARON_P2P_UDP_ADDRESS: 0.0.0.0:3630
   CHARON_MONITORING_ADDRESS: 0.0.0.0:3620
+  CHARON_FEATURE_SET_ENABLE: fetch_only_commidx_0
 
 services:
   #       _                                  _ _            _

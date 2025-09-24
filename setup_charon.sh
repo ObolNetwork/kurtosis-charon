@@ -205,7 +205,7 @@ if [ -n "$genesis_time" ]; then
     CLUSTER_NAME=${CLUSTER_NAME:-"test"}
 
     # Create charon cluster.
-    docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" obolnetwork/charon:"${CHARON_VERSION}" create cluster \
+    docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" kaloyantanev/charon:"${CHARON_VERSION}" create cluster \
         --name="$CLUSTER_NAME" \
         --nodes=3 \
         --fee-recipient-addresses="0x8943545177806ED17B9F23F0a21ee5948eCaa776" \
