@@ -4,6 +4,7 @@ participants:
     cl_type: teku
     cl_image: consensys/teku:${CL_VERSION}
     cl_extra_params: ["--validators-graffiti-client-append-format=DISABLED"]
+    supernode: true
     use_separate_vc: true
     count: 3
     prometheus_config:
