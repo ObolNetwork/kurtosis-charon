@@ -76,8 +76,8 @@ geth-teku:
 geth-grandine:
 	CL_TYPE=grandine ./setup_el_cl.sh
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package --args-file ./network_params.yaml > planprint
-	@echo "Waiting for 10 seconds... don't skip the wait"
-	@sleep 10
+	@echo "Waiting for 60 seconds... don't skip the wait"
+	@sleep 60
 
 charon:
 	./setup_charon.sh
