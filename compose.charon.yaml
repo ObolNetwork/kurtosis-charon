@@ -62,14 +62,14 @@ services:
       CHARON_P2P_EXTERNAL_HOSTNAME: node2
       CHARON_BEACON_NODE_ENDPOINTS: ${BN_2}
 
-  #           _             
-  #          | |            
-  #  _ __ ___| | __ _ _   _ 
+  #           _
+  #          | |
+  #  _ __ ___| | __ _ _   _
   # | '__/ _ \ |/ _` | | | |
   # | | |  __/ | (_| | |_| |
   # |_|  \___|_|\__,_|\__, |
   #                    __/ |
-  #                   |___/ 
+  #                   |___/
   #relay:
   #  image: obolnetwork/charon:${CHARON_VERSION}
   #  restart: unless-stopped
@@ -107,8 +107,8 @@ services:
     image: grafana/grafana:9.5.3
     ports:
       - "3000:3000"
-    networks: [ network1 ]
-    depends_on: [ prometheus ]
+    networks: [network1]
+    depends_on: [prometheus]
     volumes:
       - ./grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
       - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/datasource.yml

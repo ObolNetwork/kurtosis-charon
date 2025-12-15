@@ -50,6 +50,5 @@ echo "Imported all keys"
     --enable-beacon-rest-api \
     --beacon-rest-api-provider="${BEACON_NODE_ADDRESS}" \
     --beacon-rpc-provider="${BEACON_NODE_ADDRESS}" \
-    --beacon-rpc-gateway-provider="${BEACON_NODE_ADDRESS}" \
     --chain-config-file="/home/data/config.yaml" \
     --distributed
