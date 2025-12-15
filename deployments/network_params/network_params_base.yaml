@@ -15,23 +15,24 @@ network_params:
   min_validator_withdrawability_delay: 256
   shard_committee_period: 1
   electra_fork_epoch: 0
-  fulu_fork_epoch: 2
+  fulu_fork_epoch: 0
   network_sync_base_url: https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/
-  bpo_1_epoch: 3
-  bpo_1_max_blobs: 12
-  bpo_1_target_blobs: 9
-  bpo_2_epoch: 4
-  bpo_2_max_blobs: 6
-  bpo_2_target_blobs: 4
-  bpo_3_epoch: 5
-  bpo_3_max_blobs: 9
-  bpo_3_target_blobs: 6
-  bpo_4_epoch: 6
-  bpo_4_max_blobs: 18
-  bpo_4_target_blobs: 12
-  bpo_5_epoch: 7
-  bpo_5_max_blobs: 9
-  bpo_5_target_blobs: 6
+  bpo_1_epoch: 1
+  bpo_1_target_blobs: 10
+  bpo_1_max_blobs: 15
+  bpo_2_epoch: 2
+  bpo_2_max_blobs: 14
+  bpo_2_target_blobs: 21
+  # BPO_3, BPO_4, BPO_5 set to very high epoch to effectively disable them, not yet planned in mainnet
+  bpo_3_epoch: 9999999
+  bpo_3_max_blobs: 14
+  bpo_3_target_blobs: 21
+  bpo_4_epoch: 9999999
+  bpo_4_max_blobs: 14
+  bpo_4_target_blobs: 21
+  bpo_5_epoch: 9999999
+  bpo_5_max_blobs: 14
+  bpo_5_target_blobs: 21
 additional_services:
   - prometheus_grafana
 wait_for_finalization: false
