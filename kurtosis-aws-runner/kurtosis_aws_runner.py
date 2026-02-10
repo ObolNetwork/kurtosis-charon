@@ -241,12 +241,12 @@ def terminate_instances(tag_values):
 def main():
     parser = argparse.ArgumentParser(description="Launch or terminate Kurtosis EC2 test fleet.")
     parser.add_argument("--branch", default="main", help="Git branch to clone (default: main)")
-    parser.add_argument("--lifetime", default="120", help="Shutdown after time (default: 120 e.g. 90m, 2h)")
+    parser.add_argument("--lifetime", default="60m", help="Shutdown after time (default: 60m e.g. 90m, 2h)")
     parser.add_argument("--env-dir", default=DEFAULT_ENV_DIR, help="Directory of combos .env files")
     parser.add_argument("--monitoring-token", help="Monitoring token for Prometheus remote write")
     parser.add_argument("--terminate", action="store_true", help="Terminate matching EC2 instances")
     parser.add_argument("--on-demand", action="store_true", help="Use On-Demand EC2 instances (default is Spot)")
-    parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help="EC2 instance type (default: c6a.xlarge)")
+    parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help="EC2 instance type (default: c6a.2xlarge)")
     args = parser.parse_args()
 
     combos = get_combos(args.env_dir)
