@@ -127,6 +127,9 @@ exit-teku:
 	./teku/exit.sh 1
 	./teku/exit.sh 2
 
+run-aws:
+	./run_aws.sh
+
 clean:
 	-docker compose -f compose.charon.yaml -f compose.lighthouse.yaml -f compose.lodestar.yaml -f compose.nimbus.yaml -f compose.prysm.yaml -f compose.teku.yaml down
 	-kurtosis enclave stop local-eth-testnet
