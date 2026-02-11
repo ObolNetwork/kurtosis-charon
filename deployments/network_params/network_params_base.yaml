@@ -8,43 +8,8 @@ network_params:
     "giant issue aisle success illegal bike spike
     question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy
     very lucky have athlete"
-  preregistered_validator_count: 0
-  genesis_delay: 20
-  ejection_balance: 16000000000
-  eth1_follow_distance: 2048
-  min_validator_withdrawability_delay: 256
   shard_committee_period: 1
-  electra_fork_epoch: 0
-  fulu_fork_epoch: 0
-  network_sync_base_url: https://ethpandaops-ethereum-node-snapshots.ams3.digitaloceanspaces.com/
-  bpo_1_epoch: 1
-  bpo_1_target_blobs: 10
-  bpo_1_max_blobs: 15
-  bpo_2_epoch: 2
-  bpo_2_max_blobs: 14
-  bpo_2_target_blobs: 21
-  # BPO_3, BPO_4, BPO_5 set to very high epoch to effectively disable them, not yet planned in mainnet
-  bpo_3_epoch: 9999999
-  bpo_3_max_blobs: 14
-  bpo_3_target_blobs: 21
-  bpo_4_epoch: 9999999
-  bpo_4_max_blobs: 14
-  bpo_4_target_blobs: 21
-  bpo_5_epoch: 9999999
-  bpo_5_max_blobs: 14
-  bpo_5_target_blobs: 21
-additional_services:
-  - prometheus_grafana
 wait_for_finalization: false
 global_log_level: info
 parallel_keystore_generation: false
 mev_type: mock
-mev_params:
-  mev_relay_image: flashbots/mev-boost-relay
-  mev_builder_image: ethpandaops/flashbots-builder:main
-  mev_builder_cl_image: sigp/lighthouse:latest
-  mev_boost_image: flashbots/mev-boost
-  mev_boost_args: ["mev-boost", "--relay-check"]
-  mev_builder_prometheus_config:
-    scrape_interval: 15s
-    labels: {}
