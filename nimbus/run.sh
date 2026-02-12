@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Cleanup nimbus directories if they already exist.
-rm -rf /home/user/nimbus-eth2/build/data/${NODE}
+rm -rf /home/user/data/${NODE}
 
 # Refer: https://nimbus.guide/keys.html
 # Running a nimbus VC involves two steps which need to run in order:
@@ -21,8 +21,8 @@ for f in /home/validator_keys/keystore-*.json; do
 
   # Import keystore with the password.
   echo "$password" | \
-  /home/user/nimbus-eth2/build/nimbus_beacon_node deposits import \
-  --data-dir=/home/user/nimbus-eth2/build/data/${NODE} \
+  /home/user/nimbus_beacon_node deposits import \
+  --data-dir=/home/user/data/${NODE} \
   /home/validator_keys/tmpkeys
 
   # Delete tmpkeys/keystore-*.json file that was copied before.
@@ -36,8 +36,8 @@ rm -r ${tmpkeys}
 echo "Imported all keys"
 
 # Now run nimbus VC
-exec /home/user/nimbus-eth2/build/nimbus_validator_client \
-  --data-dir=/home/user/nimbus-eth2/build/data/"${NODE}" \
+exec /home/user/nimbus_validator_client \
+  --data-dir=/home/user/data/"${NODE}" \
   --beacon-node="http://$NODE:3600" \
   --doppelganger-detection=false \
   --metrics \
