@@ -12,4 +12,4 @@ network_params:
 wait_for_finalization: false
 global_log_level: info
 parallel_keystore_generation: false
-mev_type: mock
+# mev_type: mock - disabled due to ethereum-package bug with non-lighthouse CLs
