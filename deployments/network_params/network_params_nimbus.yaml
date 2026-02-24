@@ -1,8 +1,8 @@
 participants:
   - el_type: geth
-    el_image: ethereum/client-go:${EL_VERSION}
+    el_image: ${EL_IMAGE}:${EL_VERSION}
     cl_type: nimbus
-    cl_image: statusim/nimbus-eth2:${CL_VERSION}
+    cl_image: ${CL_IMAGE}:${CL_VERSION}
     supernode: true
     use_separate_vc: true
     count: 3

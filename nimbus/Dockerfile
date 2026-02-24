@@ -1,8 +1,11 @@
-ARG VERSION
+ARG CL_IMAGE
+ARG CL_VERSION
+ARG VC_IMAGE
+ARG VC_VERSION
 
-FROM statusim/nimbus-eth2:${VERSION} AS nimbusbn
+FROM ${CL_IMAGE}:${CL_VERSION} AS nimbusbn
 
-FROM statusim/nimbus-validator-client:${VERSION}
+FROM ${VC_IMAGE}:${VC_VERSION}
 
 COPY --from=nimbusbn /home/user/nimbus_beacon_node /home/user/nimbus_beacon_node
 
