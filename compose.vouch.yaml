@@ -1,12 +1,11 @@
 name: kurtosis-charon
 
 x-vouch-base: &vouch-base
-  image: attestant/vouch:${VC_VERSION}
+  image: ${VC_IMAGE}:${VC_VERSION}
   entrypoint: /opt/vouch/run.sh
-  networks: [ network1 ]
+  networks: [network1]
   restart: unless-stopped
   user: "${DUID:-}:${DGID:-}" # Used by docker-in-docker as it's based on linux
-
 
 x-vouch-volume-run: &vouch-volume-run ./vouch/run.sh:/opt/vouch/run.sh
 

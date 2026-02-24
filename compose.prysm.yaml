@@ -4,7 +4,8 @@ x-prysm-base: &prysm-base
   build:
     context: prysm
     args:
-      VERSION: ${VC_VERSION}
+      VC_IMAGE: ${VC_IMAGE}
+      VC_VERSION: ${VC_VERSION}
   platform: "linux/amd64"
   networks: [network1]
   restart: unless-stopped

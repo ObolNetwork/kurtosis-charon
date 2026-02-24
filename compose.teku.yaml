@@ -1,7 +1,7 @@
 name: kurtosis-charon
 
 x-teku-base: &teku-base
-  image: consensys/teku:${VC_VERSION}
+  image: ${VC_IMAGE}:${VC_VERSION}
   networks: [network1]
   restart: unless-stopped
   user: "${DUID:-}:${DGID:-}" # Used by docker-in-docker as it's based on linux
