@@ -12,7 +12,7 @@ from tabulate import tabulate
 KEY_NAME = "kurtosis-fleet"
 SECURITY_GROUP_ID = "sg-0e208fd6ad761cafc"
 SUBNET_ID = "subnet-07d83bab8a2b8cd7d"
-DEFAULT_INSTANCE_TYPE = "c6a.xlarge"
+DEFAULT_INSTANCE_TYPE = "c6a.2xlarge"
 VOLUME_SIZE = 50
 VOLUME_TYPE = "gp3"
 VOLUME_IOPS = 6000  # optimized for Charon test runs
