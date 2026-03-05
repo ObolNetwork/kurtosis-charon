@@ -71,6 +71,13 @@ if [ -z ${CHARON_VERSION+x} ]; then
     export $(xargs <$dir)
 fi
 
+# If CHARON_IMAGE is not set, read ./deployments/env/charon.env.
+if [ -z ${CHARON_IMAGE+x} ]; then
+    dir="./deployments/env/charon.env"
+    echo "CHARON_IMAGE is unset, reading from ${dir}"
+    export $(xargs <$dir)
+fi
+
 # data folder will be used for multiple purpose further down the script.
 mkdir -p data
 
@@ -185,6 +192,11 @@ extract_bn_ip "$uuid" "$kurtosis_inspect_output" "$beaconClients" bnips
 # Create .env file if it doesn't exist
 if ! test -f ./.env; then
     touch ./.env
+fi
+
+# Write the CHARON_IMAGE that was previously loaded to the .env, if it's not written.
+if ! grep -q CHARON_IMAGE ./.env; then
+    echo "CHARON_IMAGE=${CHARON_IMAGE}" >>./.env
 fi
 
 # Write the CHARON_VERSION that was previously loaded to the .env, if it's not written.

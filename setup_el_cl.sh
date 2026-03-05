@@ -11,10 +11,25 @@ fi
 # Concatenate the CL-specific network params and the general network params and write them to network_params.yaml.
 cat "./deployments/network_params/network_params_${CL_TYPE}.yaml" ./deployments/network_params/network_params_base.yaml >network_params.yaml
 
+# If CL_IMAGE is not set, read ./deployments/env/cl_${CL_TYPE}.env.
+if [ -z ${CL_IMAGE+x} ]; then
+  dir="./deployments/env/cl_${CL_TYPE}.env"
+  echo "CL_IMAGE is unset, reading from ${dir}"
+  export $(xargs <$dir)
+fi
+
 # If CL_VERSION is not set, read ./deployments/env/cl_${CL_TYPE}.env.
 if [ -z ${CL_VERSION+x} ]; then
   dir="./deployments/env/cl_${CL_TYPE}.env"
   echo "CL_VERSION is unset, reading from ${dir}"
+  export $(xargs <$dir)
+fi
+
+# If EL_IMAGE is not set, read ./deployments/env/el_${EL_TYPE}.env.
+EL_TYPE=${EL_TYPE:-"geth"}
+if [ -z ${EL_IMAGE+x} ]; then
+  dir="./deployments/env/el_${EL_TYPE}.env"
+  echo "EL_IMAGE is unset, reading from ${dir}"
   export $(xargs <$dir)
 fi
 
