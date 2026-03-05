@@ -20,6 +20,11 @@ if ! grep -q VC_TYPE ./.env; then
     echo "VC_TYPE=${VC_TYPE}" >>./.env
 fi
 
+# Write the VC_IMAGE that was previously loaded to the .env, if it's not written.
+if ! grep -q VC_IMAGE ./.env; then
+    echo "VC_IMAGE=${VC_IMAGE}" >>./.env
+fi
+
 # Write the VC_VERSION that was previously loaded to the .env, if it's not written.
 if ! grep -q VC_VERSION ./.env; then
     echo "VC_VERSION=${VC_VERSION}" >>./.env
