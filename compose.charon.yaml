@@ -62,6 +62,18 @@ services:
       CHARON_P2P_EXTERNAL_HOSTNAME: node2
       CHARON_BEACON_NODE_ENDPOINTS: ${BN_2}
 
+  node3:
+    <<: *node-base
+    container_name: node3
+    #depends_on: [ relay ]
+    environment:
+      <<: *node-env
+      CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node3/charon-enr-private-key
+      CHARON_LOCK_FILE: /opt/charon/.charon/cluster/node3/cluster-lock.json
+      CHARON_JAEGER_SERVICE: node3
+      CHARON_P2P_EXTERNAL_HOSTNAME: node3
+      CHARON_BEACON_NODE_ENDPOINTS: ${BN_2}
+
   #           _
   #          | |
   #  _ __ ___| | __ _ _   _
