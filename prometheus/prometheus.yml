@@ -12,6 +12,9 @@ scrape_configs:
   - job_name: "charon-2"
     static_configs:
       - targets: ["node2:3620"]
+  - job_name: "charon-3"
+    static_configs:
+      - targets: ["node3:3620"]
   - job_name: "vc-lighthouse"
     static_configs:
       - targets:
@@ -24,7 +27,13 @@ scrape_configs:
       - targets: ["vc0-nimbus:8008", "vc1-nimbus:8008", "vc2-nimbus:8008"]
   - job_name: "vc-lodestar"
     static_configs:
-      - targets: ["vc0-lodestar:5064", "vc1-lodestar:5064", "vc2-lodestar:5064"]
+      - targets:
+          [
+            "vc0-lodestar:5064",
+            "vc1-lodestar:5064",
+            "vc2-lodestar:5064",
+            "vc3-lodestar:5064",
+          ]
   - job_name: "vc-prysm"
     static_configs:
       - targets: ["vc0-prysm:8081", "vc1-prysm:8081", "vc2-prysm:8081"]
