@@ -81,14 +81,13 @@ fi
 # data folder will be used for multiple purpose further down the script.
 mkdir -p data
 
-# Run the kurtosis enclave ls command and capture its output.
-enclave_output=$(kurtosis enclave ls)
-
-# Use grep and awk to extract the UUID.
-uuid=$(echo "$enclave_output" | grep -oE '^[0-9a-f]+ ' | awk '{print $1}')
-
-# Print the extracted UUID.
-echo "Extracted enclave UUID: $uuid"
+# Extract UUID for local-eth-testnet enclave only (ignore other enclaves like quickstart).
+uuid=$(kurtosis enclave ls | awk '/local-eth-testnet/{print $1; exit}')
+if [ -z "$uuid" ]; then
+    echo "ERROR: Enclave 'local-eth-testnet' not found. Run 'make geth-lighthouse' (or your CL) first."
+    exit 1
+fi
+echo "Using enclave local-eth-testnet (UUID: $uuid)"
 
 # Set a flag to indicate whether we are capturing JSON.
 capture_json=false
@@ -233,7 +232,8 @@ else
 fi
 
 # Find the Kurtosis network starting with "kt-" from `docker network ls`.
-network_name=$(docker network ls --format '{{.Name}}' | grep -oE 'kt-[a-zA-Z0-9_-]+')
+# Use only the first match to avoid writing multiple lines to .env (e.g. kt-quickstart as bare line).
+network_name=$(docker network ls --format '{{.Name}}' | grep -oE 'kt-[a-zA-Z0-9_-]+' | head -1)
 
 # Check if a network name was found.
 if [ -n "$network_name" ]; then
