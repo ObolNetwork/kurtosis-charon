@@ -84,7 +84,7 @@ mkdir -p data
 # Extract UUID for local-eth-testnet enclave only (ignore other enclaves like quickstart).
 uuid=$(kurtosis enclave ls | awk '/local-eth-testnet/{print $1; exit}')
 if [ -z "$uuid" ]; then
-    echo "ERROR: Enclave 'local-eth-testnet' not found. Run 'make geth-lighthouse' (or your CL) first."
+    echo "ERROR: Enclave 'local-eth-testnet' not found"
     exit 1
 fi
 echo "Using enclave local-eth-testnet (UUID: $uuid)"
