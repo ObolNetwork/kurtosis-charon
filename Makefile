@@ -1,47 +1,156 @@
 .PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku geth-grandine charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku run-charon-vouch run-aws stop-aws clean
 
 # Define the composite step
-geth-lighthouse-charon-lighthouse: geth-lighthouse charon run-charon-lighthouse
-geth-lighthouse-charon-lodestar: geth-lighthouse charon run-charon-lodestar
-geth-lighthouse-charon-teku: geth-lighthouse charon run-charon-teku
-geth-lighthouse-charon-nimbus: geth-lighthouse charon run-charon-nimbus
-geth-lighthouse-charon-prysm: geth-lighthouse charon run-charon-prysm
-geth-lighthouse-charon-vouch: geth-lighthouse charon run-charon-vouch
+# Each target sets CLUSTER_NAME=kurtosis-{cl}-{vc} for metrics identification.
+geth-lighthouse-charon-lighthouse:
+	$(MAKE) geth-lighthouse
+	CLUSTER_NAME=kurtosis-lighthouse-lighthouse $(MAKE) charon
+	$(MAKE) run-charon-lighthouse
+geth-lighthouse-charon-lodestar:
+	$(MAKE) geth-lighthouse
+	CLUSTER_NAME=kurtosis-lighthouse-lodestar $(MAKE) charon
+	$(MAKE) run-charon-lodestar
+geth-lighthouse-charon-teku:
+	$(MAKE) geth-lighthouse
+	CLUSTER_NAME=kurtosis-lighthouse-teku $(MAKE) charon
+	$(MAKE) run-charon-teku
+geth-lighthouse-charon-nimbus:
+	$(MAKE) geth-lighthouse
+	CLUSTER_NAME=kurtosis-lighthouse-nimbus $(MAKE) charon
+	$(MAKE) run-charon-nimbus
+geth-lighthouse-charon-prysm:
+	$(MAKE) geth-lighthouse
+	CLUSTER_NAME=kurtosis-lighthouse-prysm $(MAKE) charon
+	$(MAKE) run-charon-prysm
+geth-lighthouse-charon-vouch:
+	$(MAKE) geth-lighthouse
+	CLUSTER_NAME=kurtosis-lighthouse-vouch $(MAKE) charon
+	$(MAKE) run-charon-vouch
 
-geth-lodestar-charon-lighthouse: geth-lodestar charon run-charon-lighthouse
-geth-lodestar-charon-lodestar: geth-lodestar charon run-charon-lodestar
-geth-lodestar-charon-teku: geth-lodestar charon run-charon-teku
-geth-lodestar-charon-nimbus: geth-lodestar charon run-charon-nimbus
-geth-lodestar-charon-prysm: geth-lodestar charon run-charon-prysm
-geth-lodestar-charon-vouch: geth-lodestar charon run-charon-vouch
+geth-lodestar-charon-lighthouse:
+	$(MAKE) geth-lodestar
+	CLUSTER_NAME=kurtosis-lodestar-lighthouse $(MAKE) charon
+	$(MAKE) run-charon-lighthouse
+geth-lodestar-charon-lodestar:
+	$(MAKE) geth-lodestar
+	CLUSTER_NAME=kurtosis-lodestar-lodestar $(MAKE) charon
+	$(MAKE) run-charon-lodestar
+geth-lodestar-charon-teku:
+	$(MAKE) geth-lodestar
+	CLUSTER_NAME=kurtosis-lodestar-teku $(MAKE) charon
+	$(MAKE) run-charon-teku
+geth-lodestar-charon-nimbus:
+	$(MAKE) geth-lodestar
+	CLUSTER_NAME=kurtosis-lodestar-nimbus $(MAKE) charon
+	$(MAKE) run-charon-nimbus
+geth-lodestar-charon-prysm:
+	$(MAKE) geth-lodestar
+	CLUSTER_NAME=kurtosis-lodestar-prysm $(MAKE) charon
+	$(MAKE) run-charon-prysm
+geth-lodestar-charon-vouch:
+	$(MAKE) geth-lodestar
+	CLUSTER_NAME=kurtosis-lodestar-vouch $(MAKE) charon
+	$(MAKE) run-charon-vouch
 
-geth-teku-charon-lighthouse: geth-teku charon run-charon-lighthouse
-geth-teku-charon-lodestar: geth-teku charon run-charon-lodestar
-geth-teku-charon-teku: geth-teku charon run-charon-teku
-geth-teku-charon-nimbus: geth-teku charon run-charon-nimbus
-geth-teku-charon-prysm: geth-teku charon run-charon-prysm
-geth-teku-charon-vouch: geth-teku charon run-charon-vouch
+geth-teku-charon-lighthouse:
+	$(MAKE) geth-teku
+	CLUSTER_NAME=kurtosis-teku-lighthouse $(MAKE) charon
+	$(MAKE) run-charon-lighthouse
+geth-teku-charon-lodestar:
+	$(MAKE) geth-teku
+	CLUSTER_NAME=kurtosis-teku-lodestar $(MAKE) charon
+	$(MAKE) run-charon-lodestar
+geth-teku-charon-teku:
+	$(MAKE) geth-teku
+	CLUSTER_NAME=kurtosis-teku-teku $(MAKE) charon
+	$(MAKE) run-charon-teku
+geth-teku-charon-nimbus:
+	$(MAKE) geth-teku
+	CLUSTER_NAME=kurtosis-teku-nimbus $(MAKE) charon
+	$(MAKE) run-charon-nimbus
+geth-teku-charon-prysm:
+	$(MAKE) geth-teku
+	CLUSTER_NAME=kurtosis-teku-prysm $(MAKE) charon
+	$(MAKE) run-charon-prysm
+geth-teku-charon-vouch:
+	$(MAKE) geth-teku
+	CLUSTER_NAME=kurtosis-teku-vouch $(MAKE) charon
+	$(MAKE) run-charon-vouch
 
-geth-nimbus-charon-lighthouse: geth-nimbus charon run-charon-lighthouse
-geth-nimbus-charon-lodestar: geth-nimbus charon run-charon-lodestar
-geth-nimbus-charon-teku: geth-nimbus charon run-charon-teku
-geth-nimbus-charon-nimbus: geth-nimbus charon run-charon-nimbus
-geth-nimbus-charon-prysm: geth-nimbus charon run-charon-prysm
-geth-nimbus-charon-vouch: geth-nimbus charon run-charon-vouch
+geth-nimbus-charon-lighthouse:
+	$(MAKE) geth-nimbus
+	CLUSTER_NAME=kurtosis-nimbus-lighthouse $(MAKE) charon
+	$(MAKE) run-charon-lighthouse
+geth-nimbus-charon-lodestar:
+	$(MAKE) geth-nimbus
+	CLUSTER_NAME=kurtosis-nimbus-lodestar $(MAKE) charon
+	$(MAKE) run-charon-lodestar
+geth-nimbus-charon-teku:
+	$(MAKE) geth-nimbus
+	CLUSTER_NAME=kurtosis-nimbus-teku $(MAKE) charon
+	$(MAKE) run-charon-teku
+geth-nimbus-charon-nimbus:
+	$(MAKE) geth-nimbus
+	CLUSTER_NAME=kurtosis-nimbus-nimbus $(MAKE) charon
+	$(MAKE) run-charon-nimbus
+geth-nimbus-charon-prysm:
+	$(MAKE) geth-nimbus
+	CLUSTER_NAME=kurtosis-nimbus-prysm $(MAKE) charon
+	$(MAKE) run-charon-prysm
+geth-nimbus-charon-vouch:
+	$(MAKE) geth-nimbus
+	CLUSTER_NAME=kurtosis-nimbus-vouch $(MAKE) charon
+	$(MAKE) run-charon-vouch
 
-geth-prysm-charon-lighthouse: geth-prysm charon run-charon-lighthouse
-geth-prysm-charon-lodestar: geth-prysm charon run-charon-lodestar
-geth-prysm-charon-teku: geth-prysm charon run-charon-teku
-geth-prysm-charon-nimbus: geth-prysm charon run-charon-nimbus
-geth-prysm-charon-prysm: geth-prysm charon run-charon-prysm
-geth-prysm-charon-vouch: geth-prysm charon run-charon-vouch
+geth-prysm-charon-lighthouse:
+	$(MAKE) geth-prysm
+	CLUSTER_NAME=kurtosis-prysm-lighthouse $(MAKE) charon
+	$(MAKE) run-charon-lighthouse
+geth-prysm-charon-lodestar:
+	$(MAKE) geth-prysm
+	CLUSTER_NAME=kurtosis-prysm-lodestar $(MAKE) charon
+	$(MAKE) run-charon-lodestar
+geth-prysm-charon-teku:
+	$(MAKE) geth-prysm
+	CLUSTER_NAME=kurtosis-prysm-teku $(MAKE) charon
+	$(MAKE) run-charon-teku
+geth-prysm-charon-nimbus:
+	$(MAKE) geth-prysm
+	CLUSTER_NAME=kurtosis-prysm-nimbus $(MAKE) charon
+	$(MAKE) run-charon-nimbus
+geth-prysm-charon-prysm:
+	$(MAKE) geth-prysm
+	CLUSTER_NAME=kurtosis-prysm-prysm $(MAKE) charon
+	$(MAKE) run-charon-prysm
+geth-prysm-charon-vouch:
+	$(MAKE) geth-prysm
+	CLUSTER_NAME=kurtosis-prysm-vouch $(MAKE) charon
+	$(MAKE) run-charon-vouch
 
-geth-grandine-charon-lighthouse: geth-grandine charon run-charon-lighthouse
-geth-grandine-charon-lodestar: geth-grandine charon run-charon-lodestar
-geth-grandine-charon-teku: geth-grandine charon run-charon-teku
-geth-grandine-charon-nimbus: geth-grandine charon run-charon-nimbus
-geth-grandine-charon-prysm: geth-grandine charon run-charon-prysm
-geth-grandine-charon-vouch: geth-grandine charon run-charon-vouch
+geth-grandine-charon-lighthouse:
+	$(MAKE) geth-grandine
+	CLUSTER_NAME=kurtosis-grandine-lighthouse $(MAKE) charon
+	$(MAKE) run-charon-lighthouse
+geth-grandine-charon-lodestar:
+	$(MAKE) geth-grandine
+	CLUSTER_NAME=kurtosis-grandine-lodestar $(MAKE) charon
+	$(MAKE) run-charon-lodestar
+geth-grandine-charon-teku:
+	$(MAKE) geth-grandine
+	CLUSTER_NAME=kurtosis-grandine-teku $(MAKE) charon
+	$(MAKE) run-charon-teku
+geth-grandine-charon-nimbus:
+	$(MAKE) geth-grandine
+	CLUSTER_NAME=kurtosis-grandine-nimbus $(MAKE) charon
+	$(MAKE) run-charon-nimbus
+geth-grandine-charon-prysm:
+	$(MAKE) geth-grandine
+	CLUSTER_NAME=kurtosis-grandine-prysm $(MAKE) charon
+	$(MAKE) run-charon-prysm
+geth-grandine-charon-vouch:
+	$(MAKE) geth-grandine
+	CLUSTER_NAME=kurtosis-grandine-vouch $(MAKE) charon
+	$(MAKE) run-charon-vouch
 
 geth-lighthouse:
 	CL_TYPE=lighthouse ./setup_el_cl.sh

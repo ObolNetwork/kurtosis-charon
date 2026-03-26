@@ -45,6 +45,11 @@ fi
 envsubst <"network_params.yaml" >"network_params.yaml.tmp"
 mv "network_params.yaml.tmp" "network_params.yaml"
 
+# Write the CL_TYPE to the .env file, if it's not written.
+if ! grep -q CL_TYPE ./.env 2>/dev/null; then
+    echo "CL_TYPE=${CL_TYPE}" >>./.env
+fi
+
 # Add CHARON_EXTRA_RUN_ARGS for nimbus CL. For more information read the README.md.
 if [[ "$CL_TYPE" == "nimbus" ]]; then
   if ! [ -f .env ]; then

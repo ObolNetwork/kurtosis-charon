@@ -17,6 +17,9 @@ kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package
 echo "Waiting for 10 seconds..."
 sleep 10
 
+# Set cluster name from CL and VC types if not already set.
+export CLUSTER_NAME=${CLUSTER_NAME:-"kurtosis-${CL_TYPE}-${VC_TYPE}"}
+
 # Setup Charon, Monitoring and Charon VCs.
 ./setup_charon.sh
 ./setup_monitoring.sh

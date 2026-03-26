@@ -213,7 +213,7 @@ if [ -n "$genesis_time" ]; then
         echo "BN_$i=${bnips[$i]}" >>./.env
     done
 
-    CLUSTER_NAME=${CLUSTER_NAME:-"test"}
+    CLUSTER_NAME=${CLUSTER_NAME:-"kurtosis-${CL_TYPE:-unknown}"}
 
     # Create charon cluster.
     docker run -u $(id -u):$(id -g) --rm -v "$(pwd)/:/opt/charon" ${CHARON_IMAGE}:"${CHARON_VERSION}" create cluster \
@@ -226,7 +226,7 @@ if [ -n "$genesis_time" ]; then
         --testnet-chain-id=3151908 \
         --testnet-fork-version="0x10000038" \
         --testnet-genesis-timestamp="$genesis_time" \
-        --testnet-name=kurtosis-testnet
+        --testnet-name=kurtosis
 else
     echo "Genesis Time not found."
 fi
