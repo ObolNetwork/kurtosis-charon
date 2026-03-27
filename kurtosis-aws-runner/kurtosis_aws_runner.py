@@ -4,7 +4,6 @@ import re
 import sys
 import time
 import argparse
-import uuid
 from botocore.exceptions import ClientError, BotoCoreError
 from tabulate import tabulate
 
@@ -270,13 +269,17 @@ def main():
         return
 
     ami_id = get_latest_ubuntu_ami()
-    cluster_name = str(uuid.uuid4())
-    print(f"\n🚀 Launching with AMI {ami_id}, cluster name {cluster_name}, branch '{args.branch}', shutdown in {shutdown_minutes}m")
+    print(f"\n🚀 Launching with AMI {ami_id}, branch '{args.branch}', shutdown in {shutdown_minutes}m")
     print(f"📌 Instance type: {args.instance_type}, On-Demand: {args.on_demand}\n")
 
     launched_ids = []
     id_to_tag = {}
     for combo in combos:
+        # Derive cluster name from combo: "geth-{cl}-charon-{vc}" -> "kurtosis-{cl}-{vc}"
+        parts = combo.split("-charon-")
+        cl = parts[0].split("-", 1)[1]  # strip EL prefix (e.g. "geth-")
+        vc = parts[1]
+        cluster_name = f"kurtosis-{cl}-{vc}"
         iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, args.instance_type, args.on_demand, cluster_name)
         if iid:
             launched_ids.append(iid)
