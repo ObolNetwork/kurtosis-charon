@@ -35,15 +35,10 @@ if [[ "$VC_TYPE" == "lodestar" ]]; then
     mkdir -p data/lodestar/vc{0,1,2}/{caches,keystores,validator-db}
 fi
 
-# Nimbus VC Dockerfile copies nimbus_beacon_node from the nimbus CL image.
-# Write CL_IMAGE and CL_VERSION from the nimbus CL env so docker compose can pass them as build args.
+# Create data folders for nimbus VC and persist BN image for Dockerfile build.
 if [[ "$VC_TYPE" == "nimbus" ]]; then
     mkdir -p data/nimbus/vc{0,1,2}
-    export $(xargs <./deployments/env/cl_nimbus.env)
-    if ! grep -q CL_IMAGE ./.env; then
-        echo "CL_IMAGE=${CL_IMAGE}" >>./.env
-    fi
-    if ! grep -q CL_VERSION ./.env; then
-        echo "CL_VERSION=${CL_VERSION}" >>./.env
+    if ! grep -q NIMBUS_BN_IMAGE ./.env; then
+        echo "NIMBUS_BN_IMAGE=${NIMBUS_BN_IMAGE}" >>./.env
     fi
 fi
