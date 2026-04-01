@@ -48,7 +48,28 @@ extract_bn_ip() {
         fi
 
     done
+}
 
+# Extract the IPs and RPC ports of the supplied execution layer clients, from the inside of the Docker network.
+extract_el_ip() {
+    uuid=$1
+    names=$2
+    local -n ret=$3
+    ret=()
+
+    # Iterate over the supplied EL clients.
+    for elClient in ${names[@]}; do
+        # Fetch the container's IP address.
+        container_id=$(docker ps -aqf "name=$elClient")
+        el_ip=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $container_id)
+
+        if [[ $elClient == *"geth"* ]]; then
+            el_port=8545 # standard port for geth
+        fi
+        echo "Execution client address found: $el_ip:$el_port"
+        ret+=($(echo "http://$el_ip:$el_port"))
+
+    done
 }
 
 if ((BASH_VERSINFO[0] < 5)); then
@@ -118,6 +139,7 @@ uuidValidator=$(echo "$json_content" | jq -r '.all_participants[0].cl_context.va
 beaconClient=$(echo "$json_content" | jq -r '.all_participants[0].cl_context.beacon_service_name')
 
 beaconClients=$(echo "$json_content" | jq -r '.all_participants[].cl_context.beacon_service_name')
+elClients=$(echo "$json_content" | jq -r '.all_participants[].el_context.dns_name')
 
 if [ -n "$uuid" ]; then
     # Run the kurtosis port print command with the extracted UUID and save the output to a variable.
@@ -188,6 +210,9 @@ done
 # Extract BN IP:port and write to `bnips` variable.
 extract_bn_ip "$uuid" "$kurtosis_inspect_output" "$beaconClients" bnips
 
+# Extract EL IP:port and write to `elips` variable.
+extract_el_ip "$uuid" "$elClients" elips
+
 # Create .env file if it doesn't exist
 if ! test -f ./.env; then
     touch ./.env
@@ -211,6 +236,11 @@ if [ -n "$genesis_time" ]; then
     # Write BNs IP:port to the .env file.
     for i in "${!bnips[@]}"; do
         echo "BN_$i=${bnips[$i]}" >>./.env
+    done
+
+    # Write ELs IP:port to the .env file.
+    for i in "${!elips[@]}"; do
+        echo "EC_$i=${elips[$i]}" >>./.env
     done
 
     CLUSTER_NAME=${CLUSTER_NAME:-"kurtosis-${CL_TYPE:-unknown}"}

@@ -37,6 +37,7 @@ services:
       CHARON_JAEGER_SERVICE: node0
       CHARON_P2P_EXTERNAL_HOSTNAME: node0
       CHARON_BEACON_NODE_ENDPOINTS: ${BN_0}
+      CHARON_EXECUTION_CLIENT_RPC_ENDPOINT: ${EC_0}
 
   node1:
     <<: *node-base
@@ -49,6 +50,7 @@ services:
       CHARON_JAEGER_SERVICE: node1
       CHARON_P2P_EXTERNAL_HOSTNAME: node1
       CHARON_BEACON_NODE_ENDPOINTS: ${BN_1}
+      CHARON_EXECUTION_CLIENT_RPC_ENDPOINT: ${EC_1}
 
   node2:
     <<: *node-base
@@ -61,6 +63,7 @@ services:
       CHARON_JAEGER_SERVICE: node2
       CHARON_P2P_EXTERNAL_HOSTNAME: node2
       CHARON_BEACON_NODE_ENDPOINTS: ${BN_2}
+      CHARON_EXECUTION_CLIENT_RPC_ENDPOINT: ${EC_2}
 
   #           _
   #          | |
