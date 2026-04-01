@@ -76,7 +76,29 @@ def get_combos(env_dir):
     return [f"{el_client}-{cl_client}-charon-{vc_client}" for el_client in el for cl_client in cl for vc_client in vc]
 
 
-def generate_user_data(combo, branch, shutdown_minutes, monitoring_token, cluster_name):
+def parse_charon_version(charon_version):
+    """Parse charon version which can be a tag (v1.9.2) or full image ref (obolnetwork/charon:v1.9.2).
+
+    Also handles registry prefixes with ports (e.g. registry.example.com:5000/image:tag)
+    by splitting on the last colon.
+    """
+    if not charon_version:
+        return None, None
+    if ":" in charon_version:
+        image, version = charon_version.rsplit(":", 1)
+        if not image or not version:
+            safe_exit(f"Invalid --charon-version format: '{charon_version}'. Expected 'tag' or 'image:tag'.")
+        return image, version
+    return None, charon_version
+
+
+def generate_user_data(combo, branch, shutdown_minutes, monitoring_token, cluster_name, charon_version=None):
+    charon_image, charon_tag = parse_charon_version(charon_version)
+    charon_exports = ""
+    if charon_tag:
+        charon_exports += f'export CHARON_VERSION="{charon_tag}"\n'
+    if charon_image:
+        charon_exports += f'export CHARON_IMAGE="{charon_image}"\n'
     return f"""#!/bin/bash
 set -euxo pipefail
 sleep 20
@@ -99,6 +121,7 @@ su - ubuntu <<'EOF'
 cd /home/ubuntu
 git clone -b {branch} {GIT_REPO}
 cd kurtosis-charon
+{charon_exports}
 echo "PROMETHEUS_REMOTE_WRITE_TOKEN={monitoring_token}" >> deployments/env/charon.env
 echo "CLUSTER_NAME={cluster_name}" >> deployments/env/charon.env
 make {combo} || true
@@ -123,7 +146,7 @@ def instance_exists(tag_value):
         safe_exit(f"Error checking existing instances: {e}")
 
 
-def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, instance_type, on_demand, cluster_name):
+def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, instance_type, on_demand, cluster_name, charon_version=None):
     tag = instance_tag(combo)
     if instance_exists(tag):
         print(f"⚠️  Skipping existing instance: {tag}")
@@ -137,7 +160,7 @@ def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, i
         "MaxCount": 1,
         "SubnetId": SUBNET_ID,
         "SecurityGroupIds": [SECURITY_GROUP_ID],
-        "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token, cluster_name),
+        "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token, cluster_name, charon_version),
         "BlockDeviceMappings": [{
             "DeviceName": "/dev/sda1",
             "Ebs": {
@@ -246,6 +269,7 @@ def main():
     parser.add_argument("--terminate", action="store_true", help="Terminate matching EC2 instances")
     parser.add_argument("--on-demand", action="store_true", help="Use On-Demand EC2 instances (default is Spot)")
     parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help="EC2 instance type (default: c6a.2xlarge)")
+    parser.add_argument("--charon-version", default=os.environ.get("CHARON_VERSION"), help="Override Charon version (e.g. v1.9.2 or obolnetwork/charon:v1.9.2). Defaults to CHARON_VERSION env var if set.")
     args = parser.parse_args()
 
     combos = get_combos(args.env_dir)
@@ -270,7 +294,10 @@ def main():
 
     ami_id = get_latest_ubuntu_ami()
     print(f"\n🚀 Launching with AMI {ami_id}, branch '{args.branch}', shutdown in {shutdown_minutes}m")
-    print(f"📌 Instance type: {args.instance_type}, On-Demand: {args.on_demand}\n")
+    print(f"📌 Instance type: {args.instance_type}, On-Demand: {args.on_demand}")
+    if args.charon_version:
+        print(f"📌 Charon version override: {args.charon_version}")
+    print()
 
     launched_ids = []
     id_to_tag = {}
@@ -280,7 +307,7 @@ def main():
         cl = parts[0].split("-", 1)[1]  # strip EL prefix (e.g. "geth-")
         vc = parts[1]
         cluster_name = f"kurtosis-{cl}-{vc}"
-        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, args.instance_type, args.on_demand, cluster_name)
+        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, args.instance_type, args.on_demand, cluster_name, args.charon_version)
         if iid:
             launched_ids.append(iid)
             id_to_tag[iid] = tag
