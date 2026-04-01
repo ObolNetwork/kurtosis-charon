@@ -50,14 +50,6 @@ if ! grep -q CL_TYPE ./.env 2>/dev/null; then
     echo "CL_TYPE=${CL_TYPE}" >>./.env
 fi
 
-# Write CL_IMAGE and CL_VERSION to .env so downstream scripts (e.g. nimbus VC Dockerfile) can use them.
-if ! grep -q CL_IMAGE ./.env 2>/dev/null; then
-    echo "CL_IMAGE=${CL_IMAGE}" >>./.env
-fi
-if ! grep -q CL_VERSION ./.env 2>/dev/null; then
-    echo "CL_VERSION=${CL_VERSION}" >>./.env
-fi
-
 # Add CHARON_EXTRA_RUN_ARGS for nimbus CL. For more information read the README.md.
 if [[ "$CL_TYPE" == "nimbus" ]]; then
   if ! [ -f .env ]; then
