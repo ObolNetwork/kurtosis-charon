@@ -63,17 +63,11 @@ extract_el_ip() {
         container_id=$(docker ps -aqf "name=$elClient")
         el_ip=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $container_id)
 
-        # Fetch the EL RPC port, based on the client's start command flag.
-        if [ -n "$uuid" ]; then
-            el_inspect_output=$(kurtosis service inspect "$uuid" "$elClient")
-            if [[ $elClient == *"geth"* ]]; then
-                el_port=$(echo "$el_inspect_output" | grep -E '^\s+rpc:' | awk -F: '{print $NF}')
-            fi
-            echo "Execution client address found: $el_ip:$el_port"
-            ret+=($(echo "http://$el_ip:$el_port"))
-        else
-            echo "UUID not found."
+        if [[ $elClient == *"geth"* ]]; then
+            el_port=8545 # standard port for geth
         fi
+        echo "Execution client address found: $el_ip:$el_port"
+        ret+=($(echo "http://$el_ip:$el_port"))
 
     done
 }
