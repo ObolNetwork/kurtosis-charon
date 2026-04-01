@@ -35,7 +35,10 @@ if [[ "$VC_TYPE" == "lodestar" ]]; then
     mkdir -p data/lodestar/vc{0,1,2}/{caches,keystores,validator-db}
 fi
 
-# Create data folders for nimbus VC.
+# Create data folders for nimbus VC and persist BN image for Dockerfile build.
 if [[ "$VC_TYPE" == "nimbus" ]]; then
     mkdir -p data/nimbus/vc{0,1,2}
+    if ! grep -q NIMBUS_BN_IMAGE ./.env; then
+        echo "NIMBUS_BN_IMAGE=${NIMBUS_BN_IMAGE}" >>./.env
+    fi
 fi

@@ -6,8 +6,7 @@ x-nimbus-base: &nimbus-base
     args:
       VC_IMAGE: ${VC_IMAGE}
       VC_VERSION: ${VC_VERSION}
-      CL_IMAGE: ${CL_IMAGE}
-      CL_VERSION: ${CL_VERSION}
+      NIMBUS_BN_IMAGE: ${NIMBUS_BN_IMAGE}
   networks: [network1]
   restart: unless-stopped
   user: "${DUID:-}:${DGID:-}" # Used by docker-in-docker as it's based on linux
