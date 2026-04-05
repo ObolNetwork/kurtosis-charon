@@ -14,6 +14,19 @@ x-prysm-base: &prysm-base
 x-prysm-volume-run: &prysm-volume-run ./prysm/run.sh:/home/prysm/run.sh
 x-prysm-volume-config: &prysm-volume-config ./testnet/config.yaml:/home/data/config.yaml
 
+x-lodestar-base: &lodestar-base
+  image: chainsafe/lodestar:v1.40.0
+  networks: [network1]
+  restart: unless-stopped
+  entrypoint: /opt/lodestar/run.sh
+  user: "${DUID:-}:${DGID:-}" # Used by docker-in-docker as it's based on linux
+
+x-lodestar-env: &lodestar-env
+  BUILDER_API_ENABLED: true
+
+x-lodestar-volume-run: &lodestar-volume-run ./lodestar/run.sh:/opt/lodestar/run.sh
+x-lodestar-volume-config: &lodestar-volume-config ./testnet/config.yaml:/opt/lodestar/config.yaml
+
 services:
   vc0-prysm:
     <<: *prysm-base
@@ -35,15 +48,29 @@ services:
       - *prysm-volume-config
       - .charon/cluster/node1/validator_keys:/home/charon/validator_keys
 
-  vc2-prysm:
-    <<: *prysm-base
+  vc2-lodestar:
+    <<: *lodestar-base
     depends_on: [node2]
     environment:
+      <<: *lodestar-env
       BEACON_NODE_ADDRESS: "http://node2:3600"
     volumes:
-      - *prysm-volume-run
-      - *prysm-volume-config
+      - *lodestar-volume-run
+      - *lodestar-volume-config
       - .charon/cluster/node2/validator_keys:/home/charon/validator_keys
+      - ./data/lodestar/vc2:/opt/data
+
+  vc3-lodestar:
+    <<: *lodestar-base
+    depends_on: [node3]
+    environment:
+      <<: *lodestar-env
+      BEACON_NODE_ADDRESS: "http://node3:3600"
+    volumes:
+      - *lodestar-volume-run
+      - *lodestar-volume-config
+      - .charon/cluster/node3/validator_keys:/home/charon/validator_keys
+      - ./data/lodestar/vc3:/opt/data
 
 networks:
   network1:
