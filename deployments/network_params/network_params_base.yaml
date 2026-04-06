@@ -9,7 +9,12 @@ network_params:
     question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy
     very lucky have athlete"
   shard_committee_period: 1
+  prefunded_accounts: '{"0xb9e79D19f651a941757b35830232E7EFC77E1c79": {"balance": "100000ETH"}}'
 wait_for_finalization: false
 global_log_level: info
 parallel_keystore_generation: false
-# mev_type: mock - disabled due to ethereum-package bug with non-lighthouse CLs
+mev_type: flashbots
+mev_params:
+  mev_builder_subsidy: 1
+additional_services:
+  - spamoor
