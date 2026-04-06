@@ -13,7 +13,7 @@ fi
 # Setup the Kurtosis EL and CL.
 ./setup_el_cl.sh
 
-kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@6.0.0 --args-file ./network_params.yaml >planprint
+kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@6.1.0 --args-file ./network_params.yaml >planprint
 echo "Waiting for 10 seconds..."
 sleep 10
 
