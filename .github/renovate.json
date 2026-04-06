@@ -4,7 +4,20 @@
     "config:recommended"
   ],
   "enabledManagers": [
-    "github-actions"
+    "github-actions",
+    "custom.regex"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": [
+        "^deployments/env/.*\\.env$"
+      ],
+      "matchStrings": [
+        "(?:CL|VC|EL|CHARON)_IMAGE=(?<depName>[^\\n]+)\\n(?:CL|VC|EL|CHARON)_VERSION=(?<currentValue>[^\\n]+)"
+      ],
+      "datasourceTemplate": "docker"
+    }
   ],
   "packageRules": [
     {
@@ -24,6 +37,28 @@
         "renovate/github-actions"
       ],
       "groupName": "GitHub Actions updates"
+    },
+    {
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchFileNames": [
+        "deployments/env/**"
+      ],
+      "labels": [
+        "renovate/docker-deps"
+      ],
+      "groupName": "Docker image updates",
+      "schedule": [
+        "at any time"
+      ]
+    },
+    {
+      "matchPackageNames": [
+        "statusim/nimbus-eth2",
+        "statusim/nimbus-validator-client"
+      ],
+      "versioning": "regex:^multiarch-v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
     }
   ]
 }
