@@ -17,6 +17,17 @@
         "(?:CL|VC|EL|CHARON)_IMAGE=(?<depName>[^\\n]+)\\n(?:CL|VC|EL|CHARON)_VERSION=(?<currentValue>[^\\n]+)"
       ],
       "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": [
+        ".*"
+      ],
+      "matchStrings": [
+        "github\\.com/ethpandaops/ethereum-package@(?<currentValue>[^\\s]+)"
+      ],
+      "depNameTemplate": "ethpandaops/ethereum-package",
+      "datasourceTemplate": "github-tags"
     }
   ],
   "packageRules": [
