@@ -14,3 +14,5 @@ wait_for_finalization: false
 global_log_level: info
 parallel_keystore_generation: false
 mev_type: mock
+mev_params:
+  mock_mev_image: ethpandaops/rustic-builder:fulu
