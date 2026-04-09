@@ -10,7 +10,7 @@ from tabulate import tabulate
 # --- Configuration Constants ---
 KEY_NAME = "kurtosis-fleet"
 SECURITY_GROUP_ID = "sg-0e208fd6ad761cafc"
-SUBNET_ID = "subnet-07d83bab8a2b8cd7d"
+SUBNET_ID = "subnet-000b1456766381ae9" # eu-west-1c
 DEFAULT_INSTANCE_TYPE = "c6a.2xlarge"
 VOLUME_SIZE = 50
 VOLUME_TYPE = "gp3"
