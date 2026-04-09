@@ -1,5 +1,7 @@
 .PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku geth-grandine charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku run-charon-vouch run-aws stop-aws clean
 
+ETHEREUM_PACKAGE_VERSION ?= 6.1.0
+
 # Define the composite step
 # Each target sets CLUSTER_NAME=kurtosis-{cl}-{vc} for metrics identification.
 geth-lighthouse-charon-lighthouse:
@@ -11,7 +13,7 @@ geth-lighthouse-charon-lodestar:
 	CLUSTER_NAME=kurtosis-lighthouse-lodestar $(MAKE) charon
 	$(MAKE) run-charon-lodestar
 geth-lighthouse-charon-teku:
-	$(MAKE) geth-lighthouse
+	$(MAKE) geth-lighthouse ETHEREUM_PACKAGE_VERSION=6.0.0
 	CLUSTER_NAME=kurtosis-lighthouse-teku $(MAKE) charon
 	$(MAKE) run-charon-teku
 geth-lighthouse-charon-nimbus:
@@ -36,7 +38,7 @@ geth-lodestar-charon-lodestar:
 	CLUSTER_NAME=kurtosis-lodestar-lodestar $(MAKE) charon
 	$(MAKE) run-charon-lodestar
 geth-lodestar-charon-teku:
-	$(MAKE) geth-lodestar
+	$(MAKE) geth-lodestar ETHEREUM_PACKAGE_VERSION=6.0.0
 	CLUSTER_NAME=kurtosis-lodestar-teku $(MAKE) charon
 	$(MAKE) run-charon-teku
 geth-lodestar-charon-nimbus:
@@ -61,7 +63,7 @@ geth-teku-charon-lodestar:
 	CLUSTER_NAME=kurtosis-teku-lodestar $(MAKE) charon
 	$(MAKE) run-charon-lodestar
 geth-teku-charon-teku:
-	$(MAKE) geth-teku
+	$(MAKE) geth-teku ETHEREUM_PACKAGE_VERSION=6.0.0
 	CLUSTER_NAME=kurtosis-teku-teku $(MAKE) charon
 	$(MAKE) run-charon-teku
 geth-teku-charon-nimbus:
@@ -86,7 +88,7 @@ geth-nimbus-charon-lodestar:
 	CLUSTER_NAME=kurtosis-nimbus-lodestar $(MAKE) charon
 	$(MAKE) run-charon-lodestar
 geth-nimbus-charon-teku:
-	$(MAKE) geth-nimbus
+	$(MAKE) geth-nimbus ETHEREUM_PACKAGE_VERSION=6.0.0
 	CLUSTER_NAME=kurtosis-nimbus-teku $(MAKE) charon
 	$(MAKE) run-charon-teku
 geth-nimbus-charon-nimbus:
@@ -111,7 +113,7 @@ geth-prysm-charon-lodestar:
 	CLUSTER_NAME=kurtosis-prysm-lodestar $(MAKE) charon
 	$(MAKE) run-charon-lodestar
 geth-prysm-charon-teku:
-	$(MAKE) geth-prysm
+	$(MAKE) geth-prysm ETHEREUM_PACKAGE_VERSION=6.0.0
 	CLUSTER_NAME=kurtosis-prysm-teku $(MAKE) charon
 	$(MAKE) run-charon-teku
 geth-prysm-charon-nimbus:
@@ -136,7 +138,7 @@ geth-grandine-charon-lodestar:
 	CLUSTER_NAME=kurtosis-grandine-lodestar $(MAKE) charon
 	$(MAKE) run-charon-lodestar
 geth-grandine-charon-teku:
-	$(MAKE) geth-grandine
+	$(MAKE) geth-grandine ETHEREUM_PACKAGE_VERSION=6.0.0
 	CLUSTER_NAME=kurtosis-grandine-teku $(MAKE) charon
 	$(MAKE) run-charon-teku
 geth-grandine-charon-nimbus:
@@ -154,37 +156,37 @@ geth-grandine-charon-vouch:
 
 geth-lighthouse:
 	CL_TYPE=lighthouse ./setup_el_cl.sh
-	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@6.1.0 --args-file ./network_params.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@$(ETHEREUM_PACKAGE_VERSION) --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
 geth-nimbus:
 	CL_TYPE=nimbus ./setup_el_cl.sh
-	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@6.1.0 --args-file ./network_params.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@$(ETHEREUM_PACKAGE_VERSION) --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
 geth-lodestar:
 	CL_TYPE=lodestar ./setup_el_cl.sh
-	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@6.1.0 --args-file ./network_params.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@$(ETHEREUM_PACKAGE_VERSION) --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 10 seconds..."
 	@sleep 10
 
 geth-prysm:
 	CL_TYPE=prysm ./setup_el_cl.sh
-	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@6.1.0 --args-file ./network_params.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@$(ETHEREUM_PACKAGE_VERSION) --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 60 seconds... don't skip the wait"
 	@sleep 60
 
 geth-teku:
 	CL_TYPE=teku ./setup_el_cl.sh
-	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@6.1.0 --args-file ./network_params.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@$(ETHEREUM_PACKAGE_VERSION) --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 60 seconds... don't skip the wait"
 	@sleep 60
 
 geth-grandine:
 	CL_TYPE=grandine ./setup_el_cl.sh
-	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@6.1.0 --args-file ./network_params.yaml > planprint
+	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@$(ETHEREUM_PACKAGE_VERSION) --args-file ./network_params.yaml > planprint
 	@echo "Waiting for 60 seconds... don't skip the wait"
 	@sleep 60
 
@@ -243,9 +245,10 @@ stop-aws:
 	./stop_aws.sh
 
 clean:
-	-docker compose -f compose.charon.yaml -f compose.lighthouse.yaml -f compose.lodestar.yaml -f compose.nimbus.yaml -f compose.prysm.yaml -f compose.teku.yaml down
+	-docker compose -f compose.charon.yaml -f compose.lighthouse.yaml -f compose.lodestar.yaml -f compose.nimbus.yaml -f compose.prysm.yaml -f compose.teku.yaml -f compose.vouch.yaml down
 	-kurtosis enclave stop local-eth-testnet
 	-kurtosis enclave rm local-eth-testnet
+	-kurtosis clean
 	rm -rf node*
 	rm -f planprint
 	rm -rf keystore
