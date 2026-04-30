@@ -19,6 +19,8 @@ x-node-env: &node-env
   CHARON_P2P_TCP_ADDRESS: 0.0.0.0:3610
   CHARON_P2P_UDP_ADDRESS: 0.0.0.0:3630
   CHARON_MONITORING_ADDRESS: 0.0.0.0:3620
+  CHARON_OTLP_ADDRESS: otelcollector:4317
+  CHARON_OTLP_INSECURE: "true"
 
 services:
   #       _                                  _ _            _
@@ -29,12 +31,13 @@ services:
   node0:
     <<: *node-base
     container_name: node0
-    #depends_on: [ relay ]
+    depends_on: [otelcollector]
     environment:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node0/charon-enr-private-key
       CHARON_LOCK_FILE: /opt/charon/.charon/cluster/node0/cluster-lock.json
       CHARON_JAEGER_SERVICE: node0
+      CHARON_OTLP_SERVICE_NAME: node0
       CHARON_P2P_EXTERNAL_HOSTNAME: node0
       CHARON_BEACON_NODE_ENDPOINTS: ${BN_0}
       CHARON_EXECUTION_CLIENT_RPC_ENDPOINT: ${EC_0}
@@ -42,12 +45,13 @@ services:
   node1:
     <<: *node-base
     container_name: node1
-    #depends_on: [ relay ]
+    depends_on: [otelcollector]
     environment:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node1/charon-enr-private-key
       CHARON_LOCK_FILE: /opt/charon/.charon/cluster/node1/cluster-lock.json
       CHARON_JAEGER_SERVICE: node1
+      CHARON_OTLP_SERVICE_NAME: node1
       CHARON_P2P_EXTERNAL_HOSTNAME: node1
       CHARON_BEACON_NODE_ENDPOINTS: ${BN_1}
       CHARON_EXECUTION_CLIENT_RPC_ENDPOINT: ${EC_1}
@@ -55,12 +59,13 @@ services:
   node2:
     <<: *node-base
     container_name: node2
-    #depends_on: [ relay ]
+    depends_on: [otelcollector]
     environment:
       <<: *node-env
       CHARON_PRIVATE_KEY_FILE: /opt/charon/.charon/cluster/node2/charon-enr-private-key
       CHARON_LOCK_FILE: /opt/charon/.charon/cluster/node2/cluster-lock.json
       CHARON_JAEGER_SERVICE: node2
+      CHARON_OTLP_SERVICE_NAME: node2
       CHARON_P2P_EXTERNAL_HOSTNAME: node2
       CHARON_BEACON_NODE_ENDPOINTS: ${BN_2}
       CHARON_EXECUTION_CLIENT_RPC_ENDPOINT: ${EC_2}
@@ -96,6 +101,22 @@ services:
   # | | | | | | (_) | | | | | || (_) | |  | | | | | (_| |
   # |_| |_| |_|\___/|_| |_|_|\__\___/|_|  |_|_| |_|\__, |
   #                                                |___/
+  tempo:
+    image: grafana/tempo:2.4.1
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    networks: [network1]
+    ports:
+      - "3200:3200"
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml
+
+  otelcollector:
+    image: otel/opentelemetry-collector-contrib:0.104.0
+    networks: [network1]
+    depends_on: [tempo]
+    volumes:
+      - ./otelcollector/otelcollector.yaml:/etc/otelcol-contrib/config.yaml
+
   prometheus:
     image: prom/prometheus:v2.44.0
     ports:
@@ -111,7 +132,7 @@ services:
     ports:
       - "3000:3000"
     networks: [network1]
-    depends_on: [prometheus]
+    depends_on: [prometheus, tempo]
     volumes:
       - ./grafana/datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
       - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/datasource.yml

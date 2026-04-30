@@ -20,16 +20,11 @@ exporters:
     tls:
       insecure: true
 
-  otlp/remote-tempo:
-    endpoint: "tempo.monitoring.gcp.obol.tech:443"
-    headers:
-      Authorization: "Basic ${TEMPO_REMOTE_BASIC_AUTH}"
-
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [spanmetrics, otlp/local-tempo, otlp/remote-tempo]
+      exporters: [spanmetrics, otlp/local-tempo]
 
     metrics:
       receivers: [spanmetrics]
