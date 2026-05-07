@@ -77,7 +77,7 @@ The following flags are supported:
 --env-dir           The path to the env directory to load the combos config (default: ../deployments/env)
 --terminate         Terminates the instances (uses combos from the env directory to find instances)
 --on-demand         Use On-Demand EC2 instances instead of Spot instances
---instance-type     EC2 instance type to launch (default: c6a.xlarge)
+--instance-type     EC2 instance type to launch (default: c6a.4xlarge; Teku/Vouch combos use m7i.4xlarge)
 ```
 
 **Note**: The default EBS volume size is 50 GB.
