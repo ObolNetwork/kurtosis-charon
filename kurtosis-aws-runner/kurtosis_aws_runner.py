@@ -262,16 +262,14 @@ def terminate_instances(tag_values):
 
 
 def double_instance_size(instance_type: str) -> str:
+    size_map = {"2xlarge": "4xlarge", "4xlarge": "8xlarge", "8xlarge": "12xlarge"}
     try:
         family, size = instance_type.rsplit(".", 1)
-        if size == "xlarge":
-            return f"{family}.2xlarge"
-        if size.endswith("xlarge"):
-            multiplier = int(size[: -len("xlarge")])
-            return f"{family}.{multiplier * 2}xlarge"
+        if size in size_map:
+            return f"{family}.{size_map[size]}"
     except (ValueError, AttributeError):
         pass
-    return f"{instance_type.rsplit('.', 1)[0]}.8xlarge" if "." in instance_type else "c6a.8xlarge"
+    return f"{instance_type.rsplit('.', 1)[0]}.12xlarge" if "." in instance_type else "c6a.12xlarge"
 
 
 def main():
