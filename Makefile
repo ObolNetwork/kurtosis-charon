@@ -157,38 +157,32 @@ geth-grandine-charon-vouch:
 geth-lighthouse:
 	CL_TYPE=lighthouse ./setup_el_cl.sh
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@$(ETHEREUM_PACKAGE_VERSION) --args-file ./network_params.yaml > planprint
-	@echo "Waiting for 10 seconds..."
-	@sleep 10
+	./wait_beacon_nodes.sh
 
 geth-nimbus:
 	CL_TYPE=nimbus ./setup_el_cl.sh
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@$(ETHEREUM_PACKAGE_VERSION) --args-file ./network_params.yaml > planprint
-	@echo "Waiting for 10 seconds..."
-	@sleep 10
+	./wait_beacon_nodes.sh
 
 geth-lodestar:
 	CL_TYPE=lodestar ./setup_el_cl.sh
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@$(ETHEREUM_PACKAGE_VERSION) --args-file ./network_params.yaml > planprint
-	@echo "Waiting for 10 seconds..."
-	@sleep 10
+	./wait_beacon_nodes.sh
 
 geth-prysm:
 	CL_TYPE=prysm ./setup_el_cl.sh
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@$(ETHEREUM_PACKAGE_VERSION) --args-file ./network_params.yaml > planprint
-	@echo "Waiting for 60 seconds... don't skip the wait"
-	@sleep 60
+	./wait_beacon_nodes.sh
 
 geth-teku:
 	CL_TYPE=teku ./setup_el_cl.sh
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@$(ETHEREUM_PACKAGE_VERSION) --args-file ./network_params.yaml > planprint
-	@echo "Waiting for 60 seconds... don't skip the wait"
-	@sleep 60
+	./wait_beacon_nodes.sh
 
 geth-grandine:
 	CL_TYPE=grandine ./setup_el_cl.sh
 	kurtosis run --enclave local-eth-testnet github.com/ethpandaops/ethereum-package@$(ETHEREUM_PACKAGE_VERSION) --args-file ./network_params.yaml > planprint
-	@echo "Waiting for 60 seconds... don't skip the wait"
-	@sleep 60
+	./wait_beacon_nodes.sh
 
 charon:
 	./setup_charon.sh
