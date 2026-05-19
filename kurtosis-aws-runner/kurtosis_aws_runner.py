@@ -12,6 +12,7 @@ KEY_NAME = "kurtosis-fleet"
 SECURITY_GROUP_ID = "sg-0e208fd6ad761cafc"
 SUBNET_ID = "subnet-000b1456766381ae9" # eu-west-1c
 DEFAULT_INSTANCE_TYPE = "c6a.4xlarge"
+LARGE_BN_TYPES = {"prysm", "teku"}  # these BNs are CPU-heavy and need double the instance size
 LARGE_VC_TYPES = {"teku", "vouch"}  # these VCs are CPU-heavy and need double the instance size
 VOLUME_SIZE = 50
 VOLUME_TYPE = "gp3"
@@ -280,7 +281,7 @@ def main():
     parser.add_argument("--monitoring-token", help="Monitoring token for Prometheus remote write")
     parser.add_argument("--terminate", action="store_true", help="Terminate matching EC2 instances")
     parser.add_argument("--on-demand", action="store_true", help="Use On-Demand EC2 instances (default is Spot)")
-    parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help="EC2 instance type (default: c6a.4xlarge); Teku/Vouch combos automatically use double the size")
+    parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help="EC2 instance type (default: c6a.4xlarge); large BN/VC combos automatically use double the size")
     parser.add_argument("--charon-version", default=os.environ.get("CHARON_VERSION"), help="Override Charon version (e.g. v1.9.2 or obolnetwork/charon:v1.9.2). Defaults to CHARON_VERSION env var if set.")
     args = parser.parse_args()
 
@@ -306,7 +307,7 @@ def main():
 
     ami_id = get_latest_ubuntu_ami()
     print(f"\n🚀 Launching with AMI {ami_id}, branch '{args.branch}', shutdown in {shutdown_minutes}m")
-    print(f"📌 Default instance type: {args.instance_type} (Teku/Vouch: {double_instance_size(args.instance_type)}), On-Demand: {args.on_demand}")
+    print(f"📌 Default instance type: {args.instance_type} (large BN/VC combos: {double_instance_size(args.instance_type)}), On-Demand: {args.on_demand}")
     if args.charon_version:
         print(f"📌 Charon version override: {args.charon_version}")
     print()
@@ -319,7 +320,7 @@ def main():
         cl = parts[0].split("-", 1)[1]  # strip EL prefix (e.g. "geth-")
         vc = parts[1]
         cluster_name = f"kurtosis-{cl}-{vc}"
-        effective_instance_type = double_instance_size(args.instance_type) if vc in LARGE_VC_TYPES else args.instance_type
+        effective_instance_type = double_instance_size(args.instance_type) if cl in LARGE_BN_TYPES or vc in LARGE_VC_TYPES else args.instance_type
         iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, effective_instance_type, args.on_demand, cluster_name, args.charon_version)
         if iid:
             launched_ids.append(iid)
