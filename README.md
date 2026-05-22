@@ -120,18 +120,18 @@ This command will read all env files in `./deployments/env` and will stop all su
 
 ### Validators
 
-We configured this project to run 256 validators per node (each "node" is EL+CL+VC). Therefore, for 3 nodes, you will have 768 validators in total in this beacon chain. This large amount is necessary to fulfill beachon chain requirements about committees. For us it is good to test DV with that large number of validators.
+We configured this project to run 128 validators per node (each "node" is EL+CL+VC). Therefore, for 5 nodes, you will have 640 validators in total in this beacon chain. This amount is sufficient to cover sync committee duties while keeping the local network smaller than the previous 1000-validator setup.
 
-Out of the original combination of 3xELs + 3xCLs + 3xVCs one VC (that serves 256 validators) is stopped and a charon DV is started in its place with 3xCharon nodes and 3xVCs that talk to the Charon nodes. Meaning the final combination that is run is the following:
+Out of the original combination of 5xELs + 5xCLs + 5xVCs one VC (that serves 128 validators) is stopped and a charon DV is started in its place with 3xCharon nodes and 3xVCs that talk to the Charon nodes. Meaning the final combination that is run is the following:
 
-3x ELs
-3x CLs
-2x VCs (traditional)
+5x ELs
+5x CLs
+4x VCs (traditional)
 
 3x Charons
 3x VCs (serving the DV)
 
-With again, total 768 validators.
+With again, total 640 validators. The DV serves 128 of them, which is 20% of the network validators, and the final number of VCs is 7.
 
 ### System resources
 

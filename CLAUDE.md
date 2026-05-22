@@ -59,7 +59,7 @@ make exit-lighthouse   # Also: exit-nimbus, exit-lodestar, exit-teku
 
 ### Testnet Parameters
 
-- Chain ID: 3151908, slot time: 12s, 256 validators/node (768 total across 3 nodes)
+- Chain ID: 3151908, slot time: 12s, 128 validators/node (640 total across 5 nodes)
 - Fork version: 0x10000038, Capella: 0x40000038
 - Deposit contract: 0x4242424242424242424242424242424242424242
 

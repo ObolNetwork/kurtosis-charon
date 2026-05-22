@@ -5,7 +5,7 @@ participants:
     cl_image: ${CL_IMAGE}:${CL_VERSION}
     supernode: true
     use_separate_vc: true
-    count: 3
+    count: 5
     prometheus_config:
       scrape_interval: 15s
       labels: {}
