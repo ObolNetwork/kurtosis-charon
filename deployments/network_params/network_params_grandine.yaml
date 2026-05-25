@@ -8,7 +8,7 @@ participants:
     # Grandine does not support separate VC. Use another client for that.
     vc_type: lighthouse
     vc_image: sigp/lighthouse:v8.1.0
-    count: 5
+    count: 3
     prometheus_config:
       scrape_interval: 15s
       labels: {}

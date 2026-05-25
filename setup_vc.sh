@@ -1,22 +1,5 @@
 #!/usr/bin/env bash
 
-requested_VC_TYPE=${VC_TYPE-}
-requested_VC_IMAGE=${VC_IMAGE-}
-requested_VC_VERSION=${VC_VERSION-}
-
-upsert_env() {
-    local key=$1
-    local value=$2
-
-    touch ./.env
-    if grep -q "^${key}=" ./.env; then
-        sed -i.bak "s#^${key}=.*#${key}=${value}#" ./.env
-        rm -f ./.env.bak
-    else
-        echo "${key}=${value}" >>./.env
-    fi
-}
-
 # Load .env if it exists.
 if ! [ -f .env ]; then
     echo ".env does not exist, using supplied env variables."
@@ -25,35 +8,27 @@ else
     export $(xargs <.env)
 fi
 
-if [ -n "$requested_VC_TYPE" ]; then
-    VC_TYPE=$requested_VC_TYPE
-    if [ -n "$requested_VC_IMAGE" ]; then
-        VC_IMAGE=$requested_VC_IMAGE
-    else
-        unset VC_IMAGE
-    fi
-
-    if [ -n "$requested_VC_VERSION" ]; then
-        VC_VERSION=$requested_VC_VERSION
-    else
-        unset VC_VERSION
-    fi
-fi
-
-# If VC_IMAGE or VC_VERSION is not set, read ./deployments/env/vc_${VC_TYPE}.env.
-if [ -z ${VC_IMAGE+x} ] || [ -z ${VC_VERSION+x} ]; then
+# If VC_VERSION is not set, read ./deployments/env/cl_${VC_TYPE}.env.
+if [ -z ${VC_VERSION+x} ]; then
     dir="./deployments/env/vc_${VC_TYPE}.env"
-    echo "VC_IMAGE or VC_VERSION is unset, reading from ${dir}"
-    env_VC_IMAGE=$VC_IMAGE
-    env_VC_VERSION=$VC_VERSION
+    echo "VC_VERSION is unset, reading from ${dir}"
     export $(xargs <$dir)
-    VC_IMAGE=${env_VC_IMAGE:-$VC_IMAGE}
-    VC_VERSION=${env_VC_VERSION:-$VC_VERSION}
 fi
 
-upsert_env VC_TYPE "${VC_TYPE}"
-upsert_env VC_IMAGE "${VC_IMAGE}"
-upsert_env VC_VERSION "${VC_VERSION}"
+# Write the VC_TYPE that was previously loaded to the .env, if it's not written.
+if ! grep -q VC_TYPE ./.env; then
+    echo "VC_TYPE=${VC_TYPE}" >>./.env
+fi
+
+# Write the VC_IMAGE that was previously loaded to the .env, if it's not written.
+if ! grep -q VC_IMAGE ./.env; then
+    echo "VC_IMAGE=${VC_IMAGE}" >>./.env
+fi
+
+# Write the VC_VERSION that was previously loaded to the .env, if it's not written.
+if ! grep -q VC_VERSION ./.env; then
+    echo "VC_VERSION=${VC_VERSION}" >>./.env
+fi
 
 # Create data folders for lodestar VC.
 if [[ "$VC_TYPE" == "lodestar" ]]; then
