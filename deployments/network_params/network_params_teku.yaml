@@ -6,7 +6,7 @@ participants:
     cl_extra_params: ["--validators-graffiti-client-append-format=DISABLED"]
     supernode: true
     use_separate_vc: true
-    count: 5
+    count: 3
     prometheus_config:
       scrape_interval: 15s
       labels: {}

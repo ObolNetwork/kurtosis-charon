@@ -12,6 +12,8 @@ KEY_NAME = "kurtosis-fleet"
 SECURITY_GROUP_ID = "sg-0e208fd6ad761cafc"
 SUBNET_ID = "subnet-000b1456766381ae9" # eu-west-1c
 DEFAULT_INSTANCE_TYPE = "c6a.4xlarge"
+LARGE_BN_TYPES = {"prysm", "teku"}  # these BNs are CPU-heavy and need double the instance size
+LARGE_VC_TYPES = {"teku", "vouch"}  # these VCs are CPU-heavy and need double the instance size
 VOLUME_SIZE = 50
 VOLUME_TYPE = "gp3"
 VOLUME_IOPS = 6000  # optimized for Charon test runs
@@ -260,6 +262,17 @@ def terminate_instances(tag_values):
         safe_exit(f"Failed to terminate instances: {e}")
 
 
+def double_instance_size(instance_type: str) -> str:
+    size_map = {"2xlarge": "4xlarge", "4xlarge": "8xlarge", "8xlarge": "12xlarge"}
+    try:
+        family, size = instance_type.rsplit(".", 1)
+        if size in size_map:
+            return f"{family}.{size_map[size]}"
+    except (ValueError, AttributeError):
+        pass
+    return f"{instance_type.rsplit('.', 1)[0]}.12xlarge" if "." in instance_type else "c6a.12xlarge"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Launch or terminate Kurtosis EC2 test fleet.")
     parser.add_argument("--branch", default="main", help="Git branch to clone (default: main)")
@@ -268,7 +281,7 @@ def main():
     parser.add_argument("--monitoring-token", help="Monitoring token for Prometheus remote write")
     parser.add_argument("--terminate", action="store_true", help="Terminate matching EC2 instances")
     parser.add_argument("--on-demand", action="store_true", help="Use On-Demand EC2 instances (default is Spot)")
-    parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help="EC2 instance type (default: c6a.4xlarge)")
+    parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help="EC2 instance type (default: c6a.4xlarge); large BN/VC combos automatically use double the size")
     parser.add_argument("--charon-version", default=os.environ.get("CHARON_VERSION"), help="Override Charon version (e.g. v1.9.2 or obolnetwork/charon:v1.9.2). Defaults to CHARON_VERSION env var if set.")
     args = parser.parse_args()
 
@@ -294,7 +307,7 @@ def main():
 
     ami_id = get_latest_ubuntu_ami()
     print(f"\n🚀 Launching with AMI {ami_id}, branch '{args.branch}', shutdown in {shutdown_minutes}m")
-    print(f"📌 Instance type: {args.instance_type}, On-Demand: {args.on_demand}")
+    print(f"📌 Default instance type: {args.instance_type} (large BN/VC combos: {double_instance_size(args.instance_type)}), On-Demand: {args.on_demand}")
     if args.charon_version:
         print(f"📌 Charon version override: {args.charon_version}")
     print()
@@ -307,7 +320,8 @@ def main():
         cl = parts[0].split("-", 1)[1]  # strip EL prefix (e.g. "geth-")
         vc = parts[1]
         cluster_name = f"kurtosis-{cl}-{vc}"
-        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, args.instance_type, args.on_demand, cluster_name, args.charon_version)
+        effective_instance_type = double_instance_size(args.instance_type) if cl in LARGE_BN_TYPES or vc in LARGE_VC_TYPES else args.instance_type
+        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, effective_instance_type, args.on_demand, cluster_name, args.charon_version)
         if iid:
             launched_ids.append(iid)
             id_to_tag[iid] = tag
