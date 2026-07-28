@@ -20,6 +20,7 @@ services:
       --validators-external-signer-slashing-protection-enabled true
       --validators-builder-registration-default-enabled true
       --Xobol-dvt-integration-enabled true
+      --Xvalidator-client-beacon-api-executor-threads=50
       --logging=DEBUG
     volumes:
       - *teku-volume-run
@@ -36,6 +37,7 @@ services:
       --validators-external-signer-slashing-protection-enabled true
       --validators-builder-registration-default-enabled true
       --Xobol-dvt-integration-enabled true
+      --Xvalidator-client-beacon-api-executor-threads=50
       --logging=DEBUG
     volumes:
       - *teku-volume-run
@@ -52,6 +54,7 @@ services:
       --validators-external-signer-slashing-protection-enabled true
       --validators-builder-registration-default-enabled true
       --Xobol-dvt-integration-enabled true
+      --Xvalidator-client-beacon-api-executor-threads=50
       --logging=DEBUG
     volumes:
       - *teku-volume-run
