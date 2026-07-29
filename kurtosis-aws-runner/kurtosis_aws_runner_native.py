@@ -7,7 +7,7 @@ from tabulate import tabulate
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from charon_matrix.network_params import (  # noqa: E402
-    CHARON_IMAGE, EL_IMAGE, BOOTSTRAP_CL_IMAGE, CL_IMAGES, VC_IMAGES,
+    DV_IMAGE, EL_IMAGE, BOOTSTRAP_CL_IMAGE, CL_IMAGES, VC_IMAGES,
     CLS, VCS, VALIDATOR_KEYS_MNEMONIC, build_network_params,
 )
 
@@ -313,7 +313,7 @@ def main():
 
     ami_id = get_latest_ubuntu_ami()
     print(f"\n🚀 Launching with AMI {ami_id}, branch '{args.branch}', shutdown in {shutdown_minutes}m")
-    print(f"📌 Instance type: {args.instance_type}, On-Demand: {args.on_demand}, Charon image: {CHARON_IMAGE}")
+    print(f"📌 Instance type: {args.instance_type}, On-Demand: {args.on_demand}, Charon image: {DV_IMAGE}")
     print(f"📌 ethereum-package: {args.ethereum_package}\n")
 
     launched_ids = []

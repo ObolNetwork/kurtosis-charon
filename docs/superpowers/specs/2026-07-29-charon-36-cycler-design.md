@@ -1,13 +1,13 @@
-# Dappnode 24/7 Sequential 36-Combo Cycler — Design
+# Charon 24/7 Sequential 36-Combo Cycler — Design
 
 **Date:** 2026-07-29
-**Repo (new code):** `ObolNetwork/kurtosis-charon`, new dir `dappnode-cycler/`
+**Repo (new code):** `ObolNetwork/kurtosis-charon`, new dir `charon-cycler/`
 **Harness (unchanged):** `github.com/ObolNetwork/ethereum-package@charon` (native Charon integration)
 
 ## Goal
 
 Continuously exercise `charon:next` against the full **6 CL × 6 VC = 36** matrix on the
-dappnode, one combo at a time, 24/7. Each combo runs for **90 minutes**, is then torn down,
+host, one combo at a time, 24/7. Each combo runs for **90 minutes**, is then torn down,
 and its results are posted to **Slack**. The cycle repeats forever, picking up the latest
 client/Charon versions from git between runs.
 
@@ -42,16 +42,16 @@ runs the **native** Kurtosis path (`vc_type: charon`) — not the legacy docker-
 | Cluster size | **4 Charon nodes**. |
 | Duty reporting | **Worst node** — the `cluster_peer` with the fewest successful duties (worst case, not a sum). |
 | Charon CPU/mem | **Max across the 4 nodes** (worst case), chosen independently per metric. |
-| Machine total | **Whole dappnode host** (only one combo runs at a time), sampled from `/proc` by the runner. |
+| Machine total | **Whole host machine** (only one combo runs at a time), sampled from `/proc` by the runner. |
 | Process host | **systemd service**, auto-start + restart-on-crash, resume from a state file after reboot. |
 
-## Components (all new, under `kurtosis-charon/dappnode-cycler/`)
+## Components (all new, under `kurtosis-charon/charon-cycler/`)
 
 1. **`cycler.py`** — the main loop. Owns state, combo selection, git pull, launch, wait,
    teardown, and orchestration of the report.
 2. **`params.py`** — imports `build_network_params` from
    `kurtosis-aws-runner/kurtosis_aws_runner_native.py`; overrides `charon_node_count` to 4;
-   strips AWS/cloud-init concerns (the dappnode runs Kurtosis locally). If importing across
+   strips AWS/cloud-init concerns (the host runs Kurtosis locally). If importing across
    that path proves awkward, factor the shared generator into a small module both import.
 3. **`metrics.py`** — resolves the enclave's Prometheus URL
    (`kurtosis port print <enclave> prometheus http`) and runs the PromQL queries below
@@ -136,7 +136,7 @@ the single chokepoint for combo selection:
 
 ```
 def select_next_combo(state):
-    ov = read_override()        # e.g. dappnode-cycler/override.json or a state field
+    ov = read_override()        # e.g. charon-cycler/override.json or a state field
     if ov:                       # {"cl": "...", "vc": "...", "sticky": bool}
         return combo_for(ov), origin="override"
     return CYCLE[state.next_index], origin="cycle"

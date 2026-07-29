@@ -1,8 +1,8 @@
-# Dappnode 24/7 Sequential 36-Combo Cycler Implementation Plan
+# Charon 24/7 Sequential 36-Combo Cycler Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a Python service that runs the full 6×6 CL/VC Charon matrix sequentially on the dappnode, 90 minutes per combo, 24/7, posting a per-run results report to Slack.
+**Goal:** Build a Python service that runs the full 6×6 CL/VC Charon matrix sequentially on the host, 90 minutes per combo, 24/7, posting a per-run results report to Slack.
 
 **Architecture:** A long-running loop (systemd) picks the next combo, `git pull`s, launches the native `ethereum-package@charon` harness via Kurtosis with 4 Charon nodes, waits 90 min while sampling host resources, queries the in-enclave Prometheus, posts a Slack Block Kit report, tears the enclave down, persists state, and repeats. Pure logic (combo ordering, worst-node selection, ratio math, report building, state) is isolated from thin I/O adapters (Kurtosis CLI, Prometheus HTTP, Slack webhook, `/proc`) so it is unit-testable.
 
@@ -23,7 +23,7 @@
 - **Failure policy:** report and continue; never halt the cycle.
 - **Slack:** Incoming Webhook, one message per run.
 - **Version updates:** `git pull --ff-only` before every run; pins live in `charon_matrix/network_params.py`.
-- **Repo layout:** shared generator in `charon_matrix/` (repo root, importable package); cycler in `dappnode-cycler/`.
+- **Repo layout:** shared generator in `charon_matrix/` (repo root, importable package); cycler in `charon-cycler/`.
 - **Commit signing:** commits use the repo's configured YubiKey signing; retry once if the first attempt reports a signing format error.
 
 ---
@@ -37,12 +37,12 @@ kurtosis-charon/
     network_params.py                 # build_network_params + image pins + CLS/VCS (moved from AWS runner)
   kurtosis-aws-runner/
     kurtosis_aws_runner_native.py     # MODIFIED: import shared constants instead of defining inline
-  dappnode-cycler/                    # NEW cycler
+  charon-cycler/                    # NEW cycler
     pyproject.toml                    # pytest pythonpath config
     README.md
     config.example.yaml
     cycler.service                    # systemd unit
-    dappnode_cycler/
+    charon_cycler/
       __init__.py
       combos.py                       # Combo, CYCLE, enclave_name
       state.py                        # State (persist/resume)
@@ -62,7 +62,7 @@ kurtosis-charon/
       test_slack.py test_kurtosis.py test_config.py test_cycler.py
 ```
 
-Run tests from `dappnode-cycler/` (its `pyproject.toml` puts `.` and `..` on `pythonpath`, so both `dappnode_cycler` and `charon_matrix` import).
+Run tests from `charon-cycler/` (its `pyproject.toml` puts `.` and `..` on `pythonpath`, so both `charon_cycler` and `charon_matrix` import).
 
 ---
 
@@ -243,10 +243,10 @@ git commit -m "Extract shared network-params generator into charon_matrix"
 ## Task 2: Combos, ordering, and enclave naming
 
 **Files:**
-- Create: `dappnode-cycler/pyproject.toml`
-- Create: `dappnode-cycler/dappnode_cycler/__init__.py` (empty)
-- Create: `dappnode-cycler/dappnode_cycler/combos.py`
-- Create: `dappnode-cycler/tests/test_combos.py`
+- Create: `charon-cycler/pyproject.toml`
+- Create: `charon-cycler/charon_cycler/__init__.py` (empty)
+- Create: `charon-cycler/charon_cycler/combos.py`
+- Create: `charon-cycler/tests/test_combos.py`
 
 **Interfaces:**
 - Consumes: `CLS`, `VCS` from `charon_matrix.network_params`.
@@ -255,7 +255,7 @@ git commit -m "Extract shared network-params generator into charon_matrix"
 - [ ] **Step 1: Create pyproject for test paths**
 
 ```toml
-# dappnode-cycler/pyproject.toml
+# charon-cycler/pyproject.toml
 [tool.pytest.ini_options]
 pythonpath = [".", ".."]
 testpaths = ["tests"]
@@ -264,8 +264,8 @@ testpaths = ["tests"]
 - [ ] **Step 2: Write the failing test**
 
 ```python
-# dappnode-cycler/tests/test_combos.py
-from dappnode_cycler.combos import Combo, CYCLE, enclave_name
+# charon-cycler/tests/test_combos.py
+from charon_cycler.combos import Combo, CYCLE, enclave_name
 
 def test_cycle_is_36_cl_major():
     assert len(CYCLE) == 36
@@ -282,13 +282,13 @@ def test_names():
 
 - [ ] **Step 3: Run test to verify it fails**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_combos.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_combos.py -v`
 Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 4: Implement**
 
 ```python
-# dappnode-cycler/dappnode_cycler/combos.py
+# charon-cycler/charon_cycler/combos.py
 from dataclasses import dataclass
 from charon_matrix.network_params import CLS, VCS
 
@@ -316,13 +316,13 @@ def enclave_name(combo: Combo, cycle: int) -> str:
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_combos.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_combos.py -v`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add dappnode-cycler/pyproject.toml dappnode-cycler/dappnode_cycler dappnode-cycler/tests/test_combos.py
+git add charon-cycler/pyproject.toml charon-cycler/charon_cycler charon-cycler/tests/test_combos.py
 git commit -m "Add cycler combo matrix, ordering, enclave naming"
 ```
 
@@ -331,8 +331,8 @@ git commit -m "Add cycler combo matrix, ordering, enclave naming"
 ## Task 3: State persistence and resume
 
 **Files:**
-- Create: `dappnode-cycler/dappnode_cycler/state.py`
-- Create: `dappnode-cycler/tests/test_state.py`
+- Create: `charon-cycler/charon_cycler/state.py`
+- Create: `charon-cycler/tests/test_state.py`
 
 **Interfaces:**
 - Produces: `@dataclass State` with `cycle: int = 0`, `next_index: int = 0`, `current_enclave: str | None = None`. Methods: `advance() -> None` (increment `next_index`; when it reaches `len(CYCLE)` wrap to 0 and `cycle += 1`), `save(path: str) -> None` (atomic), classmethod `load(path: str) -> State` (returns default `State()` if file missing).
@@ -340,8 +340,8 @@ git commit -m "Add cycler combo matrix, ordering, enclave naming"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# dappnode-cycler/tests/test_state.py
-from dappnode_cycler.state import State
+# charon-cycler/tests/test_state.py
+from charon_cycler.state import State
 
 def test_defaults_and_roundtrip(tmp_path):
     p = str(tmp_path / "state.json")
@@ -366,17 +366,17 @@ def test_save_is_atomic(tmp_path):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_state.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_state.py -v`
 Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Implement**
 
 ```python
-# dappnode-cycler/dappnode_cycler/state.py
+# charon-cycler/charon_cycler/state.py
 import json
 import os
 from dataclasses import dataclass, asdict
-from dappnode_cycler.combos import CYCLE
+from charon_cycler.combos import CYCLE
 
 
 @dataclass
@@ -409,13 +409,13 @@ class State:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_state.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_state.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add dappnode-cycler/dappnode_cycler/state.py dappnode-cycler/tests/test_state.py
+git add charon-cycler/charon_cycler/state.py charon-cycler/tests/test_state.py
 git commit -m "Add cycler state persistence with atomic save and resume"
 ```
 
@@ -424,8 +424,8 @@ git commit -m "Add cycler state persistence with atomic save and resume"
 ## Task 4: Combo selection with priority-override hook
 
 **Files:**
-- Create: `dappnode-cycler/dappnode_cycler/selection.py`
-- Create: `dappnode-cycler/tests/test_selection.py`
+- Create: `charon-cycler/charon_cycler/selection.py`
+- Create: `charon-cycler/tests/test_selection.py`
 
 **Interfaces:**
 - Consumes: `Combo`, `CYCLE` (Task 2); `State` (Task 3).
@@ -434,10 +434,10 @@ git commit -m "Add cycler state persistence with atomic save and resume"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# dappnode-cycler/tests/test_selection.py
-from dappnode_cycler.combos import Combo
-from dappnode_cycler.state import State
-from dappnode_cycler.selection import select_next_combo, read_override
+# charon-cycler/tests/test_selection.py
+from charon_cycler.combos import Combo
+from charon_cycler.state import State
+from charon_cycler.selection import select_next_combo, read_override
 
 def test_default_reader_returns_none():
     assert read_override() is None
@@ -457,21 +457,21 @@ def test_override_takes_priority_without_advancing():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_selection.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_selection.py -v`
 Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Implement**
 
 ```python
-# dappnode-cycler/dappnode_cycler/selection.py
-from dappnode_cycler.combos import Combo, CYCLE
-from dappnode_cycler.state import State
+# charon-cycler/charon_cycler/selection.py
+from charon_cycler.combos import Combo, CYCLE
+from charon_cycler.state import State
 
 
 def read_override():
     """Extension point (not built yet): return {"cl","vc"[,"sticky"]} or None.
 
-    A future implementation reads dappnode-cycler/override.json. Until then this
+    A future implementation reads charon-cycler/override.json. Until then this
     stub returns None so the cycle runs normally, while select_next_combo already
     handles the override branch.
     """
@@ -491,13 +491,13 @@ def select_next_combo(state: State, override_reader=read_override):
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_selection.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_selection.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add dappnode-cycler/dappnode_cycler/selection.py dappnode-cycler/tests/test_selection.py
+git add charon-cycler/charon_cycler/selection.py charon-cycler/tests/test_selection.py
 git commit -m "Add combo selection with designed-in override hook"
 ```
 
@@ -506,8 +506,8 @@ git commit -m "Add combo selection with designed-in override hook"
 ## Task 5: Args-file builder (4 nodes + token substitution)
 
 **Files:**
-- Create: `dappnode-cycler/dappnode_cycler/params.py`
-- Create: `dappnode-cycler/tests/test_params.py`
+- Create: `charon-cycler/charon_cycler/params.py`
+- Create: `charon-cycler/tests/test_params.py`
 
 **Interfaces:**
 - Consumes: `build_network_params` (Task 1); `Combo` (Task 2).
@@ -516,9 +516,9 @@ git commit -m "Add combo selection with designed-in override hook"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# dappnode-cycler/tests/test_params.py
-from dappnode_cycler.combos import Combo
-from dappnode_cycler.params import build_args_file, write_args_file
+# charon-cycler/tests/test_params.py
+from charon_cycler.combos import Combo
+from charon_cycler.params import build_args_file, write_args_file
 
 def test_four_nodes_and_token_substituted():
     y = build_args_file(Combo("lighthouse", "teku"), token="SECRET123")
@@ -534,16 +534,16 @@ def test_write_args_file(tmp_path):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_params.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_params.py -v`
 Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Implement**
 
 ```python
-# dappnode-cycler/dappnode_cycler/params.py
+# charon-cycler/charon_cycler/params.py
 import os
 from charon_matrix.network_params import build_network_params
-from dappnode_cycler.combos import Combo
+from charon_cycler.combos import Combo
 
 
 def build_args_file(combo: Combo, token: str, charon_node_count: int = 4) -> str:
@@ -560,14 +560,14 @@ def write_args_file(combo: Combo, token: str, dir_path: str, charon_node_count: 
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_params.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_params.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add dappnode-cycler/dappnode_cycler/params.py dappnode-cycler/tests/test_params.py
-git commit -m "Add dappnode args-file builder (4 nodes, token subst)"
+git add charon-cycler/charon_cycler/params.py charon-cycler/tests/test_params.py
+git commit -m "Add args-file builder (4 nodes, token subst)"
 ```
 
 ---
@@ -575,8 +575,8 @@ git commit -m "Add dappnode args-file builder (4 nodes, token subst)"
 ## Task 6: PromQL query builders
 
 **Files:**
-- Create: `dappnode-cycler/dappnode_cycler/promql.py`
-- Create: `dappnode-cycler/tests/test_promql.py`
+- Create: `charon-cycler/charon_cycler/promql.py`
+- Create: `charon-cycler/tests/test_promql.py`
 
 **Interfaces:**
 - Produces (all take `cluster_name: str`, and where noted `window_s: int`; return `str`):
@@ -590,8 +590,8 @@ git commit -m "Add dappnode args-file builder (4 nodes, token subst)"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# dappnode-cycler/tests/test_promql.py
-from dappnode_cycler import promql
+# charon-cycler/tests/test_promql.py
+from charon_cycler import promql
 
 def test_duty_queries_group_by_peer_and_use_window():
     q = promql.duty_success("kurtosis-teku-prysm", 4500)
@@ -612,13 +612,13 @@ def test_resource_and_health_queries():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_promql.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_promql.py -v`
 Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Implement**
 
 ```python
-# dappnode-cycler/dappnode_cycler/promql.py
+# charon-cycler/charon_cycler/promql.py
 def _sel(cluster_name: str) -> str:
     return f'cluster_name="{cluster_name}"'
 
@@ -654,13 +654,13 @@ def health_firing_now(cluster_name: str) -> str:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_promql.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_promql.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add dappnode-cycler/dappnode_cycler/promql.py dappnode-cycler/tests/test_promql.py
+git add charon-cycler/charon_cycler/promql.py charon-cycler/tests/test_promql.py
 git commit -m "Add PromQL builders for duties, resources, health checks"
 ```
 
@@ -669,8 +669,8 @@ git commit -m "Add PromQL builders for duties, resources, health checks"
 ## Task 7: Prometheus client + metrics aggregation
 
 **Files:**
-- Create: `dappnode-cycler/dappnode_cycler/metrics.py`
-- Create: `dappnode-cycler/tests/test_metrics.py`
+- Create: `charon-cycler/charon_cycler/metrics.py`
+- Create: `charon-cycler/tests/test_metrics.py`
 
 **Interfaces:**
 - Consumes: `promql` (Task 6).
@@ -687,9 +687,9 @@ git commit -m "Add PromQL builders for duties, resources, health checks"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# dappnode-cycler/tests/test_metrics.py
+# charon-cycler/tests/test_metrics.py
 import json
-from dappnode_cycler.metrics import (
+from charon_cycler.metrics import (
     Sample, DutyResult, select_worst_node, max_value, parse_health, PrometheusClient,
 )
 
@@ -737,13 +737,13 @@ def test_prometheus_client_parses_result():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_metrics.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_metrics.py -v`
 Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Implement**
 
 ```python
-# dappnode-cycler/dappnode_cycler/metrics.py
+# charon-cycler/charon_cycler/metrics.py
 import json
 import urllib.parse
 import urllib.request
@@ -839,13 +839,13 @@ class PrometheusClient:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_metrics.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_metrics.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add dappnode-cycler/dappnode_cycler/metrics.py dappnode-cycler/tests/test_metrics.py
+git add charon-cycler/charon_cycler/metrics.py charon-cycler/tests/test_metrics.py
 git commit -m "Add Prometheus client and worst-node/resource/health aggregation"
 ```
 
@@ -854,8 +854,8 @@ git commit -m "Add Prometheus client and worst-node/resource/health aggregation"
 ## Task 8: Host resource sampler
 
 **Files:**
-- Create: `dappnode-cycler/dappnode_cycler/host_sampler.py`
-- Create: `dappnode-cycler/tests/test_host_sampler.py`
+- Create: `charon-cycler/charon_cycler/host_sampler.py`
+- Create: `charon-cycler/tests/test_host_sampler.py`
 
 **Interfaces:**
 - Produces:
@@ -868,8 +868,8 @@ git commit -m "Add Prometheus client and worst-node/resource/health aggregation"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# dappnode-cycler/tests/test_host_sampler.py
-from dappnode_cycler.host_sampler import (
+# charon-cycler/tests/test_host_sampler.py
+from charon_cycler.host_sampler import (
     parse_cpu_line, cpu_percent, parse_meminfo, Sampler, HostStats,
 )
 
@@ -913,13 +913,13 @@ Implementation note for `parse_cpu_line`: fields after `cpu` are user, nice, sys
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_host_sampler.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_host_sampler.py -v`
 Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Implement**
 
 ```python
-# dappnode-cycler/dappnode_cycler/host_sampler.py
+# charon-cycler/charon_cycler/host_sampler.py
 import threading
 import time
 from dataclasses import dataclass
@@ -1013,13 +1013,13 @@ class Sampler:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Fix the `test_parse_cpu_line` expectation to `(200, 1000)` per the formula note. Run: `cd dappnode-cycler && python -m pytest tests/test_host_sampler.py -v`
+Fix the `test_parse_cpu_line` expectation to `(200, 1000)` per the formula note. Run: `cd charon-cycler && python -m pytest tests/test_host_sampler.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add dappnode-cycler/dappnode_cycler/host_sampler.py dappnode-cycler/tests/test_host_sampler.py
+git add charon-cycler/charon_cycler/host_sampler.py charon-cycler/tests/test_host_sampler.py
 git commit -m "Add host CPU/mem sampler (/proc, avg+peak)"
 ```
 
@@ -1028,8 +1028,8 @@ git commit -m "Add host CPU/mem sampler (/proc, avg+peak)"
 ## Task 9: Report model + Slack Block Kit builder
 
 **Files:**
-- Create: `dappnode-cycler/dappnode_cycler/report.py`
-- Create: `dappnode-cycler/tests/test_report.py`
+- Create: `charon-cycler/charon_cycler/report.py`
+- Create: `charon-cycler/tests/test_report.py`
 
 **Interfaces:**
 - Consumes: `WorstNode`, `HealthCheck` (Task 7); `HostStats` (Task 8); `Combo` (Task 2).
@@ -1041,11 +1041,11 @@ git commit -m "Add host CPU/mem sampler (/proc, avg+peak)"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# dappnode-cycler/tests/test_report.py
-from dappnode_cycler.combos import Combo
-from dappnode_cycler.metrics import WorstNode, DutyResult, HealthCheck
-from dappnode_cycler.host_sampler import HostStats
-from dappnode_cycler.report import ReportData, build_text, build_blocks
+# charon-cycler/tests/test_report.py
+from charon_cycler.combos import Combo
+from charon_cycler.metrics import WorstNode, DutyResult, HealthCheck
+from charon_cycler.host_sampler import HostStats
+from charon_cycler.report import ReportData, build_text, build_blocks
 
 def _data(status="ok", health=None, worst=None):
     return ReportData(
@@ -1078,17 +1078,17 @@ def test_failed_status_shows_error():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_report.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_report.py -v`
 Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Implement**
 
 ```python
-# dappnode-cycler/dappnode_cycler/report.py
+# charon-cycler/charon_cycler/report.py
 from dataclasses import dataclass, field
-from dappnode_cycler.combos import Combo
-from dappnode_cycler.metrics import WorstNode, HealthCheck
-from dappnode_cycler.host_sampler import HostStats
+from charon_cycler.combos import Combo
+from charon_cycler.metrics import WorstNode, HealthCheck
+from charon_cycler.host_sampler import HostStats
 
 _EMOJI = {"ok": "✅", "degraded": "⚠️", "failed": "❌"}
 
@@ -1167,13 +1167,13 @@ def build_blocks(data: ReportData) -> list:
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_report.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_report.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add dappnode-cycler/dappnode_cycler/report.py dappnode-cycler/tests/test_report.py
+git add charon-cycler/charon_cycler/report.py charon-cycler/tests/test_report.py
 git commit -m "Add report model and Slack Block Kit builder"
 ```
 
@@ -1182,8 +1182,8 @@ git commit -m "Add report model and Slack Block Kit builder"
 ## Task 10: Slack webhook client
 
 **Files:**
-- Create: `dappnode-cycler/dappnode_cycler/slack.py`
-- Create: `dappnode-cycler/tests/test_slack.py`
+- Create: `charon-cycler/charon_cycler/slack.py`
+- Create: `charon-cycler/tests/test_slack.py`
 
 **Interfaces:**
 - Produces: `post(webhook_url: str, text: str, blocks: list, http_post=_http_post) -> None`; `_http_post(url: str, data: bytes) -> int` (returns HTTP status). `post` sends `{"text": text, "blocks": blocks}` as JSON and raises `RuntimeError` on non-200.
@@ -1191,10 +1191,10 @@ git commit -m "Add report model and Slack Block Kit builder"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# dappnode-cycler/tests/test_slack.py
+# charon-cycler/tests/test_slack.py
 import json
 import pytest
-from dappnode_cycler import slack
+from charon_cycler import slack
 
 def test_post_sends_text_and_blocks():
     captured = {}
@@ -1213,13 +1213,13 @@ def test_post_raises_on_non_200():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_slack.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_slack.py -v`
 Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Implement**
 
 ```python
-# dappnode-cycler/dappnode_cycler/slack.py
+# charon-cycler/charon_cycler/slack.py
 import json
 import urllib.request
 
@@ -1239,13 +1239,13 @@ def post(webhook_url: str, text: str, blocks: list, http_post=_http_post) -> Non
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_slack.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_slack.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add dappnode-cycler/dappnode_cycler/slack.py dappnode-cycler/tests/test_slack.py
+git add charon-cycler/charon_cycler/slack.py charon-cycler/tests/test_slack.py
 git commit -m "Add Slack Incoming Webhook client"
 ```
 
@@ -1254,8 +1254,8 @@ git commit -m "Add Slack Incoming Webhook client"
 ## Task 11: Kurtosis CLI wrappers
 
 **Files:**
-- Create: `dappnode-cycler/dappnode_cycler/kurtosis.py`
-- Create: `dappnode-cycler/tests/test_kurtosis.py`
+- Create: `charon-cycler/charon_cycler/kurtosis.py`
+- Create: `charon-cycler/tests/test_kurtosis.py`
 
 **Interfaces:**
 - Produces (all take an overridable `runner=subprocess.run`):
@@ -1267,8 +1267,8 @@ git commit -m "Add Slack Incoming Webhook client"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# dappnode-cycler/tests/test_kurtosis.py
-from dappnode_cycler import kurtosis
+# charon-cycler/tests/test_kurtosis.py
+from charon_cycler import kurtosis
 
 class FakeCompleted:
     def __init__(self, stdout="", returncode=0):
@@ -1305,13 +1305,13 @@ def test_remove_enclave_never_raises():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_kurtosis.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_kurtosis.py -v`
 Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Implement**
 
 ```python
-# dappnode-cycler/dappnode_cycler/kurtosis.py
+# charon-cycler/charon_cycler/kurtosis.py
 import subprocess
 
 
@@ -1349,13 +1349,13 @@ def git_pull(repo_path, runner=subprocess.run):
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_kurtosis.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_kurtosis.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add dappnode-cycler/dappnode_cycler/kurtosis.py dappnode-cycler/tests/test_kurtosis.py
+git add charon-cycler/charon_cycler/kurtosis.py charon-cycler/tests/test_kurtosis.py
 git commit -m "Add Kurtosis CLI + git pull wrappers"
 ```
 
@@ -1364,9 +1364,9 @@ git commit -m "Add Kurtosis CLI + git pull wrappers"
 ## Task 12: Config loader
 
 **Files:**
-- Create: `dappnode-cycler/dappnode_cycler/config.py`
-- Create: `dappnode-cycler/config.example.yaml`
-- Create: `dappnode-cycler/tests/test_config.py`
+- Create: `charon-cycler/charon_cycler/config.py`
+- Create: `charon-cycler/config.example.yaml`
+- Create: `charon-cycler/tests/test_config.py`
 
 **Interfaces:**
 - Produces: `@dataclass Config` with `slack_webhook_url: str`, `repo_path: str`, `state_path: str`, `monitoring_token: str = ""`, `package_ref: str = "github.com/ObolNetwork/ethereum-package@charon"`, `run_minutes: int = 90`, `warmup_minutes: int = 15`, `startup_deadline_minutes: int = 25`, `sample_interval_s: int = 15`. `load_config(path: str) -> Config` (YAML; unknown keys ignored; missing required keys raise `KeyError`).
@@ -1374,9 +1374,9 @@ git commit -m "Add Kurtosis CLI + git pull wrappers"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# dappnode-cycler/tests/test_config.py
+# charon-cycler/tests/test_config.py
 import pytest
-from dappnode_cycler.config import load_config, Config
+from charon_cycler.config import load_config, Config
 
 def test_load_with_defaults(tmp_path):
     p = tmp_path / "c.yaml"
@@ -1401,13 +1401,13 @@ def test_missing_required_raises(tmp_path):
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_config.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_config.py -v`
 Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Implement**
 
 ```python
-# dappnode-cycler/dappnode_cycler/config.py
+# charon-cycler/charon_cycler/config.py
 from dataclasses import dataclass, fields
 import yaml
 
@@ -1448,10 +1448,10 @@ Use the explicit-validation version so `test_missing_required_raises` passes wit
 Create `config.example.yaml`:
 
 ```yaml
-# dappnode-cycler/config.example.yaml
+# charon-cycler/config.example.yaml
 slack_webhook_url: "https://hooks.slack.com/services/XXX/YYY/ZZZ"
-repo_path: "/home/dappnode/kurtosis-charon"
-state_path: "/var/lib/dappnode-cycler/state.json"
+repo_path: "/opt/kurtosis-charon"
+state_path: "/var/lib/charon-cycler/state.json"
 monitoring_token: ""          # PROMETHEUS_REMOTE_WRITE_TOKEN; empty disables remote_write auth
 package_ref: "github.com/ObolNetwork/ethereum-package@charon"
 run_minutes: 90
@@ -1462,13 +1462,13 @@ sample_interval_s: 15
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_config.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_config.py -v`
 Expected: PASS. (If `yaml` is unavailable, `pip install pyyaml` in the venv first.)
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add dappnode-cycler/dappnode_cycler/config.py dappnode-cycler/config.example.yaml dappnode-cycler/tests/test_config.py
+git add charon-cycler/charon_cycler/config.py charon-cycler/config.example.yaml charon-cycler/tests/test_config.py
 git commit -m "Add cycler config loader and example config"
 ```
 
@@ -1477,8 +1477,8 @@ git commit -m "Add cycler config loader and example config"
 ## Task 13: Main loop (run_one + orchestration)
 
 **Files:**
-- Create: `dappnode-cycler/dappnode_cycler/cycler.py`
-- Create: `dappnode-cycler/tests/test_cycler.py`
+- Create: `charon-cycler/charon_cycler/cycler.py`
+- Create: `charon-cycler/tests/test_cycler.py`
 
 **Interfaces:**
 - Consumes: everything above.
@@ -1491,12 +1491,12 @@ git commit -m "Add cycler config loader and example config"
 - [ ] **Step 1: Write the failing test**
 
 ```python
-# dappnode-cycler/tests/test_cycler.py
-from dappnode_cycler.combos import Combo
-from dappnode_cycler.config import Config
-from dappnode_cycler.metrics import Sample
-from dappnode_cycler.host_sampler import Sampler
-from dappnode_cycler.cycler import run_one, Deps
+# charon-cycler/tests/test_cycler.py
+from charon_cycler.combos import Combo
+from charon_cycler.config import Config
+from charon_cycler.metrics import Sample
+from charon_cycler.host_sampler import Sampler
+from charon_cycler.cycler import run_one, Deps
 
 class FakeProm:
     def __init__(self, table):
@@ -1511,7 +1511,7 @@ class FakeSampler:
     def start(self): pass
     def stop(self): pass
     def summary(self):
-        from dappnode_cycler.host_sampler import HostStats
+        from charon_cycler.host_sampler import HostStats
         return HostStats(20.0, 60.0, 4e9, 5e9, 16e9)
 
 def _cfg():
@@ -1558,28 +1558,28 @@ def test_run_one_startup_failure_posts_failed():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_cycler.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_cycler.py -v`
 Expected: FAIL with `ModuleNotFoundError`.
 
 - [ ] **Step 3: Implement**
 
 ```python
-# dappnode-cycler/dappnode_cycler/cycler.py
+# charon-cycler/charon_cycler/cycler.py
 import time
 from dataclasses import dataclass
 from typing import Callable
 
 from charon_matrix.network_params import CHARON_IMAGE, CL_IMAGES, VC_IMAGES
-from dappnode_cycler import kurtosis, promql, slack
-from dappnode_cycler.combos import Combo, CYCLE, enclave_name
-from dappnode_cycler.config import Config, load_config
-from dappnode_cycler.host_sampler import Sampler
-from dappnode_cycler.metrics import (
+from charon_cycler import kurtosis, promql, slack
+from charon_cycler.combos import Combo, CYCLE, enclave_name
+from charon_cycler.config import Config, load_config
+from charon_cycler.host_sampler import Sampler
+from charon_cycler.metrics import (
     PrometheusClient, select_worst_node, max_value, parse_health,
 )
-from dappnode_cycler.report import ReportData, build_text, build_blocks
-from dappnode_cycler.selection import select_next_combo
-from dappnode_cycler.state import State
+from charon_cycler.report import ReportData, build_text, build_blocks
+from charon_cycler.selection import select_next_combo
+from charon_cycler.state import State
 
 
 @dataclass
@@ -1680,7 +1680,7 @@ def _failed_report(combo, cycle, error) -> ReportData:
 
 
 def _default_deps(cfg: Config) -> Deps:
-    from dappnode_cycler.params import write_args_file
+    from charon_cycler.params import write_args_file
 
     def wait_healthy(prom, cluster_name, deadline_s):
         waited = 0
@@ -1737,18 +1737,18 @@ if __name__ == "__main__":
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd dappnode-cycler && python -m pytest tests/test_cycler.py -v`
+Run: `cd charon-cycler && python -m pytest tests/test_cycler.py -v`
 Expected: PASS.
 
 - [ ] **Step 5: Run the full suite**
 
-Run: `cd dappnode-cycler && python -m pytest -v && python -m pytest ../charon_matrix/tests -v`
+Run: `cd charon-cycler && python -m pytest -v && python -m pytest ../charon_matrix/tests -v`
 Expected: all PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add dappnode-cycler/dappnode_cycler/cycler.py dappnode-cycler/tests/test_cycler.py
+git add charon-cycler/charon_cycler/cycler.py charon-cycler/tests/test_cycler.py
 git commit -m "Add cycler main loop with injectable deps and resume"
 ```
 
@@ -1757,25 +1757,25 @@ git commit -m "Add cycler main loop with injectable deps and resume"
 ## Task 14: systemd unit, README, ops wiring
 
 **Files:**
-- Create: `dappnode-cycler/cycler.service`
-- Create: `dappnode-cycler/README.md`
+- Create: `charon-cycler/cycler.service`
+- Create: `charon-cycler/README.md`
 
 **Interfaces:** none (ops/docs). No new code; validated by inspection + a dry import.
 
 - [ ] **Step 1: Write the systemd unit**
 
 ```ini
-# dappnode-cycler/cycler.service
+# charon-cycler/cycler.service
 [Unit]
-Description=Charon 36-combo dappnode cycler
+Description=Charon 36-combo test cycler
 After=docker.service network-online.target
 Wants=docker.service network-online.target
 
 [Service]
 Type=simple
-User=dappnode
-WorkingDirectory=/home/dappnode/kurtosis-charon/dappnode-cycler
-ExecStart=/home/dappnode/kurtosis-charon/dappnode-cycler/.venv/bin/python -m dappnode_cycler.cycler /home/dappnode/kurtosis-charon/dappnode-cycler/config.yaml
+User=charon
+WorkingDirectory=/opt/kurtosis-charon/charon-cycler
+ExecStart=/opt/kurtosis-charon/charon-cycler/.venv/bin/python -m charon_cycler.cycler /opt/kurtosis-charon/charon-cycler/config.yaml
 Restart=always
 RestartSec=30
 StandardOutput=journal
@@ -1791,14 +1791,14 @@ Document: purpose; the run cycle; how versions are bumped (edit pins in `charon_
 
 - [ ] **Step 3: Sanity-check the entrypoint imports**
 
-Run: `cd dappnode-cycler && python -c "import dappnode_cycler.cycler"` (with `..` and `.` importable, e.g. `PYTHONPATH=.:.. python -c ...`)
+Run: `cd charon-cycler && python -c "import charon_cycler.cycler"` (with `..` and `.` importable, e.g. `PYTHONPATH=.:.. python -c ...`)
 Expected: no ImportError.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add dappnode-cycler/cycler.service dappnode-cycler/README.md
-git commit -m "Add systemd unit and README for dappnode cycler"
+git add charon-cycler/cycler.service charon-cycler/README.md
+git commit -m "Add systemd unit and README for the cycler"
 ```
 
 ---
