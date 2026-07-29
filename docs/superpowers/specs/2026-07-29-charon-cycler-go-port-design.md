@@ -6,10 +6,17 @@
 
 ## Goal
 
-Reimplement the 24/7 sequential 36-combo Charon cycler in **Go**, as a single
-static binary — no Python, no venv on the host. Behaviour is identical to the
-Python implementation (see `2026-07-29-charon-36-cycler-design.md`); this is a
-language port, not a redesign.
+Reimplement the 24/7 sequential 36-combo Charon cycler in **Go**, run directly
+with `go run .` — no Python, no venv, no committed build artifact. Behaviour is
+identical to the Python implementation (see
+`2026-07-29-charon-36-cycler-design.md`); this is a language port, not a redesign.
+
+**Execution model:** the service runs via `go run .` (the host already has the
+Go toolchain). No binary is built or committed. Modern `go run` forwards
+`SIGTERM`/`SIGINT` to the child, so systemd `stop`/`Restart=always` work
+normally. Caveats, all handled in the unit file: the service user needs a
+writable `GOCACHE`/`HOME` (one `Environment=` line), and each (re)start
+recompiles for ~1–3s (negligible for a process that runs for days).
 
 ## Guiding constraint: keep it script-like
 
@@ -38,8 +45,8 @@ charon-cycler/
   go.mod                # module github.com/ObolNetwork/kurtosis-charon/charon-cycler, go 1.26, no requires
   main.go               # ALL program code, package main
   main_test.go          # table-driven tests for the pure functions + func-var fakes
-  cycler.service        # systemd unit (ExecStart = the built binary; no PYTHONPATH)
-  README.md             # build/run/deploy/version-bump/override docs
+  cycler.service        # systemd unit (ExecStart = `go run .`; GOCACHE/HOME set; no PYTHONPATH)
+  README.md             # run (go run)/deploy/version-bump/override docs
 images.json             # repo root: shared image pins (NEW; also read by the Python AWS runner)
 ```
 
@@ -128,15 +135,17 @@ args-file generation (4 nodes + token subst + nimbus json_requests), state
 round-trip + advance wrap, selection cycle-vs-override, and health parsing. I/O
 glue (kurtosis arg construction, slack payload) is tested by swapping the
 package-level `runCommand`/`httpPost` func vars for fakes that capture inputs.
-Gate: `go vet ./...` clean and `go test ./...` green; `go build` produces the binary.
+Gate: `go vet ./...` clean, `go test ./...` green, and `go build ./...` compiles
+as a sanity check (the built binary is discarded — the service runs via `go run .`).
 
 ## Cleanup / deliverables
 
 - Delete the Python cycler package + tests + pyproject + config.example.yaml.
 - Add `images.json`; refactor `charon_matrix/network_params.py` to read it.
-- Update `charon-cycler/cycler.service` (ExecStart = built binary, drop
-  PYTHONPATH) and `charon-cycler/README.md` (build with `go build -o cycler .`,
-  env-var config, deploy, version bump via `images.json`, override hook).
+- Update `charon-cycler/cycler.service` (ExecStart = `go run .`, `WorkingDirectory`
+  = the module dir, `Environment=` for `GOCACHE`/`HOME` and the full `go` path,
+  drop PYTHONPATH) and `charon-cycler/README.md` (run with `go run .`, env-var
+  config, deploy, version bump via `images.json`, override hook).
 
 ## Out of scope
 
