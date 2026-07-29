@@ -1,4 +1,3 @@
-# charon-cycler/cycler.service
 [Unit]
 Description=Charon 36-combo test cycler
 After=docker.service network-online.target
@@ -8,8 +7,13 @@ Wants=docker.service network-online.target
 Type=simple
 User=charon
 WorkingDirectory=/opt/kurtosis-charon/charon-cycler
-Environment="PYTHONPATH=/opt/kurtosis-charon:/opt/kurtosis-charon/charon-cycler"
-ExecStart=/opt/kurtosis-charon/charon-cycler/.venv/bin/python -m charon_cycler.cycler /opt/kurtosis-charon/charon-cycler/config.yaml
+Environment=GOCACHE=/var/cache/charon-cycler/go-build
+Environment=HOME=/opt/kurtosis-charon
+Environment=CYCLER_SLACK_WEBHOOK_URL=
+Environment=CYCLER_REPO_PATH=/opt/kurtosis-charon
+Environment=CYCLER_STATE_PATH=/var/lib/charon-cycler/state.json
+Environment=CYCLER_MONITORING_TOKEN=
+ExecStart=/opt/homebrew/bin/go run .
 Restart=always
 RestartSec=30
 StandardOutput=journal

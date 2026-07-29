@@ -1,7 +1,7 @@
 // Command charon-cycler cycles the ethereum-package devnet through the
 // CL x VC matrix behind Charon, sampling metrics and posting a Slack report
 // for each run. This file (main.go) is a script-like Go port of the
-// charon_cycler Python package: no sub-packages, no interfaces, just plain
+// original Python cycler package: no sub-packages, no interfaces, just plain
 // data records and package-level functions/vars.
 package main
 
@@ -73,10 +73,10 @@ type config struct {
 	interRunBackoffS, maxBackoffS                                      int
 }
 
-// envInt reads an integer env var into *dst if present and non-empty and
-// parses cleanly; otherwise dst is left untouched.
+// envInt reads an integer env var (CYCLER_<name>) into *dst if present and
+// non-empty and parses cleanly; otherwise dst is left untouched.
 func envInt(name string, dst *int) {
-	v, ok := os.LookupEnv(name)
+	v, ok := os.LookupEnv("CYCLER_" + name)
 	if !ok || v == "" {
 		return
 	}
@@ -85,8 +85,10 @@ func envInt(name string, dst *int) {
 	}
 }
 
+// envStr reads a string env var (CYCLER_<name>) into *dst if present and
+// non-empty.
 func envStr(name string, dst *string) {
-	if v, ok := os.LookupEnv(name); ok && v != "" {
+	if v, ok := os.LookupEnv("CYCLER_" + name); ok && v != "" {
 		*dst = v
 	}
 }
@@ -173,13 +175,13 @@ func loadConfig() (config, error) {
 
 	var missing []string
 	if cfg.slackWebhookURL == "" {
-		missing = append(missing, "slack_webhook_url (SLACK_WEBHOOK_URL / --slack-webhook-url)")
+		missing = append(missing, "slack_webhook_url (CYCLER_SLACK_WEBHOOK_URL / --slack-webhook-url)")
 	}
 	if cfg.repoPath == "" {
-		missing = append(missing, "repo_path (REPO_PATH / --repo-path)")
+		missing = append(missing, "repo_path (CYCLER_REPO_PATH / --repo-path)")
 	}
 	if cfg.statePath == "" {
-		missing = append(missing, "state_path (STATE_PATH / --state-path)")
+		missing = append(missing, "state_path (CYCLER_STATE_PATH / --state-path)")
 	}
 	if len(missing) > 0 {
 		return config{}, fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))

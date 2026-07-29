@@ -388,17 +388,17 @@ func TestParseMeminfo(t *testing.T) {
 
 func TestLoadConfig(t *testing.T) {
 	t.Run("required present -> defaults applied", func(t *testing.T) {
-		t.Setenv("SLACK_WEBHOOK_URL", "http://hook")
-		t.Setenv("REPO_PATH", "/srv/kurtosis-charon")
-		t.Setenv("STATE_PATH", "/var/lib/cycler/state.json")
-		t.Setenv("MONITORING_TOKEN", "")
-		t.Setenv("PACKAGE_REF", "")
-		t.Setenv("RUN_MINUTES", "")
-		t.Setenv("WARMUP_MINUTES", "")
-		t.Setenv("STARTUP_DEADLINE_MINUTES", "")
-		t.Setenv("SAMPLE_INTERVAL_S", "")
-		t.Setenv("INTER_RUN_BACKOFF_S", "")
-		t.Setenv("MAX_BACKOFF_S", "")
+		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "http://hook")
+		t.Setenv("CYCLER_REPO_PATH", "/srv/kurtosis-charon")
+		t.Setenv("CYCLER_STATE_PATH", "/var/lib/cycler/state.json")
+		t.Setenv("CYCLER_MONITORING_TOKEN", "")
+		t.Setenv("CYCLER_PACKAGE_REF", "")
+		t.Setenv("CYCLER_RUN_MINUTES", "")
+		t.Setenv("CYCLER_WARMUP_MINUTES", "")
+		t.Setenv("CYCLER_STARTUP_DEADLINE_MINUTES", "")
+		t.Setenv("CYCLER_SAMPLE_INTERVAL_S", "")
+		t.Setenv("CYCLER_INTER_RUN_BACKOFF_S", "")
+		t.Setenv("CYCLER_MAX_BACKOFF_S", "")
 
 		cfg, err := loadConfig()
 		if err != nil {
@@ -428,10 +428,10 @@ func TestLoadConfig(t *testing.T) {
 	})
 
 	t.Run("overrides applied", func(t *testing.T) {
-		t.Setenv("SLACK_WEBHOOK_URL", "h")
-		t.Setenv("REPO_PATH", "r")
-		t.Setenv("STATE_PATH", "st")
-		t.Setenv("RUN_MINUTES", "30")
+		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "h")
+		t.Setenv("CYCLER_REPO_PATH", "r")
+		t.Setenv("CYCLER_STATE_PATH", "st")
+		t.Setenv("CYCLER_RUN_MINUTES", "30")
 
 		cfg, err := loadConfig()
 		if err != nil {
@@ -443,13 +443,31 @@ func TestLoadConfig(t *testing.T) {
 	})
 
 	t.Run("missing required raises", func(t *testing.T) {
-		t.Setenv("SLACK_WEBHOOK_URL", "")
-		t.Setenv("REPO_PATH", "r")
-		t.Setenv("STATE_PATH", "s")
+		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "")
+		t.Setenv("CYCLER_REPO_PATH", "r")
+		t.Setenv("CYCLER_STATE_PATH", "s")
 
 		_, err := loadConfig()
 		if err == nil {
 			t.Fatal("expected error when slackWebhookURL missing")
+		}
+	})
+
+	t.Run("bare env name is not picked up (CYCLER_-only)", func(t *testing.T) {
+		// SLACK_WEBHOOK_URL (bare, no CYCLER_ prefix) must NOT satisfy the
+		// required slack_webhook_url config -- only CYCLER_SLACK_WEBHOOK_URL
+		// counts. Setting the bare name alongside the other two required
+		// CYCLER_ vars should still error as missing.
+		t.Setenv("SLACK_WEBHOOK_URL", "http://hook")
+		t.Setenv("CYCLER_REPO_PATH", "r")
+		t.Setenv("CYCLER_STATE_PATH", "s")
+
+		_, err := loadConfig()
+		if err == nil {
+			t.Fatal("expected error: bare SLACK_WEBHOOK_URL (unprefixed) must not be read")
+		}
+		if !strings.Contains(err.Error(), "CYCLER_SLACK_WEBHOOK_URL") {
+			t.Errorf("error = %v, want it to name CYCLER_SLACK_WEBHOOK_URL", err)
 		}
 	})
 }
