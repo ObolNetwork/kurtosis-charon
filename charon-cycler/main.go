@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -747,3 +748,553 @@ var (
 	sleepFn    = time.Sleep
 	readFileFn = os.ReadFile
 )
+
+// ---------------------------------------------------------------------------
+// metrics.py -> PrometheusClient.query -> promQuery
+// ---------------------------------------------------------------------------
+
+// promQuery GETs Prometheus's instant-query endpoint and parses the result
+// into samples, mirroring PrometheusClient.query. It returns an error
+// (including errorType/error from the response body) whenever the JSON
+// "status" field isn't "success".
+func promQuery(baseURL, promQL string) ([]sample, error) {
+	u := strings.TrimRight(baseURL, "/") + "/api/v1/query?query=" + url.QueryEscape(promQL)
+	body, _, err := httpGet(u)
+	if err != nil {
+		return nil, err
+	}
+
+	var payload struct {
+		Status    string `json:"status"`
+		ErrorType string `json:"errorType"`
+		Error     string `json:"error"`
+		Data      struct {
+			Result []struct {
+				Metric map[string]string  `json:"metric"`
+				Value  [2]json.RawMessage `json:"value"`
+			} `json:"result"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, fmt.Errorf("prometheus query: invalid JSON response: %w", err)
+	}
+	if payload.Status != "success" {
+		return nil, fmt.Errorf("prometheus query failed: errorType=%q error=%q", payload.ErrorType, payload.Error)
+	}
+
+	samples := make([]sample, 0, len(payload.Data.Result))
+	for _, item := range payload.Data.Result {
+		if len(item.Value) < 2 {
+			continue
+		}
+		var valStr string
+		if err := json.Unmarshal(item.Value[1], &valStr); err != nil {
+			return nil, fmt.Errorf("prometheus query: invalid sample value: %w", err)
+		}
+		v, err := strconv.ParseFloat(valStr, 64)
+		if err != nil {
+			return nil, fmt.Errorf("prometheus query: invalid sample value %q: %w", valStr, err)
+		}
+		samples = append(samples, sample{labels: item.Metric, value: v})
+	}
+	return samples, nil
+}
+
+// ---------------------------------------------------------------------------
+// slack.py -> slackPost
+// ---------------------------------------------------------------------------
+
+func slackPost(webhookURL, text string, blocks []map[string]any) error {
+	payload := map[string]any{"text": text, "blocks": blocks}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	status, err := httpPost(webhookURL, data)
+	if err != nil {
+		return err
+	}
+	if status != 200 {
+		return fmt.Errorf("slack webhook returned HTTP %d", status)
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// kurtosis.py -> kurtosisRun, kurtosisRemove, prometheusBaseURL, gitPull
+// ---------------------------------------------------------------------------
+
+// kurtosisRun launches an enclave via `kurtosis run`. It returns an error on
+// non-zero exit (runCommand's error already reflects that, as it does for
+// os/exec.Cmd.CombinedOutput).
+func kurtosisRun(enclave, pkg, argsFile string) error {
+	out, err := runCommand("kurtosis", "run", "--enclave", enclave, pkg, "--args-file", argsFile)
+	if err != nil {
+		return fmt.Errorf("kurtosis run failed for %s: %w (output: %s)", enclave, err, strings.TrimSpace(out))
+	}
+	return nil
+}
+
+// kurtosisRemove tears down an enclave via `kurtosis enclave rm -f`. It is
+// best-effort/idempotent -- it never returns an error and, via the recover,
+// never panics -- so callers can call it freely as a guarded pre-clear or a
+// guaranteed-teardown step.
+func kurtosisRemove(enclave string) {
+	defer func() { _ = recover() }()
+	_, _ = runCommand("kurtosis", "enclave", "rm", "-f", enclave)
+}
+
+// prometheusBaseURL resolves the in-enclave Prometheus URL via
+// `kurtosis port print`. It returns "" on any error or empty output.
+func prometheusBaseURL(enclave string) string {
+	out, err := runCommand("kurtosis", "port", "print", enclave, "prometheus", "http")
+	if err != nil {
+		return ""
+	}
+	trimmed := strings.TrimSpace(out)
+	if trimmed == "" {
+		return ""
+	}
+	lines := strings.Split(trimmed, "\n")
+	return strings.TrimSpace(lines[len(lines)-1])
+}
+
+// gitPull runs `git -C repoPath pull --ff-only`. It returns an error on
+// non-zero exit.
+func gitPull(repoPath string) error {
+	out, err := runCommand("git", "-C", repoPath, "pull", "--ff-only")
+	if err != nil {
+		return fmt.Errorf("git pull failed in %s: %w (output: %s)", repoPath, err, strings.TrimSpace(out))
+	}
+	return nil
+}
+
+// ---------------------------------------------------------------------------
+// host_sampler.py -> Sampler -> sampleHost
+//
+// sampleHost is a plain function (not an interface/struct) run as a
+// goroutine: it samples /proc/stat and /proc/meminfo via readFileFn every
+// intervalS seconds until stopCh is closed/signaled, then returns the
+// summary. Read errors (e.g. non-Linux hosts, or in tests) are tolerated by
+// skipping that sample, matching the "best-effort" spirit of the rest of
+// this port; an all-error run simply yields all-zero stats.
+// ---------------------------------------------------------------------------
+
+func floatsAvg(xs []float64) float64 {
+	if len(xs) == 0 {
+		return 0
+	}
+	var sum float64
+	for _, x := range xs {
+		sum += x
+	}
+	return sum / float64(len(xs))
+}
+
+func floatsMax(xs []float64) float64 {
+	m := xs[0]
+	for _, x := range xs[1:] {
+		if x > m {
+			m = x
+		}
+	}
+	return m
+}
+
+func sampleHost(stopCh <-chan struct{}, intervalS int) hostStats {
+	if intervalS < 1 {
+		intervalS = 1
+	}
+	interval := time.Duration(intervalS) * time.Second
+
+	var cpuSamples, memSamples []float64
+	var memTotal float64
+	var prevCPU [2]float64
+	havePrevCPU := false
+
+	sampleOnce := func() {
+		if statText, err := readFileFn("/proc/stat"); err == nil {
+			cur := [2]float64{}
+			cur[0], cur[1] = parseCPULine(string(statText))
+			if havePrevCPU {
+				cpuSamples = append(cpuSamples, cpuPercent(prevCPU, cur))
+			}
+			prevCPU = cur
+			havePrevCPU = true
+		}
+		if memText, err := readFileFn("/proc/meminfo"); err == nil {
+			used, total := parseMeminfo(string(memText))
+			memSamples = append(memSamples, used)
+			memTotal = total
+		}
+	}
+
+	sampleOnce() // prime the CPU baseline, matching Sampler._loop's initial call
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+loop:
+	for {
+		select {
+		case <-stopCh:
+			break loop
+		case <-ticker.C:
+			sampleOnce()
+		}
+	}
+
+	if len(cpuSamples) == 0 {
+		cpuSamples = []float64{0}
+	}
+	if len(memSamples) == 0 {
+		memSamples = []float64{0}
+	}
+	return hostStats{
+		cpuAvg:   floatsAvg(cpuSamples),
+		cpuPeak:  floatsMax(cpuSamples),
+		memAvg:   floatsAvg(memSamples),
+		memPeak:  floatsMax(memSamples),
+		memTotal: memTotal,
+	}
+}
+
+// ---------------------------------------------------------------------------
+// cycler.py -> wait_healthy -> waitHealthy
+// ---------------------------------------------------------------------------
+
+// waitHealthy polls core_scheduler_validators_active>0 until deadlineS
+// elapses, sleeping sampleIntervalS-independent 15s steps between polls
+// (matching _default_deps.wait_healthy). A promQuery error ends the wait
+// early (returns false) rather than retrying -- this is a deliberate change
+// from Python's behavior of letting the exception propagate out of
+// wait_healthy and fail the whole run, since this Go signature returns a
+// bool rather than (bool, error); the net effect on run_one is the same
+// (the run is treated as unhealthy/failed).
+func waitHealthy(baseURL, clusterName string, deadlineS int) bool {
+	promQL := fmt.Sprintf(`core_scheduler_validators_active{cluster_name="%s"}`, clusterName)
+	waited := 0
+	for waited < deadlineS {
+		samples, err := promQuery(baseURL, promQL)
+		if err != nil {
+			return false
+		}
+		for _, sm := range samples {
+			if sm.value > 0 {
+				return true
+			}
+		}
+		sleepFn(15 * time.Second)
+		waited += 15
+	}
+	return false
+}
+
+// ---------------------------------------------------------------------------
+// cycler.py -> collect_report -> collectReport
+// ---------------------------------------------------------------------------
+
+// degradedPctThreshold mirrors cycler.py's DEGRADED_PCT_THRESHOLD: below
+// this per-duty success pct on the worst node, or with any health check
+// firing now, a run's status is downgraded from "ok" to "degraded".
+const degradedPctThreshold = 99.5
+
+// collectReport queries Prometheus for duty/mem/cpu/health data over the
+// scored window and assembles a reportData, applying the ok/degraded
+// classification (never "failed" -- a query error is returned to the
+// caller, which builds the failed report). window/status are always
+// computed here as "ok" or "degraded"; runOne fills in the human-readable
+// window label afterwards since it's derived from wall-clock time, not from
+// anything collectReport queries.
+func collectReport(baseURL string, c combo, cycle, windowS int, host hostStats, im images) (reportData, error) {
+	cn := c.clusterName()
+
+	expected, err := promQuery(baseURL, promDutyExpected(cn, windowS))
+	if err != nil {
+		return reportData{}, err
+	}
+	success, err := promQuery(baseURL, promDutySuccess(cn, windowS))
+	if err != nil {
+		return reportData{}, err
+	}
+	worst, ok := selectWorstNode(expected, success)
+	var worstPtr *worstNode
+	if ok {
+		worstPtr = &worst
+	}
+
+	memSamples, err := promQuery(baseURL, promCharonMemPeak(cn, windowS))
+	if err != nil {
+		return reportData{}, err
+	}
+	var memPtr *float64
+	if v, ok := maxValue(memSamples); ok {
+		memPtr = &v
+	}
+
+	cpuSamples, err := promQuery(baseURL, promCharonCPUPeak(cn, windowS))
+	if err != nil {
+		return reportData{}, err
+	}
+	var cpuPtr *float64
+	if v, ok := maxValue(cpuSamples); ok {
+		cpuPtr = &v
+	}
+
+	fired, err := promQuery(baseURL, promHealthFired(cn, windowS))
+	if err != nil {
+		return reportData{}, err
+	}
+	firingNow, err := promQuery(baseURL, promHealthFiringNow(cn))
+	if err != nil {
+		return reportData{}, err
+	}
+	health := parseHealth(fired, firingNow)
+
+	degraded := false
+	if worstPtr != nil {
+		for _, d := range worstPtr.duties {
+			if d.pct() < degradedPctThreshold {
+				degraded = true
+				break
+			}
+		}
+	}
+	if !degraded {
+		for _, h := range health {
+			if h.firingNow {
+				degraded = true
+				break
+			}
+		}
+	}
+	status := "ok"
+	if degraded {
+		status = "degraded"
+	}
+
+	clImage := im.CL[c.cl]
+	if clImage == "" {
+		clImage = c.cl
+	}
+	vcImage := im.VC[c.vc]
+	if vcImage == "" {
+		vcImage = c.vc
+	}
+
+	h := host
+	return reportData{
+		combo:          c,
+		cycle:          cycle,
+		status:         status,
+		clImage:        clImage,
+		vcImage:        vcImage,
+		charonImage:    im.Charon,
+		worst:          worstPtr,
+		charonMemBytes: memPtr,
+		charonCPU:      cpuPtr,
+		host:           &h,
+		health:         health,
+	}, nil
+}
+
+// ---------------------------------------------------------------------------
+// cycler.py -> run_one -> runOne (+ helpers _failed_report, _post_best_effort)
+// ---------------------------------------------------------------------------
+
+// charonNodeCount mirrors params.py's write_args_file default.
+const charonNodeCount = 4
+
+func fmtWindow(start, end time.Time) string {
+	return fmt.Sprintf("%s-%s UTC", start.UTC().Format("15:04"), end.UTC().Format("15:04"))
+}
+
+// failedReport mirrors cycler.py's _failed_report. Since the Go port loads
+// CL/VC image pins from the repo's images.json (rather than a static
+// charon_matrix import), a failure that happens before those pins are
+// available falls back to the raw client names, matching Python's
+// CL_IMAGES.get(combo.cl, combo.cl) default.
+func failedReport(c combo, cycle int, errMsg string) reportData {
+	return reportData{
+		combo:   c,
+		cycle:   cycle,
+		status:  "failed",
+		clImage: c.cl,
+		vcImage: c.vc,
+		window:  "-",
+		errMsg:  errMsg,
+	}
+}
+
+// postBestEffort mirrors _post_best_effort: Slack failures (including a
+// panic from a misbehaving fake) must never break runOne.
+func postBestEffort(cfg config, d reportData) {
+	defer func() { _ = recover() }()
+	_ = slackPost(cfg.slackWebhookURL, buildText(d), buildBlocks(d))
+}
+
+// runWindow performs the post-launch phase of runOne: wait for health, run
+// the sampler across the wait window, then collect the report. The sampler
+// is always started right before, and stopped right after, the wait loop --
+// there is no early return in between, so teardown is unconditional in the
+// only case where it was started.
+func runWindow(cfg config, c combo, cycle int, enclave string, im images) reportData {
+	baseURL := prometheusBaseURL(enclave)
+	if baseURL == "" || !waitHealthy(baseURL, c.clusterName(), cfg.startupDeadlineMinutes*60) {
+		return failedReport(c, cycle, "cluster did not become healthy before deadline")
+	}
+
+	stopCh := make(chan struct{})
+	sampleDone := make(chan hostStats, 1)
+	go func() { sampleDone <- sampleHost(stopCh, cfg.sampleIntervalS) }()
+
+	totalS := cfg.runMinutes * 60
+	for elapsed := 0; elapsed < totalS; {
+		step := cfg.sampleIntervalS
+		if step > totalS-elapsed {
+			step = totalS - elapsed
+		}
+		if step < 1 {
+			step = 1
+		}
+		sleepFn(time.Duration(step) * time.Second)
+		elapsed += step
+	}
+
+	end := nowFn()
+	windowS := cfg.runMinutes*60 - cfg.warmupMinutes*60
+	if windowS < 1 {
+		windowS = 1
+	}
+	windowLabel := fmtWindow(end.Add(-time.Duration(windowS)*time.Second), end)
+
+	close(stopCh)
+	host := <-sampleDone
+
+	data, err := collectReport(baseURL, c, cycle, windowS, host, im)
+	if err != nil {
+		return failedReport(c, cycle, err.Error())
+	}
+	data.window = windowLabel
+	return data
+}
+
+// runOne mirrors cycler.py's run_one exactly: a guarded pre-clear, then
+// pre-launch (git pull + build/write args file) failures produce a failed
+// report and return before anything was launched; a launch failure tears
+// down and returns; after a successful launch, teardown is guaranteed via
+// defer, and any failure from there on (unhealthy startup, sampling,
+// metrics query, report assembly) still produces a failed report. The
+// top-level recover is an extra safety net beyond the Python reference (it
+// has no direct analogue) so that even an unexpected panic from a fake or a
+// bug never escapes to kill the caller's loop.
+func runOne(cfg config, c combo, cycle int) (result reportData) {
+	enclave := enclaveName(cycle, c)
+
+	defer func() {
+		if r := recover(); r != nil {
+			result = failedReport(c, cycle, fmt.Sprintf("panic: %v", r))
+			postBestEffort(cfg, result)
+			kurtosisRemove(enclave)
+		}
+	}()
+
+	kurtosisRemove(enclave) // idempotent: clear any stale enclave from a previous run
+
+	if err := gitPull(cfg.repoPath); err != nil {
+		data := failedReport(c, cycle, fmt.Sprintf("pre-launch failed: %v", err))
+		postBestEffort(cfg, data)
+		kurtosisRemove(enclave)
+		return data
+	}
+
+	im, err := loadImages(cfg.repoPath)
+	if err != nil {
+		data := failedReport(c, cycle, fmt.Sprintf("pre-launch failed: %v", err))
+		postBestEffort(cfg, data)
+		kurtosisRemove(enclave)
+		return data
+	}
+
+	argsYAML := buildArgsFile(im, c, cfg.monitoringToken, charonNodeCount)
+	argsPath := filepath.Join(os.TempDir(), "network_params.yaml")
+	if err := os.WriteFile(argsPath, []byte(argsYAML), 0o644); err != nil {
+		data := failedReport(c, cycle, fmt.Sprintf("pre-launch failed: %v", err))
+		postBestEffort(cfg, data)
+		kurtosisRemove(enclave)
+		return data
+	}
+
+	if err := kurtosisRun(enclave, cfg.packageRef, argsPath); err != nil {
+		data := failedReport(c, cycle, fmt.Sprintf("launch failed: %v", err))
+		postBestEffort(cfg, data)
+		kurtosisRemove(enclave)
+		return data
+	}
+	defer kurtosisRemove(enclave) // guaranteed teardown after a successful launch
+
+	data := runWindow(cfg, c, cycle, enclave, im)
+	postBestEffort(cfg, data)
+	return data
+}
+
+// ---------------------------------------------------------------------------
+// cycler.py -> main, _default_deps -> mainLoop, main
+// ---------------------------------------------------------------------------
+
+// mainLoop mirrors cycler.py's main(): resume from a possibly-interrupted
+// run, then loop forever selecting the next combo, running it, and backing
+// off according to consecutive failures. State-save errors are logged and
+// otherwise ignored (best-effort) -- unlike the Python reference, which
+// would let an unhandled exception from state.save crash the process --
+// since this whole task's mandate is that the loop must never die.
+func mainLoop(cfg config) {
+	st, err := loadState(cfg.statePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "charon-cycler: failed to load state (starting fresh): %v\n", err)
+		st = state{}
+	}
+
+	saveState := func() {
+		if err := st.save(cfg.statePath); err != nil {
+			fmt.Fprintf(os.Stderr, "charon-cycler: failed to save state: %v\n", err)
+		}
+	}
+
+	if st.CurrentEnclave != "" {
+		kurtosisRemove(st.CurrentEnclave) // best-effort: clear an enclave left over from an interrupted run
+		st.CurrentEnclave = ""
+		saveState()
+	}
+
+	consecutiveFailures := 0
+	for {
+		c, origin := selectNextCombo(st)
+		st.CurrentEnclave = enclaveName(st.Cycle, c)
+		saveState()
+
+		data := runOne(cfg, c, st.Cycle)
+
+		st.CurrentEnclave = ""
+		saveState()
+		if origin == "cycle" {
+			st.advance()
+			saveState()
+		}
+
+		if data.status == "failed" {
+			consecutiveFailures++
+		} else {
+			consecutiveFailures = 0
+		}
+		sleepFn(time.Duration(computeBackoff(consecutiveFailures, cfg.interRunBackoffS, cfg.maxBackoffS)) * time.Second)
+	}
+}
+
+func main() {
+	cfg, err := loadConfig()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "charon-cycler:", err)
+		os.Exit(1)
+	}
+	mainLoop(cfg)
+}

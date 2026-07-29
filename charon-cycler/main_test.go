@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCycleIs36CLMajor(t *testing.T) {
@@ -574,5 +576,294 @@ func TestLoadImages(t *testing.T) {
 	}
 	if im.VC["vouch"] != "attestant/vouch:1.13.1" {
 		t.Errorf("VC[vouch] = %q", im.VC["vouch"])
+	}
+}
+
+// writeTestImages writes testImages() as images.json into dir, for tests
+// that exercise runOne's loadImages(cfg.repoPath) step.
+func writeTestImages(t *testing.T, dir string) {
+	t.Helper()
+	data, err := json.Marshal(testImages())
+	if err != nil {
+		t.Fatalf("marshal images: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "images.json"), data, 0o644); err != nil {
+		t.Fatalf("write images.json: %v", err)
+	}
+}
+
+func TestPromQueryParsesAndErrors(t *testing.T) {
+	old := httpGet
+	defer func() { httpGet = old }()
+
+	httpGet = func(string) ([]byte, int, error) {
+		return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"42.5"]}]}}`), 200, nil
+	}
+	samples, err := promQuery("http://x", "up")
+	if err != nil {
+		t.Fatalf("promQuery error: %v", err)
+	}
+	if len(samples) != 1 || samples[0].value != 42.5 {
+		t.Fatalf("samples = %+v, want one sample value 42.5", samples)
+	}
+	if samples[0].labels["duty"] != "attester" || samples[0].labels["cluster_peer"] != "0" {
+		t.Errorf("labels = %+v", samples[0].labels)
+	}
+
+	httpGet = func(string) ([]byte, int, error) {
+		return []byte(`{"status":"error","errorType":"bad_data"}`), 200, nil
+	}
+	if _, err := promQuery("http://x", "up"); err == nil {
+		t.Fatal("expected error when status != success")
+	} else if !strings.Contains(err.Error(), "bad_data") {
+		t.Errorf("error = %v, want mention of errorType bad_data", err)
+	}
+}
+
+func TestSlackPostPayloadAndNon200(t *testing.T) {
+	old := httpPost
+	defer func() { httpPost = old }()
+
+	var capturedURL string
+	var capturedBody []byte
+	httpPost = func(u string, body []byte) (int, error) {
+		capturedURL, capturedBody = u, body
+		return 200, nil
+	}
+	if err := slackPost("http://hook", "hello", []map[string]any{{"type": "section"}}); err != nil {
+		t.Fatalf("slackPost error: %v", err)
+	}
+	if capturedURL != "http://hook" {
+		t.Errorf("posted url = %q, want http://hook", capturedURL)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(capturedBody, &payload); err != nil {
+		t.Fatalf("unmarshal posted body: %v", err)
+	}
+	if payload["text"] != "hello" {
+		t.Errorf("payload text = %v, want hello", payload["text"])
+	}
+	if _, ok := payload["blocks"]; !ok {
+		t.Errorf("payload missing blocks key: %+v", payload)
+	}
+
+	httpPost = func(string, []byte) (int, error) { return 500, nil }
+	if err := slackPost("http://hook", "hi", nil); err == nil {
+		t.Error("expected error on non-200 status")
+	}
+}
+
+func TestKurtosisRunAndRemove(t *testing.T) {
+	old := runCommand
+	defer func() { runCommand = old }()
+
+	var captured []string
+	runCommand = func(name string, args ...string) (string, error) {
+		captured = append([]string{name}, args...)
+		return "", nil
+	}
+	if err := kurtosisRun("c1-teku-prysm", "pkg@ref", "/tmp/args.yaml"); err != nil {
+		t.Fatalf("kurtosisRun error: %v", err)
+	}
+	want := []string{"kurtosis", "run", "--enclave", "c1-teku-prysm", "pkg@ref", "--args-file", "/tmp/args.yaml"}
+	if !reflect.DeepEqual(captured, want) {
+		t.Errorf("captured argv = %v, want %v", captured, want)
+	}
+
+	runCommand = func(string, ...string) (string, error) { return "boom", fmt.Errorf("exit status 1") }
+	if err := kurtosisRun("e", "pkg", "f"); err == nil {
+		t.Error("expected error from kurtosisRun on runCommand failure")
+	}
+
+	// kurtosisRemove must never panic, even if the fake errors.
+	runCommand = func(string, ...string) (string, error) { return "", fmt.Errorf("boom") }
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("kurtosisRemove panicked: %v", r)
+			}
+		}()
+		kurtosisRemove("c1-teku-prysm")
+	}()
+}
+
+func TestPrometheusBaseURLParse(t *testing.T) {
+	old := runCommand
+	defer func() { runCommand = old }()
+
+	runCommand = func(string, ...string) (string, error) { return "http://127.0.0.1:53455\n", nil }
+	if got := prometheusBaseURL("e"); got != "http://127.0.0.1:53455" {
+		t.Errorf("prometheusBaseURL = %q, want http://127.0.0.1:53455", got)
+	}
+
+	runCommand = func(string, ...string) (string, error) { return "", fmt.Errorf("rc!=0") }
+	if got := prometheusBaseURL("e"); got != "" {
+		t.Errorf("prometheusBaseURL on runner error = %q, want empty", got)
+	}
+}
+
+func TestRunOnePreLaunchFailurePostsFailed(t *testing.T) {
+	oldRun, oldPost := runCommand, httpPost
+	defer func() { runCommand, httpPost = oldRun, oldPost }()
+
+	runCommand = func(name string, args ...string) (string, error) {
+		if name == "git" {
+			return "", fmt.Errorf("network unreachable")
+		}
+		return "", nil
+	}
+	postCount := 0
+	httpPost = func(string, []byte) (int, error) {
+		postCount++
+		return 200, nil
+	}
+
+	cfg := config{
+		slackWebhookURL: "http://hook", repoPath: "/nonexistent", packageRef: "pkg",
+		runMinutes: 1, warmupMinutes: 0, startupDeadlineMinutes: 1, sampleIntervalS: 1,
+	}
+	data := runOne(cfg, combo{cl: "teku", vc: "prysm"}, 1)
+	if data.status != "failed" {
+		t.Errorf("status = %q, want failed", data.status)
+	}
+	if postCount != 1 {
+		t.Errorf("slackPost called %d times, want 1", postCount)
+	}
+}
+
+func TestRunOneMidRunFailureTearsDownAndPosts(t *testing.T) {
+	oldRun, oldPost, oldGet, oldSleep := runCommand, httpPost, httpGet, sleepFn
+	defer func() { runCommand, httpPost, httpGet, sleepFn = oldRun, oldPost, oldGet, oldSleep }()
+	sleepFn = func(time.Duration) {}
+
+	dir := t.TempDir()
+	writeTestImages(t, dir)
+
+	removeCalls := 0
+	runCommand = func(name string, args ...string) (string, error) {
+		if name != "kurtosis" {
+			return "", nil // git pull, etc.
+		}
+		switch {
+		case len(args) > 0 && args[0] == "port":
+			return "http://127.0.0.1:9999\n", nil
+		case len(args) > 0 && args[0] == "enclave":
+			removeCalls++
+			return "", nil
+		}
+		return "", nil // "kurtosis run"
+	}
+	httpGet = func(u string) ([]byte, int, error) {
+		if strings.Contains(u, "core_scheduler_validators_active") {
+			return []byte(`{"status":"success","data":{"result":[{"metric":{},"value":[1,"1"]}]}}`), 200, nil
+		}
+		// Everything queried during collectReport fails.
+		return []byte(`{"status":"error","errorType":"timeout"}`), 200, nil
+	}
+	postCount := 0
+	httpPost = func(string, []byte) (int, error) { postCount++; return 200, nil }
+
+	cfg := config{
+		slackWebhookURL: "http://hook", repoPath: dir, packageRef: "pkg",
+		runMinutes: 1, warmupMinutes: 0, startupDeadlineMinutes: 1, sampleIntervalS: 1,
+	}
+	data := runOne(cfg, combo{cl: "teku", vc: "prysm"}, 1)
+	if data.status != "failed" {
+		t.Errorf("status = %q, want failed", data.status)
+	}
+	if postCount != 1 {
+		t.Errorf("slackPost called %d times, want 1", postCount)
+	}
+	if removeCalls < 1 {
+		t.Errorf("kurtosisRemove (via runCommand enclave rm) not observed")
+	}
+}
+
+func TestRunOneHappyPathOK(t *testing.T) {
+	oldRun, oldPost, oldGet, oldSleep, oldNow := runCommand, httpPost, httpGet, sleepFn, nowFn
+	defer func() { runCommand, httpPost, httpGet, sleepFn, nowFn = oldRun, oldPost, oldGet, oldSleep, oldNow }()
+
+	dir := t.TempDir()
+	writeTestImages(t, dir)
+
+	runCommand = func(name string, args ...string) (string, error) {
+		if name == "kurtosis" && len(args) > 0 && args[0] == "port" {
+			return "http://127.0.0.1:9999\n", nil
+		}
+		return "", nil
+	}
+	httpGet = func(u string) ([]byte, int, error) {
+		switch {
+		case strings.Contains(u, "core_scheduler_validators_active"):
+			return []byte(`{"status":"success","data":{"result":[{"metric":{},"value":[1,"1"]}]}}`), 200, nil
+		case strings.Contains(u, "core_tracker_expect_duties_total"):
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"780"]}]}}`), 200, nil
+		case strings.Contains(u, "core_tracker_success_duties_total"):
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"780"]}]}}`), 200, nil
+		case strings.Contains(u, "process_resident_memory_bytes"):
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0"},"value":[1,"1.2e8"]}]}}`), 200, nil
+		case strings.Contains(u, "process_cpu_seconds_total"):
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0"},"value":[1,"0.5"]}]}}`), 200, nil
+		case strings.Contains(u, "app_health_checks"):
+			return []byte(`{"status":"success","data":{"result":[]}}`), 200, nil
+		}
+		return []byte(`{"status":"success","data":{"result":[]}}`), 200, nil
+	}
+	sleepFn = func(time.Duration) {}
+	fixedNow := time.Date(2026, 7, 29, 12, 0, 0, 0, time.UTC)
+	nowFn = func() time.Time { return fixedNow }
+	httpPost = func(string, []byte) (int, error) { return 200, nil }
+
+	cfg := config{
+		slackWebhookURL: "http://hook", repoPath: dir, packageRef: "pkg",
+		runMinutes: 2, warmupMinutes: 1, startupDeadlineMinutes: 1, sampleIntervalS: 1,
+	}
+	data := runOne(cfg, combo{cl: "teku", vc: "prysm"}, 1)
+	if data.status != "ok" {
+		t.Fatalf("status = %q, want ok (errMsg=%q)", data.status, data.errMsg)
+	}
+	windowS := cfg.runMinutes*60 - cfg.warmupMinutes*60
+	wantWindow := fmtWindow(fixedNow.Add(-time.Duration(windowS)*time.Second), fixedNow)
+	if data.window != wantWindow {
+		t.Errorf("window = %q, want %q", data.window, wantWindow)
+	}
+}
+
+func TestDegradedTolerance(t *testing.T) {
+	old := httpGet
+	defer func() { httpGet = old }()
+
+	im := testImages()
+	mkResp := func(pct float64) func(string) ([]byte, int, error) {
+		expected := 1000.0
+		success := expected * pct / 100
+		return func(u string) ([]byte, int, error) {
+			switch {
+			case strings.Contains(u, "core_tracker_expect_duties_total"):
+				return []byte(fmt.Sprintf(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"%v"]}]}}`, expected)), 200, nil
+			case strings.Contains(u, "core_tracker_success_duties_total"):
+				return []byte(fmt.Sprintf(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"%v"]}]}}`, success)), 200, nil
+			default:
+				return []byte(`{"status":"success","data":{"result":[]}}`), 200, nil
+			}
+		}
+	}
+
+	httpGet = mkResp(99.9)
+	data, err := collectReport("http://x", combo{cl: "teku", vc: "prysm"}, 1, 60, hostStats{}, im)
+	if err != nil {
+		t.Fatalf("collectReport error: %v", err)
+	}
+	if data.status != "ok" {
+		t.Errorf("status at 99.9%% pct = %q, want ok", data.status)
+	}
+
+	httpGet = mkResp(95)
+	data, err = collectReport("http://x", combo{cl: "teku", vc: "prysm"}, 1, 60, hostStats{}, im)
+	if err != nil {
+		t.Fatalf("collectReport error: %v", err)
+	}
+	if data.status != "degraded" {
+		t.Errorf("status at 95%% pct = %q, want degraded", data.status)
 	}
 }
