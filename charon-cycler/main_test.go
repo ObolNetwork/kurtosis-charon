@@ -767,6 +767,7 @@ func TestRunOneMidRunFailureTearsDownAndPosts(t *testing.T) {
 		slackWebhookURL: "http://hook", repoPath: dir, packageRef: "pkg",
 		runMinutes: 1, warmupMinutes: 0, startupDeadlineMinutes: 1, sampleIntervalS: 1,
 	}
+	im := testImages()
 	data := runOne(cfg, combo{cl: "teku", vc: "prysm"}, 1)
 	if data.status != "failed" {
 		t.Errorf("status = %q, want failed", data.status)
@@ -774,8 +775,24 @@ func TestRunOneMidRunFailureTearsDownAndPosts(t *testing.T) {
 	if postCount != 1 {
 		t.Errorf("slackPost called %d times, want 1", postCount)
 	}
-	if removeCalls < 1 {
-		t.Errorf("kurtosisRemove (via runCommand enclave rm) not observed")
+	// This failure happens after loadImages succeeded (mid-run, during
+	// collectReport), so failedReport must carry the real pins through,
+	// not fall back to the short client names / a blank charon image.
+	if data.clImage != im.CL["teku"] {
+		t.Errorf("clImage = %q, want real pin %q", data.clImage, im.CL["teku"])
+	}
+	if data.vcImage != im.VC["prysm"] {
+		t.Errorf("vcImage = %q, want real pin %q", data.vcImage, im.VC["prysm"])
+	}
+	if data.charonImage != im.Charon {
+		t.Errorf("charonImage = %q, want %q", data.charonImage, im.Charon)
+	}
+	// Exactly 2 kurtosis-enclave-rm calls are guaranteed on this path: the
+	// guarded pre-clear at the top of runOne, and the deferred teardown
+	// after a successful kurtosisRun. A regression that drops either one
+	// should fail this count.
+	if removeCalls != 2 {
+		t.Errorf("kurtosisRemove (via runCommand enclave rm) called %d times, want 2 (pre-clear + deferred teardown)", removeCalls)
 	}
 }
 

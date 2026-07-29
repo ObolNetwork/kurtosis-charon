@@ -784,9 +784,6 @@ func promQuery(baseURL, promQL string) ([]sample, error) {
 
 	samples := make([]sample, 0, len(payload.Data.Result))
 	for _, item := range payload.Data.Result {
-		if len(item.Value) < 2 {
-			continue
-		}
 		var valStr string
 		if err := json.Unmarshal(item.Value[1], &valStr); err != nil {
 			return nil, fmt.Errorf("prometheus query: invalid sample value: %w", err)
@@ -1108,20 +1105,33 @@ func fmtWindow(start, end time.Time) string {
 	return fmt.Sprintf("%s-%s UTC", start.UTC().Format("15:04"), end.UTC().Format("15:04"))
 }
 
-// failedReport mirrors cycler.py's _failed_report. Since the Go port loads
-// CL/VC image pins from the repo's images.json (rather than a static
-// charon_matrix import), a failure that happens before those pins are
-// available falls back to the raw client names, matching Python's
-// CL_IMAGES.get(combo.cl, combo.cl) default.
-func failedReport(c combo, cycle int, errMsg string) reportData {
+// failedReport mirrors cycler.py's _failed_report, which always resolves the
+// real CL/VC/Charon image pins (from a static charon_matrix import) even on
+// failure. The Go port loads those pins from the repo's images.json via
+// loadImages, so failedReport takes the already-loaded images and applies
+// the same im.CL[c.cl]-or-c.cl fallback collectReport uses. Callers that
+// haven't loaded images yet (i.e. only the gitPull-failure branch in runOne,
+// before loadImages runs) pass the zero-value images{}, which falls back to
+// the raw client names and a blank charon image -- the only case where the
+// data is genuinely unavailable.
+func failedReport(c combo, cycle int, errMsg string, im images) reportData {
+	clImage := im.CL[c.cl]
+	if clImage == "" {
+		clImage = c.cl
+	}
+	vcImage := im.VC[c.vc]
+	if vcImage == "" {
+		vcImage = c.vc
+	}
 	return reportData{
-		combo:   c,
-		cycle:   cycle,
-		status:  "failed",
-		clImage: c.cl,
-		vcImage: c.vc,
-		window:  "-",
-		errMsg:  errMsg,
+		combo:       c,
+		cycle:       cycle,
+		status:      "failed",
+		clImage:     clImage,
+		vcImage:     vcImage,
+		charonImage: im.Charon,
+		window:      "-",
+		errMsg:      errMsg,
 	}
 }
 
@@ -1140,7 +1150,7 @@ func postBestEffort(cfg config, d reportData) {
 func runWindow(cfg config, c combo, cycle int, enclave string, im images) reportData {
 	baseURL := prometheusBaseURL(enclave)
 	if baseURL == "" || !waitHealthy(baseURL, c.clusterName(), cfg.startupDeadlineMinutes*60) {
-		return failedReport(c, cycle, "cluster did not become healthy before deadline")
+		return failedReport(c, cycle, "cluster did not become healthy before deadline", im)
 	}
 
 	stopCh := make(chan struct{})
@@ -1172,7 +1182,7 @@ func runWindow(cfg config, c combo, cycle int, enclave string, im images) report
 
 	data, err := collectReport(baseURL, c, cycle, windowS, host, im)
 	if err != nil {
-		return failedReport(c, cycle, err.Error())
+		return failedReport(c, cycle, err.Error(), im)
 	}
 	data.window = windowLabel
 	return data
@@ -1189,10 +1199,15 @@ func runWindow(cfg config, c combo, cycle int, enclave string, im images) report
 // bug never escapes to kill the caller's loop.
 func runOne(cfg config, c combo, cycle int) (result reportData) {
 	enclave := enclaveName(cycle, c)
+	// im is declared here (rather than via := at its loadImages call site
+	// below) so the recover handler can reference it too: whatever im holds
+	// at the point of a panic (zero-value before loadImages succeeds, fully
+	// populated after) is the most accurate pins failedReport can use.
+	var im images
 
 	defer func() {
 		if r := recover(); r != nil {
-			result = failedReport(c, cycle, fmt.Sprintf("panic: %v", r))
+			result = failedReport(c, cycle, fmt.Sprintf("panic: %v", r), im)
 			postBestEffort(cfg, result)
 			kurtosisRemove(enclave)
 		}
@@ -1201,15 +1216,18 @@ func runOne(cfg config, c combo, cycle int) (result reportData) {
 	kurtosisRemove(enclave) // idempotent: clear any stale enclave from a previous run
 
 	if err := gitPull(cfg.repoPath); err != nil {
-		data := failedReport(c, cycle, fmt.Sprintf("pre-launch failed: %v", err))
+		// images.json hasn't been read yet, so there are no real pins
+		// available -- im is still its zero value here.
+		data := failedReport(c, cycle, fmt.Sprintf("pre-launch failed: %v", err), im)
 		postBestEffort(cfg, data)
 		kurtosisRemove(enclave)
 		return data
 	}
 
-	im, err := loadImages(cfg.repoPath)
+	var err error
+	im, err = loadImages(cfg.repoPath)
 	if err != nil {
-		data := failedReport(c, cycle, fmt.Sprintf("pre-launch failed: %v", err))
+		data := failedReport(c, cycle, fmt.Sprintf("pre-launch failed: %v", err), im)
 		postBestEffort(cfg, data)
 		kurtosisRemove(enclave)
 		return data
@@ -1218,14 +1236,14 @@ func runOne(cfg config, c combo, cycle int) (result reportData) {
 	argsYAML := buildArgsFile(im, c, cfg.monitoringToken, charonNodeCount)
 	argsPath := filepath.Join(os.TempDir(), "network_params.yaml")
 	if err := os.WriteFile(argsPath, []byte(argsYAML), 0o644); err != nil {
-		data := failedReport(c, cycle, fmt.Sprintf("pre-launch failed: %v", err))
+		data := failedReport(c, cycle, fmt.Sprintf("pre-launch failed: %v", err), im)
 		postBestEffort(cfg, data)
 		kurtosisRemove(enclave)
 		return data
 	}
 
 	if err := kurtosisRun(enclave, cfg.packageRef, argsPath); err != nil {
-		data := failedReport(c, cycle, fmt.Sprintf("launch failed: %v", err))
+		data := failedReport(c, cycle, fmt.Sprintf("launch failed: %v", err), im)
 		postBestEffort(cfg, data)
 		kurtosisRemove(enclave)
 		return data
