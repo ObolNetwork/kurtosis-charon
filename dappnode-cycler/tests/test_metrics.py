@@ -1,4 +1,5 @@
 import json
+import pytest
 from dappnode_cycler.metrics import (
     Sample, DutyResult, select_worst_node, max_value, parse_health, PrometheusClient,
 )
@@ -43,3 +44,26 @@ def test_prometheus_client_parses_result():
     c._http_get = lambda url: body
     out = c.query("whatever")
     assert out == [Sample({"duty": "attester", "cluster_peer": "0"}, 42.5)]
+
+
+def test_prometheus_client_raises_on_error_status():
+    body = json.dumps({"status": "error", "errorType": "bad_data", "error": "parse error"})
+    c = PrometheusClient("http://x:9090")
+    c._http_get = lambda url: body
+    with pytest.raises(RuntimeError):
+        c.query("whatever")
+
+
+def test_worst_node_duty_missing_from_success_defaults_to_zero():
+    expected = [S({"duty": "attester", "cluster_peer": "0"}, 100),
+                S({"duty": "attester", "cluster_peer": "1"}, 100),
+                S({"duty": "proposer", "cluster_peer": "1"}, 5)]
+    success = [S({"duty": "attester", "cluster_peer": "0"}, 100),
+               S({"duty": "attester", "cluster_peer": "1"}, 90)]
+    # proposer has no success sample at all for peer "1" (the worst peer).
+    wn = select_worst_node(expected, success)
+    assert wn.peer == "1"
+    by_duty = {d.duty: d for d in wn.duties}
+    assert by_duty["proposer"].expected == 5
+    assert by_duty["proposer"].success == 0.0
+    assert by_duty["proposer"].pct == 0.0

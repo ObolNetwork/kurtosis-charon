@@ -87,5 +87,11 @@ class PrometheusClient:
     def query(self, promql: str):
         url = f"{self.base_url}/api/v1/query?" + urllib.parse.urlencode({"query": promql})
         payload = json.loads(self._http_get(url))
+        if payload.get("status") != "success":
+            error_type = payload.get("errorType")
+            error = payload.get("error")
+            raise RuntimeError(
+                f"Prometheus query failed: errorType={error_type!r} error={error!r}"
+            )
         result = payload.get("data", {}).get("result", [])
         return [Sample(item["metric"], float(item["value"][1])) for item in result]
