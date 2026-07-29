@@ -1,10 +1,10 @@
-# dappnode cycler
+# Charon matrix cycler
 
 A small Python service that runs the Charon 36-combo test matrix (6 CL clients x
 6 VC clients: `lighthouse`, `lodestar`, `nimbus`, `teku`, `prysm`, `grandine` for
 CL, and the same six plus `vouch` swapped in for VC — see
 `charon_matrix/network_params.py` for the authoritative lists) 24/7 on a
-dappnode host, using the local Kurtosis `ethereum-package` harness.
+host machine, using the local Kurtosis `ethereum-package` harness.
 
 ## What it does (the run cycle)
 
@@ -51,7 +51,7 @@ of the cycler service required.
 ## Install
 
 ```bash
-cd dappnode-cycler
+cd charon-cycler
 python -m venv .venv
 .venv/bin/pip install pyyaml   # runtime dependency
 .venv/bin/pip install pytest   # only needed to run the test suite
@@ -92,32 +92,32 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now cycler
 ```
 
-`cycler.service` runs as the `dappnode` user out of
-`/home/dappnode/kurtosis-charon/dappnode-cycler`, using that directory's
-`.venv/bin/python -m dappnode_cycler.cycler config.yaml`. Adjust the paths in
+`cycler.service` runs as the `charon` user out of
+`/opt/kurtosis-charon/charon-cycler`, using that directory's
+`.venv/bin/python -m charon_cycler.cycler config.yaml`. Adjust the paths in
 `cycler.service` if your checkout lives elsewhere. `Restart=always` with
 `RestartSec=30` means the service comes back on crash or reboot; state/resume
 behavior (below) makes that safe.
 
 **Important — PYTHONPATH:** `cycler.py` does
 `from charon_matrix.network_params import ...`, and `charon_matrix` lives one
-level up from `dappnode-cycler`, at the repo root
-(`/home/dappnode/kurtosis-charon/charon_matrix`). Running
-`python -m dappnode_cycler.cycler` only puts the current working directory on
-`sys.path`, which makes `dappnode_cycler` importable but *not* `charon_matrix`.
+level up from `charon-cycler`, at the repo root
+(`/opt/kurtosis-charon/charon_matrix`). Running
+`python -m charon_cycler.cycler` only puts the current working directory on
+`sys.path`, which makes `charon_cycler` importable but *not* `charon_matrix`.
 Without both directories on `PYTHONPATH`, the service crash-loops with
 `ModuleNotFoundError: No module named 'charon_matrix'`. `cycler.service`
 therefore sets:
 
 ```ini
-Environment="PYTHONPATH=/home/dappnode/kurtosis-charon:/home/dappnode/kurtosis-charon/dappnode-cycler"
+Environment="PYTHONPATH=/opt/kurtosis-charon:/opt/kurtosis-charon/charon-cycler"
 ```
 
 If your checkout lives somewhere other than
-`/home/dappnode/kurtosis-charon`, update both this `Environment=` line and the
+`/opt/kurtosis-charon`, update both this `Environment=` line and the
 `WorkingDirectory`/`ExecStart` paths to match — `PYTHONPATH` must include the
-repo root (for `charon_matrix`) and the `dappnode-cycler` directory (for
-`dappnode_cycler`).
+repo root (for `charon_matrix`) and the `charon-cycler` directory (for
+`charon_cycler`).
 
 ## Logs
 
@@ -146,11 +146,11 @@ service picks back up where it left off instead of restarting the whole
 
 ## Priority-override extension point (not built yet)
 
-`dappnode_cycler/selection.py` has a `read_override()` stub that always
+`charon_cycler/selection.py` has a `read_override()` stub that always
 returns `None`, so `select_next_combo()` currently always falls through to the
 normal cycle order. It's the designed extension point for a future
 "run this combo next / pin this combo" feature: a later implementation would
-have `read_override()` read a `dappnode-cycler/override.json` (or similar)
+have `read_override()` read a `charon-cycler/override.json` (or similar)
 file and return `{"cl": ..., "vc": ..., "sticky": ...}` to jump the cycle to
 that combo. `select_next_combo()` already has the override branch wired up —
 only the reader needs to be implemented.
@@ -158,6 +158,6 @@ only the reader needs to be implemented.
 ## Running tests
 
 ```bash
-cd dappnode-cycler
+cd charon-cycler
 .venv/bin/pytest
 ```

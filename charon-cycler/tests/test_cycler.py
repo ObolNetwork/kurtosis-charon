@@ -1,8 +1,8 @@
-from dappnode_cycler.combos import Combo
-from dappnode_cycler.config import Config
-from dappnode_cycler.metrics import Sample
-from dappnode_cycler.host_sampler import Sampler
-from dappnode_cycler.cycler import run_one, Deps, collect_report, compute_backoff, _fmt_window
+from charon_cycler.combos import Combo
+from charon_cycler.config import Config
+from charon_cycler.metrics import Sample
+from charon_cycler.host_sampler import Sampler
+from charon_cycler.cycler import run_one, Deps, collect_report, compute_backoff, _fmt_window
 
 class FakeProm:
     def __init__(self, table):
@@ -17,7 +17,7 @@ class FakeSampler:
     def start(self): pass
     def stop(self): pass
     def summary(self):
-        from dappnode_cycler.host_sampler import HostStats
+        from charon_cycler.host_sampler import HostStats
         return HostStats(20.0, 60.0, 4e9, 5e9, 16e9)
 
 def _cfg():
@@ -75,7 +75,7 @@ class TrackingSampler:
     def stop(self):
         self.stopped = True
     def summary(self):
-        from dappnode_cycler.host_sampler import HostStats
+        from charon_cycler.host_sampler import HostStats
         return HostStats(20.0, 60.0, 4e9, 5e9, 16e9)
 
 

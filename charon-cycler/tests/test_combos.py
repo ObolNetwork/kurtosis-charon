@@ -1,4 +1,4 @@
-from dappnode_cycler.combos import Combo, CYCLE, enclave_name
+from charon_cycler.combos import Combo, CYCLE, enclave_name
 
 
 def test_cycle_is_36_cl_major():

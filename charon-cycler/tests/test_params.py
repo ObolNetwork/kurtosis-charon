@@ -1,5 +1,5 @@
-from dappnode_cycler.combos import Combo
-from dappnode_cycler.params import build_args_file, write_args_file
+from charon_cycler.combos import Combo
+from charon_cycler.params import build_args_file, write_args_file
 
 
 def test_four_nodes_and_token_substituted():

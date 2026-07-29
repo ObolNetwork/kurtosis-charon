@@ -3,7 +3,7 @@ import urllib.error
 import urllib.request
 
 import pytest
-from dappnode_cycler import slack
+from charon_cycler import slack
 
 def test_post_sends_text_and_blocks():
     captured = {}

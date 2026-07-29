@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
-from dappnode_cycler.combos import Combo
-from dappnode_cycler.metrics import WorstNode, HealthCheck
-from dappnode_cycler.host_sampler import HostStats
+from charon_cycler.combos import Combo
+from charon_cycler.metrics import WorstNode, HealthCheck
+from charon_cycler.host_sampler import HostStats
 
 _EMOJI = {"ok": "✅", "degraded": "⚠️", "failed": "❌"}
 

@@ -1,7 +1,7 @@
 import os
 
 from charon_matrix.network_params import build_network_params
-from dappnode_cycler.combos import Combo
+from charon_cycler.combos import Combo
 
 
 def build_args_file(combo: Combo, token: str, charon_node_count: int = 4) -> str:

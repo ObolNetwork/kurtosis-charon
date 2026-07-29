@@ -1,6 +1,6 @@
 import json
 import pytest
-from dappnode_cycler.metrics import (
+from charon_cycler.metrics import (
     Sample, DutyResult, select_worst_node, max_value, parse_health, PrometheusClient,
 )
 

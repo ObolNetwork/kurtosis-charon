@@ -1,5 +1,5 @@
 import pytest
-from dappnode_cycler.config import load_config, Config
+from charon_cycler.config import load_config, Config
 
 def test_load_with_defaults(tmp_path):
     p = tmp_path / "c.yaml"

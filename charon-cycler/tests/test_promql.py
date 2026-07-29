@@ -1,4 +1,4 @@
-from dappnode_cycler import promql
+from charon_cycler import promql
 
 def test_duty_queries_group_by_peer_and_use_window():
     q = promql.duty_success("kurtosis-teku-prysm", 4500)

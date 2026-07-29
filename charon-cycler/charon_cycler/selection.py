@@ -1,11 +1,11 @@
-from dappnode_cycler.combos import Combo, CYCLE
-from dappnode_cycler.state import State
+from charon_cycler.combos import Combo, CYCLE
+from charon_cycler.state import State
 
 
 def read_override():
     """Extension point (not built yet): return {"cl","vc"[,"sticky"]} or None.
 
-    A future implementation reads dappnode-cycler/override.json. Until then this
+    A future implementation reads charon-cycler/override.json. Until then this
     stub returns None so the cycle runs normally, while select_next_combo already
     handles the override branch.
     """

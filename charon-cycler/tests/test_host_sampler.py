@@ -1,4 +1,4 @@
-from dappnode_cycler.host_sampler import (
+from charon_cycler.host_sampler import (
     parse_cpu_line, cpu_percent, parse_meminfo, Sampler, HostStats,
 )
 

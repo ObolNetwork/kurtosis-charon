@@ -1,6 +1,6 @@
-from dappnode_cycler.combos import Combo
-from dappnode_cycler.state import State
-from dappnode_cycler.selection import select_next_combo, read_override
+from charon_cycler.combos import Combo
+from charon_cycler.state import State
+from charon_cycler.selection import select_next_combo, read_override
 
 
 def test_default_reader_returns_none():

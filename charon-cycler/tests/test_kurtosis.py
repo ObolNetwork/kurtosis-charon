@@ -1,4 +1,4 @@
-from dappnode_cycler import kurtosis
+from charon_cycler import kurtosis
 
 
 class FakeCompleted:

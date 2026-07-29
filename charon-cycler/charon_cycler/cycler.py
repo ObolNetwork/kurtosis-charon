@@ -3,16 +3,16 @@ from dataclasses import dataclass
 from typing import Callable
 
 from charon_matrix.network_params import CHARON_IMAGE, CL_IMAGES, VC_IMAGES
-from dappnode_cycler import kurtosis, promql, slack
-from dappnode_cycler.combos import Combo, enclave_name
-from dappnode_cycler.config import Config, load_config
-from dappnode_cycler.host_sampler import Sampler
-from dappnode_cycler.metrics import (
+from charon_cycler import kurtosis, promql, slack
+from charon_cycler.combos import Combo, enclave_name
+from charon_cycler.config import Config, load_config
+from charon_cycler.host_sampler import Sampler
+from charon_cycler.metrics import (
     PrometheusClient, select_worst_node, max_value, parse_health,
 )
-from dappnode_cycler.report import ReportData, build_text, build_blocks
-from dappnode_cycler.selection import select_next_combo
-from dappnode_cycler.state import State
+from charon_cycler.report import ReportData, build_text, build_blocks
+from charon_cycler.selection import select_next_combo
+from charon_cycler.state import State
 
 
 @dataclass
@@ -169,7 +169,7 @@ def _failed_report(combo, cycle, error) -> ReportData:
 
 
 def _default_deps(cfg: Config) -> Deps:
-    from dappnode_cycler.params import write_args_file
+    from charon_cycler.params import write_args_file
 
     def wait_healthy(prom, cluster_name, deadline_s):
         waited = 0

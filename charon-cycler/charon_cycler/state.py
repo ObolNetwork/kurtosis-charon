@@ -1,7 +1,7 @@
 import json
 import os
 from dataclasses import dataclass, asdict
-from dappnode_cycler.combos import CYCLE
+from charon_cycler.combos import CYCLE
 
 
 @dataclass

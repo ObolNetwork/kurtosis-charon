@@ -1,4 +1,4 @@
-from dappnode_cycler.state import State
+from charon_cycler.state import State
 
 
 def test_defaults_and_roundtrip(tmp_path):
