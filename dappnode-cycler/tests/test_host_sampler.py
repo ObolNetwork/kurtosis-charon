@@ -43,3 +43,24 @@ def test_sampler_summary_avg_and_peak():
     assert out.mem_peak == 750 * 1024   # second sample used 750kB
     assert out.mem_total == 1000 * 1024
     assert 0.0 <= out.cpu_avg <= 100.0 and out.cpu_peak >= out.cpu_avg
+
+
+def test_sampler_restart_clears_stop_event():
+    s = Sampler(interval_s=0.01)
+    s._read_stat = lambda: "cpu  100 0 100 800 0 0 0 0 0 0\n"
+    s._read_meminfo = lambda: "MemTotal: 1000 kB\nMemAvailable: 500 kB\n"
+
+    s.start()
+    assert s._thread.is_alive()
+    s.stop()
+    assert s._stop.is_set()
+    assert not s._thread.is_alive()
+
+    # Restarting the same instance must clear the stop event, otherwise
+    # _loop's `while not self._stop.wait(...)` exits immediately after the
+    # single priming sample (silent one-shot degradation).
+    s.start()
+    assert not s._stop.is_set()
+    assert s._thread.is_alive()
+    s.stop()
+    assert not s._thread.is_alive()

@@ -1,5 +1,4 @@
 import threading
-import time
 from dataclasses import dataclass
 
 
@@ -69,6 +68,7 @@ class Sampler:
             self._sample_once()
 
     def start(self):
+        self._stop.clear()
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
 
