@@ -154,6 +154,18 @@ beyond ensuring every generated config carries `prometheus_params` + `additional
 `write_relabel_configs` keeping `job =~ charon(.*)|otelcollector`; the `CLUSTER_NAME` env sets the
 charon cluster name. The native path reproduces every one of these.
 
+## Kurtosis version (required)
+
+The cloud-init installs a **pinned Kurtosis CLI `1.20.0`** from the release-artifacts
+`.deb`, not `apt install kurtosis-cli`. The `apt.fury.io/kurtosis-tech` repo is stale
+(tops out at `1.15.2`), and `1.15.2` lacks the `GpuConfig` Starlark builtin the
+`ethereum-package@charon` harness references (`src/zkboost/zkboost_launcher.star`).
+Because Starlark resolves globals at compile time, the whole `main.star` fails to load
+with `undefined: GpuConfig`, the enclave is created with **zero services**, and nothing
+reaches Grafana. Validated end-to-end on a live instance: `1.20.0` loads the package,
+starts 29 services, and remote-writes charon metrics (`cluster_name=kurtosis-<cl>-<vc>`).
+Bump `KURTOSIS_VERSION` in the runner if the harness later needs a newer builtin.
+
 ## Launch parameters
 
 - One EC2 per combo = **36 instances**, all launched in a single run so they start together.

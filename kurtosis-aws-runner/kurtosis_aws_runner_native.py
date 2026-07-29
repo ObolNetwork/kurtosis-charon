@@ -16,6 +16,9 @@ VOLUME_THROUGHPUT = 250  # MB/s
 BASE_TAG = "kurtosis-fleet"
 GIT_REPO = "https://github.com/ObolNetwork/kurtosis-charon.git"
 ETHEREUM_PACKAGE = "github.com/ObolNetwork/ethereum-package@charon"
+# apt.fury.io/kurtosis-tech is stale at 1.15.2, which lacks the GpuConfig Starlark
+# builtin the ethereum-package@charon harness requires; pin a known-good release.
+KURTOSIS_VERSION = "1.20.0"
 
 # --- Image pins (resolved 2026-07-29) ---------------------------------------
 # Charon under test is the main-branch image; it stays a moving tag on purpose.
@@ -199,9 +202,10 @@ apt-get update -y
 apt-get install -y apt-transport-https ca-certificates curl software-properties-common git make jq gettext bash
 curl -fsSL https://get.docker.com | sh
 usermod -aG docker ubuntu
-echo "deb [trusted=yes] https://apt.fury.io/kurtosis-tech/ /" > /etc/apt/sources.list.d/kurtosis.list
-apt update -y
-apt install -y kurtosis-cli
+# Install a pinned Kurtosis CLI from the release artifacts (apt.fury.io is stale
+# at 1.15.2, which fails to load the harness with "undefined: GpuConfig").
+curl -fsSL -o /tmp/kurtosis-cli.deb "https://github.com/kurtosis-tech/kurtosis-cli-release-artifacts/releases/download/{KURTOSIS_VERSION}/kurtosis-cli_{KURTOSIS_VERSION}_linux_amd64.deb"
+apt-get install -y /tmp/kurtosis-cli.deb
 
 su - ubuntu <<'OUTER_EOF'
 cd /home/ubuntu
