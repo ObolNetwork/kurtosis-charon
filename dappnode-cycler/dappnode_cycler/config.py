@@ -13,6 +13,8 @@ class Config:
     warmup_minutes: int = 15
     startup_deadline_minutes: int = 25
     sample_interval_s: int = 15
+    inter_run_backoff_s: int = 30
+    max_backoff_s: int = 900
 
 
 def load_config(path: str) -> Config:

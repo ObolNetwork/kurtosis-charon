@@ -30,9 +30,20 @@ class Deps:
     wait_healthy: Callable
 
 
+DEGRADED_PCT_THRESHOLD = 99.5  # below this duty-success pct, a run is "degraded" -- above
+                                # it we treat the shortfall as extrapolation noise from
+                                # Prometheus's increase() over the window (routinely reads
+                                # ~99.96%/100.04% on a fully healthy node).
+
+
 def _fmt_window(start_s: float, end_s: float) -> str:
     f = "%H:%M"
     return f"{time.strftime(f, time.gmtime(start_s))}-{time.strftime(f, time.gmtime(end_s))} UTC"
+
+
+def compute_backoff(consecutive_failures: int, base: int, cap: int) -> int:
+    """Bounded, escalating inter-run backoff: base, 2*base, 4*base, ... capped at `cap`."""
+    return min(cap, base * (2 ** consecutive_failures))
 
 
 def collect_report(prom, combo, cycle, window_s, host_stats, status, window_label):
@@ -47,7 +58,7 @@ def collect_report(prom, combo, cycle, window_s, host_stats, status, window_labe
         prom.query(promql.health_firing_now(cn)),
     )
     if status == "ok":
-        degraded = any(d.pct < 100.0 for d in (worst.duties if worst else [])) or \
+        degraded = any(d.pct < DEGRADED_PCT_THRESHOLD for d in (worst.duties if worst else [])) or \
             any(h.firing_now for h in health)
         status = "degraded" if degraded else "ok"
     return ReportData(
@@ -83,10 +94,19 @@ def run_one(combo: Combo, cycle: int, cfg: Config, deps: Deps) -> ReportData:
         deps.remove_enclave(enclave)  # idempotent: clear any stale enclave
     except Exception:
         pass
-    deps.git_pull(cfg.repo_path)
-    args_file = deps.write_args_file(combo, cfg.monitoring_token, "/tmp")
 
-    start = deps.now()
+    try:
+        deps.git_pull(cfg.repo_path)
+        args_file = deps.write_args_file(combo, cfg.monitoring_token, "/tmp")
+    except Exception as e:
+        # Nothing was launched yet, so there's no enclave to tear down -- but
+        # the pre-clear above may have removed a stale one, and calling this
+        # again is harmless (best-effort/idempotent), so do it for safety.
+        data = _failed_report(combo, cycle, f"pre-launch failed: {e}")
+        _post_best_effort(deps, data)
+        _teardown_best_effort(deps, enclave)
+        return data
+
     try:
         deps.run_enclave(enclave, cfg.package_ref, args_file)
     except Exception as e:
@@ -118,8 +138,11 @@ def run_one(combo: Combo, cycle: int, cfg: Config, deps: Deps) -> ReportData:
 
         end = deps.now()
         window_s = max(1, int(cfg.run_minutes * 60 - cfg.warmup_minutes * 60))
+        # Label the SCORED window (trailing window_s ending now), not the full
+        # launch-to-finish span -- startup/wait_healthy time isn't scored.
+        window_label = _fmt_window(end - window_s, end)
         data = collect_report(prom, combo, cycle, window_s, sampler.summary(), "ok",
-                              _fmt_window(start, end))
+                              window_label)
     except Exception as e:
         data = _failed_report(combo, cycle, str(e))
     finally:
@@ -185,18 +208,22 @@ def main(config_path: str) -> None:
             pass
         state.current_enclave = None
         state.save(cfg.state_path)
+    consecutive_failures = 0
     while True:
         combo, origin = select_next_combo(state)
         state.current_enclave = enclave_name(combo, state.cycle)
         state.save(cfg.state_path)
         try:
-            run_one(combo, state.cycle, cfg, deps)
+            data = run_one(combo, state.cycle, cfg, deps)
+            failed = data.status == "failed"
         except Exception:
-            pass  # never break the cycle
+            failed = True  # never break the cycle, even if run_one itself raises
+        consecutive_failures = consecutive_failures + 1 if failed else 0
         state.current_enclave = None
         if origin == "cycle":
             state.advance()
         state.save(cfg.state_path)
+        deps.sleep(compute_backoff(consecutive_failures, cfg.inter_run_backoff_s, cfg.max_backoff_s))
 
 
 if __name__ == "__main__":
