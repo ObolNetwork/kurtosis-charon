@@ -1,0 +1,21 @@
+{
+  "charon": "obolnetwork/charon:next",
+  "el": "ethereum/client-go:v1.17.4",
+  "bootstrap_cl": "sigp/lighthouse:v8.2.1",
+  "cl": {
+    "lighthouse": "sigp/lighthouse:v8.2.1",
+    "lodestar": "chainsafe/lodestar:v1.45.0",
+    "nimbus": "statusim/nimbus-eth2:multiarch-v26.7.0",
+    "teku": "consensys/teku:26.7.1",
+    "prysm": "gcr.io/prysmaticlabs/prysm/beacon-chain:v7.1.8",
+    "grandine": "sifrai/grandine:2.0.5"
+  },
+  "vc": {
+    "lighthouse": "sigp/lighthouse:v8.2.1",
+    "lodestar": "chainsafe/lodestar:v1.45.0",
+    "nimbus": "statusim/nimbus-validator-client:multiarch-v26.7.0",
+    "teku": "consensys/teku:26.7.1",
+    "prysm": "gcr.io/prysmaticlabs/prysm/validator:v7.1.8",
+    "vouch": "attestant/vouch:1.13.1"
+  }
+}

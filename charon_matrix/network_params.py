@@ -1,23 +1,13 @@
-CHARON_IMAGE = "obolnetwork/charon:next"
-EL_IMAGE = "ethereum/client-go:v1.17.4"
-BOOTSTRAP_CL_IMAGE = "sigp/lighthouse:v8.2.1"
+import json as _json
+import os as _os
 
-CL_IMAGES = {
-    "lighthouse": "sigp/lighthouse:v8.2.1",
-    "lodestar": "chainsafe/lodestar:v1.45.0",
-    "nimbus": "statusim/nimbus-eth2:multiarch-v26.7.0",
-    "teku": "consensys/teku:26.7.1",
-    "prysm": "gcr.io/prysmaticlabs/prysm/beacon-chain:v7.1.8",
-    "grandine": "sifrai/grandine:2.0.5",
-}
-VC_IMAGES = {
-    "lighthouse": "sigp/lighthouse:v8.2.1",
-    "lodestar": "chainsafe/lodestar:v1.45.0",
-    "nimbus": "statusim/nimbus-validator-client:multiarch-v26.7.0",
-    "teku": "consensys/teku:26.7.1",
-    "prysm": "gcr.io/prysmaticlabs/prysm/validator:v7.1.8",
-    "vouch": "attestant/vouch:1.13.1",
-}
+_IMAGES = _json.load(open(_os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "images.json")))
+CHARON_IMAGE = _IMAGES["charon"]
+EL_IMAGE = _IMAGES["el"]
+BOOTSTRAP_CL_IMAGE = _IMAGES["bootstrap_cl"]
+CL_IMAGES = _IMAGES["cl"]
+VC_IMAGES = _IMAGES["vc"]
+
 CLS = ["lighthouse", "lodestar", "nimbus", "teku", "prysm", "grandine"]
 VCS = ["lighthouse", "lodestar", "nimbus", "teku", "prysm", "vouch"]
 VALIDATOR_KEYS_MNEMONIC = (
