@@ -1,0 +1,10 @@
+# dappnode-cycler/config.example.yaml
+slack_webhook_url: "https://hooks.slack.com/services/XXX/YYY/ZZZ"
+repo_path: "/home/dappnode/kurtosis-charon"
+state_path: "/var/lib/dappnode-cycler/state.json"
+monitoring_token: ""          # PROMETHEUS_REMOTE_WRITE_TOKEN; empty disables remote_write auth
+package_ref: "github.com/ObolNetwork/ethereum-package@charon"
+run_minutes: 90
+warmup_minutes: 15
+startup_deadline_minutes: 25
+sample_interval_s: 15
