@@ -1,0 +1,231 @@
+import time
+from dataclasses import dataclass
+from typing import Callable
+
+from charon_matrix.network_params import CHARON_IMAGE, CL_IMAGES, VC_IMAGES
+from dappnode_cycler import kurtosis, promql, slack
+from dappnode_cycler.combos import Combo, enclave_name
+from dappnode_cycler.config import Config, load_config
+from dappnode_cycler.host_sampler import Sampler
+from dappnode_cycler.metrics import (
+    PrometheusClient, select_worst_node, max_value, parse_health,
+)
+from dappnode_cycler.report import ReportData, build_text, build_blocks
+from dappnode_cycler.selection import select_next_combo
+from dappnode_cycler.state import State
+
+
+@dataclass
+class Deps:
+    git_pull: Callable
+    run_enclave: Callable
+    remove_enclave: Callable
+    prometheus_base_url: Callable
+    make_prom_client: Callable
+    make_sampler: Callable
+    slack_post: Callable
+    sleep: Callable
+    now: Callable
+    write_args_file: Callable
+    wait_healthy: Callable
+
+
+DEGRADED_PCT_THRESHOLD = 99.5  # below this duty-success pct, a run is "degraded" -- above
+                                # it we treat the shortfall as extrapolation noise from
+                                # Prometheus's increase() over the window (routinely reads
+                                # ~99.96%/100.04% on a fully healthy node).
+
+
+def _fmt_window(start_s: float, end_s: float) -> str:
+    f = "%H:%M"
+    return f"{time.strftime(f, time.gmtime(start_s))}-{time.strftime(f, time.gmtime(end_s))} UTC"
+
+
+def compute_backoff(consecutive_failures: int, base: int, cap: int) -> int:
+    """Bounded, escalating inter-run backoff: base, 2*base, 4*base, ... capped at `cap`."""
+    return min(cap, base * (2 ** consecutive_failures))
+
+
+def collect_report(prom, combo, cycle, window_s, host_stats, status, window_label):
+    cn = combo.cluster_name
+    expected = prom.query(promql.duty_expected(cn, window_s))
+    success = prom.query(promql.duty_success(cn, window_s))
+    worst = select_worst_node(expected, success)
+    mem = max_value(prom.query(promql.charon_mem_peak(cn, window_s)))
+    cpu = max_value(prom.query(promql.charon_cpu_peak(cn, window_s)))
+    health = parse_health(
+        prom.query(promql.health_fired(cn, window_s)),
+        prom.query(promql.health_firing_now(cn)),
+    )
+    if status == "ok":
+        degraded = any(d.pct < DEGRADED_PCT_THRESHOLD for d in (worst.duties if worst else [])) or \
+            any(h.firing_now for h in health)
+        status = "degraded" if degraded else "ok"
+    return ReportData(
+        combo=combo, cycle=cycle, status=status,
+        cl_image=CL_IMAGES.get(combo.cl, combo.cl),
+        vc_image=VC_IMAGES.get(combo.vc, combo.vc),
+        charon_image=CHARON_IMAGE, window=window_label,
+        worst_node=worst, charon_mem_bytes=mem, charon_cpu=cpu,
+        host=host_stats, health=health,
+    )
+
+
+def _post_best_effort(deps: Deps, data: ReportData) -> None:
+    """Slack failures must never prevent teardown or crash run_one."""
+    try:
+        deps.slack_post(build_text(data), build_blocks(data))
+    except Exception:
+        pass
+
+
+def _teardown_best_effort(deps: Deps, enclave: str) -> None:
+    """remove_enclave is already best-effort/idempotent, but guard here too
+    in case a Deps implementation doesn't honor that contract."""
+    try:
+        deps.remove_enclave(enclave)
+    except Exception:
+        pass
+
+
+def run_one(combo: Combo, cycle: int, cfg: Config, deps: Deps) -> ReportData:
+    enclave = enclave_name(combo, cycle)
+    try:
+        deps.remove_enclave(enclave)  # idempotent: clear any stale enclave
+    except Exception:
+        pass
+
+    try:
+        deps.git_pull(cfg.repo_path)
+        args_file = deps.write_args_file(combo, cfg.monitoring_token, "/tmp")
+    except Exception as e:
+        # Nothing was launched yet, so there's no enclave to tear down -- but
+        # the pre-clear above may have removed a stale one, and calling this
+        # again is harmless (best-effort/idempotent), so do it for safety.
+        data = _failed_report(combo, cycle, f"pre-launch failed: {e}")
+        _post_best_effort(deps, data)
+        _teardown_best_effort(deps, enclave)
+        return data
+
+    try:
+        deps.run_enclave(enclave, cfg.package_ref, args_file)
+    except Exception as e:
+        data = _failed_report(combo, cycle, f"launch failed: {e}")
+        _post_best_effort(deps, data)
+        _teardown_best_effort(deps, enclave)
+        return data
+
+    # From here on, any failure (unhealthy startup, sampling, metrics query,
+    # report assembly) must still produce a `failed` report and guarantee
+    # teardown -- never raise out of run_one.
+    sampler = None
+    try:
+        base_url = deps.prometheus_base_url(enclave)
+        prom = deps.make_prom_client(base_url) if base_url else None
+        healthy = bool(prom) and deps.wait_healthy(
+            prom, combo.cluster_name, cfg.startup_deadline_minutes * 60)
+        if not healthy:
+            raise RuntimeError("cluster did not become healthy before deadline")
+
+        sampler = deps.make_sampler()
+        sampler.start()
+        total_s = cfg.run_minutes * 60
+        elapsed = 0
+        while elapsed < total_s:
+            step = max(1, min(cfg.sample_interval_s, total_s - elapsed))
+            deps.sleep(step)
+            elapsed += step
+
+        end = deps.now()
+        window_s = max(1, int(cfg.run_minutes * 60 - cfg.warmup_minutes * 60))
+        # Label the SCORED window (trailing window_s ending now), not the full
+        # launch-to-finish span -- startup/wait_healthy time isn't scored.
+        window_label = _fmt_window(end - window_s, end)
+        data = collect_report(prom, combo, cycle, window_s, sampler.summary(), "ok",
+                              window_label)
+    except Exception as e:
+        data = _failed_report(combo, cycle, str(e))
+    finally:
+        if sampler is not None:
+            try:
+                sampler.stop()
+            except Exception:
+                pass
+
+    _post_best_effort(deps, data)
+    _teardown_best_effort(deps, enclave)
+    return data
+
+
+def _failed_report(combo, cycle, error) -> ReportData:
+    return ReportData(
+        combo=combo, cycle=cycle, status="failed",
+        cl_image=CL_IMAGES.get(combo.cl, combo.cl),
+        vc_image=VC_IMAGES.get(combo.vc, combo.vc),
+        charon_image=CHARON_IMAGE, window="-",
+        worst_node=None, charon_mem_bytes=None, charon_cpu=None,
+        host=None, health=[], error=error,
+    )
+
+
+def _default_deps(cfg: Config) -> Deps:
+    from dappnode_cycler.params import write_args_file
+
+    def wait_healthy(prom, cluster_name, deadline_s):
+        waited = 0
+        while waited < deadline_s:
+            active = prom.query(
+                f'core_scheduler_validators_active{{cluster_name="{cluster_name}"}}')
+            if active and any(s.value > 0 for s in active):
+                return True
+            time.sleep(15)
+            waited += 15
+        return False
+
+    return Deps(
+        git_pull=kurtosis.git_pull,
+        run_enclave=kurtosis.run_enclave,
+        remove_enclave=kurtosis.remove_enclave,
+        prometheus_base_url=kurtosis.prometheus_base_url,
+        make_prom_client=lambda url: PrometheusClient(url),
+        make_sampler=lambda: Sampler(cfg.sample_interval_s),
+        slack_post=lambda text, blocks: slack.post(cfg.slack_webhook_url, text, blocks),
+        sleep=time.sleep,
+        now=time.time,
+        write_args_file=write_args_file,
+        wait_healthy=wait_healthy,
+    )
+
+
+def main(config_path: str) -> None:
+    cfg = load_config(config_path)
+    deps = _default_deps(cfg)
+    state = State.load(cfg.state_path)
+    if state.current_enclave:
+        try:
+            deps.remove_enclave(state.current_enclave)  # interrupted run
+        except Exception:
+            pass
+        state.current_enclave = None
+        state.save(cfg.state_path)
+    consecutive_failures = 0
+    while True:
+        combo, origin = select_next_combo(state)
+        state.current_enclave = enclave_name(combo, state.cycle)
+        state.save(cfg.state_path)
+        try:
+            data = run_one(combo, state.cycle, cfg, deps)
+            failed = data.status == "failed"
+        except Exception:
+            failed = True  # never break the cycle, even if run_one itself raises
+        consecutive_failures = consecutive_failures + 1 if failed else 0
+        state.current_enclave = None
+        if origin == "cycle":
+            state.advance()
+        state.save(cfg.state_path)
+        deps.sleep(compute_backoff(consecutive_failures, cfg.inter_run_backoff_s, cfg.max_backoff_s))
+
+
+if __name__ == "__main__":
+    import sys
+    main(sys.argv[1] if len(sys.argv) > 1 else "config.yaml")
