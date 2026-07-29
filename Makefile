@@ -1,4 +1,4 @@
-.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku geth-grandine charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku run-charon-vouch run-aws stop-aws run-native stop-native clean
+.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku geth-grandine charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku run-charon-vouch run-aws stop-aws run-aws-native stop-aws-native run-native stop-native clean
 
 ETHEREUM_PACKAGE_VERSION ?= 6.1.0
 
@@ -237,6 +237,14 @@ run-aws:
 
 stop-aws:
 	./stop_aws.sh
+
+# Launch/terminate the native-Charon fleet (full 6 CL x 6 VC = 36 matrix,
+# charon:next via ObolNetwork/ethereum-package@charon, uniform c6a.4xlarge).
+run-aws-native:
+	./run_aws_native.sh
+
+stop-aws-native:
+	./stop_aws_native.sh
 
 # Run/stop the native Charon cluster from the Obol ethereum-package charon branch.
 run-native:
