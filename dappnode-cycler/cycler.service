@@ -8,6 +8,7 @@ Wants=docker.service network-online.target
 Type=simple
 User=dappnode
 WorkingDirectory=/home/dappnode/kurtosis-charon/dappnode-cycler
+Environment="PYTHONPATH=/home/dappnode/kurtosis-charon:/home/dappnode/kurtosis-charon/dappnode-cycler"
 ExecStart=/home/dappnode/kurtosis-charon/dappnode-cycler/.venv/bin/python -m dappnode_cycler.cycler /home/dappnode/kurtosis-charon/dappnode-cycler/config.yaml
 Restart=always
 RestartSec=30

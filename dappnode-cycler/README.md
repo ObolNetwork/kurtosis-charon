@@ -59,15 +59,22 @@ python -m venv .venv
 cp config.example.yaml config.yaml
 ```
 
-Edit `config.yaml` and set at minimum:
+Edit `config.yaml` and set the following. `load_config()` raises `KeyError` at
+startup if any of the three **required** keys is missing:
+
+Required:
 
 - `slack_webhook_url` — Slack Incoming Webhook URL for run reports.
 - `repo_path` — absolute path to this repo checkout on the host (the cycler
   `git pull`s this path before each run).
 - `state_path` — absolute path to the state file (see below); the containing
   directory must exist and be writable by the service user.
+
+Optional:
+
 - `monitoring_token` — the Prometheus remote-write auth token
-  (`PROMETHEUS_REMOTE_WRITE_TOKEN`); leave empty to disable remote-write auth.
+  (`PROMETHEUS_REMOTE_WRITE_TOKEN`); defaults to `""`, which disables
+  remote-write auth. Not required to start the cycler.
 
 The remaining keys (`package_ref`, `run_minutes`, `warmup_minutes`,
 `startup_deadline_minutes`, `sample_interval_s`) have sane defaults in
@@ -91,6 +98,26 @@ sudo systemctl enable --now cycler
 `cycler.service` if your checkout lives elsewhere. `Restart=always` with
 `RestartSec=30` means the service comes back on crash or reboot; state/resume
 behavior (below) makes that safe.
+
+**Important — PYTHONPATH:** `cycler.py` does
+`from charon_matrix.network_params import ...`, and `charon_matrix` lives one
+level up from `dappnode-cycler`, at the repo root
+(`/home/dappnode/kurtosis-charon/charon_matrix`). Running
+`python -m dappnode_cycler.cycler` only puts the current working directory on
+`sys.path`, which makes `dappnode_cycler` importable but *not* `charon_matrix`.
+Without both directories on `PYTHONPATH`, the service crash-loops with
+`ModuleNotFoundError: No module named 'charon_matrix'`. `cycler.service`
+therefore sets:
+
+```ini
+Environment="PYTHONPATH=/home/dappnode/kurtosis-charon:/home/dappnode/kurtosis-charon/dappnode-cycler"
+```
+
+If your checkout lives somewhere other than
+`/home/dappnode/kurtosis-charon`, update both this `Environment=` line and the
+`WorkingDirectory`/`ExecStart` paths to match — `PYTHONPATH` must include the
+repo root (for `charon_matrix`) and the `dappnode-cycler` directory (for
+`dappnode_cycler`).
 
 ## Logs
 
