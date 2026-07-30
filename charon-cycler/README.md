@@ -143,16 +143,6 @@ This means a reboot or systemd restart loses at most the in-flight run — the
 service picks back up where it left off instead of restarting the whole
 36-combo matrix.
 
-## Priority-override extension point (not built yet)
-
-`selectNextCombo` consults a `readOverride` func var that always returns
-`nil`, so combo selection currently always falls through to the normal cycle
-order. It's the designed extension point for a future "run this combo next /
-pin this combo" feature: a later implementation would have `readOverride`
-read a `charon-cycler/override.json` (or similar) file and return a `*combo`
-to jump the cycle to that combo. `selectNextCombo` already has the override
-branch wired up — only the reader needs to be implemented.
-
 ## Running tests
 
 ```bash

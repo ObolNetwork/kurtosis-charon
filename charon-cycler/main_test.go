@@ -108,8 +108,8 @@ func TestLoadStateRejectsOutOfRangeNextIndex(t *testing.T) {
 		if s != (state{}) {
 			t.Errorf("loadState(next_index=99) = %+v, want zero state", s)
 		}
-		if got, origin := selectNextCombo(s); origin != "cycle" || got != cycle[0] {
-			t.Errorf("selectNextCombo(zero state) = (%+v,%q), want (%+v,cycle)", got, origin, cycle[0])
+		if got := selectNextCombo(s); got != cycle[0] {
+			t.Errorf("selectNextCombo(zero state) = %+v, want %+v", got, cycle[0])
 		}
 	})
 
@@ -125,49 +125,19 @@ func TestLoadStateRejectsOutOfRangeNextIndex(t *testing.T) {
 		if s != (state{}) {
 			t.Errorf("loadState(next_index=-1) = %+v, want zero state", s)
 		}
-		if got, origin := selectNextCombo(s); origin != "cycle" || got != cycle[0] {
-			t.Errorf("selectNextCombo(zero state) = (%+v,%q), want (%+v,cycle)", got, origin, cycle[0])
+		if got := selectNextCombo(s); got != cycle[0] {
+			t.Errorf("selectNextCombo(zero state) = %+v, want %+v", got, cycle[0])
 		}
 	})
 }
 
 func TestSelectNextCombo(t *testing.T) {
-	old := readOverride
-	defer func() { readOverride = old }()
-
-	t.Run("no override selects from cycle", func(t *testing.T) {
-		readOverride = func() *combo { return nil }
-		s := state{NextIndex: 6}
-		got, origin := selectNextCombo(s)
-		if origin != "cycle" {
-			t.Errorf("origin = %q, want cycle", origin)
-		}
-		if got != (combo{"lodestar", "lighthouse"}) {
-			t.Errorf("combo = %+v, want lodestar/lighthouse", got)
-		}
-	})
-
-	t.Run("override takes priority without advancing", func(t *testing.T) {
-		readOverride = func() *combo { return &combo{cl: "prysm", vc: "teku"} }
-		s := state{NextIndex: 6}
-		got, origin := selectNextCombo(s)
-		if origin != "override" {
-			t.Errorf("origin = %q, want override", origin)
-		}
-		if got != (combo{"prysm", "teku"}) {
-			t.Errorf("combo = %+v, want prysm/teku", got)
-		}
-		if s.NextIndex != 6 {
-			t.Errorf("state.NextIndex mutated to %d, want unchanged 6", s.NextIndex)
-		}
-	})
-
-	t.Run("default readOverride is inert", func(t *testing.T) {
-		readOverride = old
-		if got := readOverride(); got != nil {
-			t.Errorf("default readOverride() = %+v, want nil", got)
-		}
-	})
+	if got := selectNextCombo(state{NextIndex: 6}); got != (combo{"lodestar", "lighthouse"}) {
+		t.Errorf("combo = %+v, want lodestar/lighthouse", got)
+	}
+	if got := selectNextCombo(state{NextIndex: 0}); got != cycle[0] {
+		t.Errorf("combo = %+v, want %+v", got, cycle[0])
+	}
 }
 
 func TestComputeBackoff(t *testing.T) {

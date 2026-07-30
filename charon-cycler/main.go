@@ -66,9 +66,17 @@ func init() {
 // ---------------------------------------------------------------------------
 
 type config struct {
-	slackWebhookURL, repoPath, statePath, monitoringToken, packageRef  string
-	runMinutes, warmupMinutes, startupDeadlineMinutes, sampleIntervalS int
-	interRunBackoffS, maxBackoffS                                      int
+	slackWebhookURL        string
+	repoPath               string
+	statePath              string
+	monitoringToken        string
+	packageRef             string
+	runMinutes             int
+	warmupMinutes          int
+	startupDeadlineMinutes int
+	sampleIntervalS        int
+	interRunBackoffS       int
+	maxBackoffS            int
 }
 
 // envInt reads an integer env var (CYCLER_<name>) into *dst if present and
@@ -246,19 +254,11 @@ func (s *state) advance() {
 }
 
 // ---------------------------------------------------------------------------
-// Combo selection: readOverride, selectNextCombo.
+// Combo selection.
 // ---------------------------------------------------------------------------
 
-// readOverride is a var (not a plain func) so tests can substitute an
-// override without a runtime dependency-injection layer. Its real behavior
-// is inert: it always returns nil until an override.json reader is built.
-var readOverride = func() *combo { return nil }
-
-func selectNextCombo(s state) (combo, string) {
-	if ov := readOverride(); ov != nil {
-		return *ov, "override"
-	}
-	return cycle[s.NextIndex], "cycle"
+func selectNextCombo(s state) combo {
+	return cycle[s.NextIndex]
 }
 
 // ---------------------------------------------------------------------------
@@ -1313,18 +1313,15 @@ func mainLoop(cfg config) {
 
 	consecutiveFailures := 0
 	for {
-		c, origin := selectNextCombo(st)
+		c := selectNextCombo(st)
 		st.CurrentEnclave = enclaveName(st.Cycle, c)
 		saveState()
 
 		data := runOne(cfg, c, st.Cycle)
 
 		st.CurrentEnclave = ""
+		st.advance()
 		saveState()
-		if origin == "cycle" {
-			st.advance()
-			saveState()
-		}
 
 		if data.status == "failed" {
 			consecutiveFailures++
