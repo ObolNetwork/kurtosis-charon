@@ -5,12 +5,6 @@ import time
 import argparse
 from tabulate import tabulate
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from charon_matrix.network_params import (  # noqa: E402
-    DV_IMAGE, EL_IMAGE, BOOTSTRAP_CL_IMAGE, CL_IMAGES, VC_IMAGES,
-    CLS, VCS, VALIDATOR_KEYS_MNEMONIC, build_network_params,
-)
-
 KEY_NAME = "kurtosis-fleet"
 SECURITY_GROUP_ID = "sg-0e208fd6ad761cafc"
 SUBNET_ID = "subnet-000b1456766381ae9"  # eu-west-1c
@@ -26,9 +20,43 @@ ETHEREUM_PACKAGE = "github.com/ObolNetwork/ethereum-package@charon"
 # builtin the ethereum-package@charon harness requires; pin a known-good release.
 KURTOSIS_VERSION = "1.20.0"
 
+# --- Image pins (resolved 2026-07-29) ---------------------------------------
+# Charon under test is the main-branch image; it stays a moving tag on purpose.
+CHARON_IMAGE = "obolnetwork/charon:next"
+EL_IMAGE = "ethereum/client-go:v1.17.4"
+# Vanilla bootstrap node's CL/VC (kept pinned + consistent with CL_IMAGES).
+BOOTSTRAP_CL_IMAGE = "sigp/lighthouse:v8.2.1"
+
+# Beacon-node (consensus client) images, keyed by client type.
+CL_IMAGES = {
+    "lighthouse": "sigp/lighthouse:v8.2.1",
+    "lodestar": "chainsafe/lodestar:v1.45.0",
+    "nimbus": "statusim/nimbus-eth2:multiarch-v26.7.0",
+    "teku": "consensys/teku:26.7.1",
+    "prysm": "gcr.io/prysmaticlabs/prysm/beacon-chain:v7.1.8",
+    "grandine": "sifrai/grandine:2.0.5",
+}
+
+# Validator-client images (the VC Charon drives), keyed by client type.
+VC_IMAGES = {
+    "lighthouse": "sigp/lighthouse:v8.2.1",
+    "lodestar": "chainsafe/lodestar:v1.45.0",
+    "nimbus": "statusim/nimbus-validator-client:multiarch-v26.7.0",
+    "teku": "consensys/teku:26.7.1",
+    "prysm": "gcr.io/prysmaticlabs/prysm/validator:v7.1.8",
+    "vouch": "attestant/vouch:1.13.1",
+}
+
 # The full 6 CL x 6 VC = 36 matrix. One EC2 instance per combo. "bn"/"vc" name the
 # beacon-node and validator-client clients; the enclave is <bn>-charon-<vc>.
+CLS = ["lighthouse", "lodestar", "nimbus", "teku", "prysm", "grandine"]
+VCS = ["lighthouse", "lodestar", "nimbus", "teku", "prysm", "vouch"]
 COMBOS = [{"name": f"{cl}-{vc}", "bn": cl, "vc": vc} for cl in CLS for vc in VCS]
+
+VALIDATOR_KEYS_MNEMONIC = (
+    "giant issue aisle success illegal bike spike question tent bar rely arctic "
+    "volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
+)
 
 # boto3 clients are created lazily in main() so --dump-configs works without AWS.
 ec2 = None
@@ -42,6 +70,87 @@ def enclave_name(combo):
 def safe_exit(message):
     print(f"❌ {message}")
     sys.exit(1)
+
+
+def build_network_params(cl, vc):
+    """Return the full ethereum-package args-file YAML for one CL x VC combo.
+
+    Mirrors the deployments/network_params/network_params_charon_*.yaml files,
+    generalised to any CL beacon node x any Charon-driven VC:
+      - a 2x vanilla geth/lighthouse supernode that bootstraps and keeps the chain
+        alive (grandine will not bootstrap a fresh chain solo), and
+      - the combo under test: <cl> beacon / charon:next / <vc>.
+
+    The $PROMETHEUS_REMOTE_WRITE_TOKEN placeholder is left intact for envsubst on
+    the instance (so dumped configs never contain the secret). Monitoring parity
+    with the non-native path: prometheus remote_write to Obol central + charon
+    self-labels cluster_name=kurtosis-<cl>-<vc>.
+    """
+    # Nimbus VC needs Charon's json_requests feature; only emitted for vc=nimbus.
+    nimbus_env = ""
+    if vc == "nimbus":
+        nimbus_env = (
+            "    vc_extra_env_vars:\n"
+            "      CHARON_FEATURE_SET_ENABLE: json_requests\n"
+        )
+    return f"""participants:
+  # 0) vanilla validator (always kept — bootstraps/keeps the chain alive;
+  #    also lets the CL under test sync, since e.g. grandine won't bootstrap solo)
+  - el_type: geth
+    el_image: {EL_IMAGE}
+    cl_type: lighthouse
+    cl_image: {BOOTSTRAP_CL_IMAGE}
+    use_separate_vc: true
+    vc_type: lighthouse
+    vc_image: {BOOTSTRAP_CL_IMAGE}
+    count: 2
+    supernode: true
+
+  # 1) {cl} beacon / charon:next / {vc}  (combo under test)
+  - el_type: geth
+    el_image: {EL_IMAGE}
+    cl_type: {cl}
+    cl_image: {CL_IMAGES[cl]}
+    supernode: true
+    use_separate_vc: true
+    vc_type: charon
+    vc_image: {CHARON_IMAGE}
+    charon_node_count: 3
+    charon_params:
+      charon_vc: {vc}
+      charon_vc_image: {VC_IMAGES[vc]}
+{nimbus_env}    count: 1
+network_params:
+  network: kurtosis
+  network_id: "3151908"
+  deposit_contract_address: "0x4242424242424242424242424242424242424242"
+  seconds_per_slot: 12
+  num_validator_keys_per_node: 128
+  preregistered_validator_keys_mnemonic: "{VALIDATOR_KEYS_MNEMONIC}"
+  shard_committee_period: 1
+  prefunded_accounts: '{{"0xb9e79D19f651a941757b35830232E7EFC77E1c79": {{"balance": "100000ETH"}}}}'
+wait_for_finalization: false
+global_log_level: info
+parallel_keystore_generation: false
+mev_type: flashbots
+mev_params:
+  mev_builder_subsidy: 1
+prometheus_params:
+  remote_write_url: "https://vm.monitoring.gcp.obol.tech/write"
+  remote_write_token: "$PROMETHEUS_REMOTE_WRITE_TOKEN"
+  remote_write_relabel_configs:
+    - SourceLabels: ["job"]
+      Regex: ".*charon.*"
+      Action: keep
+    - SourceLabels: ["client_name"]
+      Regex: "charon"
+      TargetLabel: job
+      Replacement: charon
+      Action: replace
+additional_services:
+  - spamoor
+  - prometheus
+"""
 
 
 def parse_lifetime_arg(value: str) -> int:
@@ -75,7 +184,7 @@ def get_latest_ubuntu_ami():
         safe_exit(f"Failed to fetch latest Ubuntu AMI: {e}")
 
 
-def generate_user_data(combo, branch, shutdown_minutes, monitoring_token, ethereum_package=ETHEREUM_PACKAGE):
+def generate_user_data(combo, branch, shutdown_minutes, monitoring_token):
     """Cloud-init that installs Docker + Kurtosis, clones kurtosis-charon, writes this
     combo's generated args-file, substitutes the monitoring token with envsubst, then
     runs the native-Charon ethereum-package (mirrors `make run-native`).
@@ -107,7 +216,7 @@ export PROMETHEUS_REMOTE_WRITE_TOKEN="{monitoring_token}"
 cat > /tmp/network_params_raw.yaml <<'PARAMS_EOF'
 {network_params}PARAMS_EOF
 envsubst '$PROMETHEUS_REMOTE_WRITE_TOKEN' < /tmp/network_params_raw.yaml > /tmp/network_params.yaml
-kurtosis run --enclave {enclave} {ethereum_package} --args-file /tmp/network_params.yaml || true
+kurtosis run --enclave {enclave} {ETHEREUM_PACKAGE} --args-file /tmp/network_params.yaml || true
 OUTER_EOF
 """
 
@@ -129,7 +238,7 @@ def instance_exists(tag_value):
         safe_exit(f"Error checking existing instances: {e}")
 
 
-def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, instance_type, on_demand, ethereum_package=ETHEREUM_PACKAGE):
+def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, instance_type, on_demand):
     tag = instance_tag(combo)
     if instance_exists(tag):
         print(f"⚠️  Skipping existing instance: {tag}")
@@ -143,7 +252,7 @@ def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, i
         "MaxCount": 1,
         "SubnetId": SUBNET_ID,
         "SecurityGroupIds": [SECURITY_GROUP_ID],
-        "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token, ethereum_package),
+        "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token),
         "BlockDeviceMappings": [{
             "DeviceName": "/dev/sda1",
             "Ebs": {
@@ -274,7 +383,6 @@ def main():
     parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help=f"EC2 instance type for all combos (default: {DEFAULT_INSTANCE_TYPE})")
     parser.add_argument("--only", help="Comma-separated combo names to launch (default: all 36). Format: <cl>-<vc>, e.g. lighthouse-teku,prysm-vouch")
     parser.add_argument("--dump-configs", nargs="?", const="generated_configs", metavar="DIR", help="Write all generated args-files to DIR (default: generated_configs) and exit. No AWS calls.")
-    parser.add_argument("--ethereum-package", default=ETHEREUM_PACKAGE, help=f"ethereum-package ref to run (default: {ETHEREUM_PACKAGE}). Override to test a harness branch, e.g. github.com/ObolNetwork/ethereum-package@my-fix")
     args = parser.parse_args()
 
     combos = COMBOS
@@ -313,13 +421,12 @@ def main():
 
     ami_id = get_latest_ubuntu_ami()
     print(f"\n🚀 Launching with AMI {ami_id}, branch '{args.branch}', shutdown in {shutdown_minutes}m")
-    print(f"📌 Instance type: {args.instance_type}, On-Demand: {args.on_demand}, Charon image: {DV_IMAGE}")
-    print(f"📌 ethereum-package: {args.ethereum_package}\n")
+    print(f"📌 Instance type: {args.instance_type}, On-Demand: {args.on_demand}, Charon image: {CHARON_IMAGE}\n")
 
     launched_ids = []
     id_to_tag = {}
     for combo in combos:
-        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, args.instance_type, args.on_demand, args.ethereum_package)
+        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, args.instance_type, args.on_demand)
         if iid:
             launched_ids.append(iid)
             id_to_tag[iid] = tag
