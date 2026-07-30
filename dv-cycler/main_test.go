@@ -171,7 +171,7 @@ func TestComputeBackoff(t *testing.T) {
 
 func testImages() images {
 	return images{
-		Charon:      "obolnetwork/charon:next",
+		DV:          "obolnetwork/charon:next",
 		EL:          "ethereum/client-go:v1.17.4",
 		BootstrapCL: "sigp/lighthouse:v8.2.1",
 		CL: map[string]string{
@@ -263,11 +263,11 @@ func TestPromQLBuilders(t *testing.T) {
 	if !strings.Contains(promDutyExpected("kurtosis-a-b", 60), "core_tracker_expect_duties_total") {
 		t.Errorf("promDutyExpected missing metric name")
 	}
-	if !strings.Contains(promCharonMemPeak("kurtosis-a-b", 5400), "process_resident_memory_bytes") {
-		t.Errorf("promCharonMemPeak missing metric name")
+	if !strings.Contains(promDVMemPeak("kurtosis-a-b", 5400), "process_resident_memory_bytes") {
+		t.Errorf("promDVMemPeak missing metric name")
 	}
-	if !strings.Contains(promCharonCPUPeak("kurtosis-a-b", 5400), "process_cpu_seconds_total") {
-		t.Errorf("promCharonCPUPeak missing metric name")
+	if !strings.Contains(promDVCPUPeak("kurtosis-a-b", 5400), "process_cpu_seconds_total") {
+		t.Errorf("promDVCPUPeak missing metric name")
 	}
 	if !strings.Contains(promHealthFired("kurtosis-a-b", 5400), "max_over_time(app_health_checks") {
 		t.Errorf("promHealthFired missing metric name")
@@ -503,21 +503,21 @@ func TestBuildBlocksStatuses(t *testing.T) {
 		mem := 512.0 * 1024 * 1024
 		cpu := 1.4
 		return reportData{
-			combo:       combo{cl: "teku", vc: "prysm"},
-			cycle:       3,
-			status:      status,
-			clImage:     "consensys/teku:26.7.1",
-			vcImage:     "gcr.io/.../validator:v7.1.8",
-			charonImage: "obolnetwork/charon:next",
-			window:      "12:00-13:30 UTC",
+			combo:   combo{cl: "teku", vc: "prysm"},
+			cycle:   3,
+			status:  status,
+			clImage: "consensys/teku:26.7.1",
+			vcImage: "gcr.io/.../validator:v7.1.8",
+			dvImage: "obolnetwork/charon:next",
+			window:  "12:00-13:30 UTC",
 			worst: &worstNode{peer: "1", duties: []dutyResult{
 				{duty: "attester", expected: 780, success: 780},
 				{duty: "aggregator", expected: 150, success: 130},
 			}},
-			charonMemBytes: &mem,
-			charonCPU:      &cpu,
-			host:           &hostStats{cpuAvg: 30, cpuPeak: 82, memAvg: 8e9, memPeak: 9e9, memTotal: 16e9},
-			health:         []healthCheck{{name: "high-inclusion-delay", severity: "warning", firingNow: false}},
+			dvMemBytes: &mem,
+			dvCPU:      &cpu,
+			host:       &hostStats{cpuAvg: 30, cpuPeak: 82, memAvg: 8e9, memPeak: 9e9, memTotal: 16e9},
+			health:     []healthCheck{{name: "high-inclusion-delay", severity: "warning", firingNow: false}},
 		}
 	}
 
@@ -555,14 +555,14 @@ func TestBuildBlocksStatuses(t *testing.T) {
 
 	t.Run("failed status shows error and nil optionals don't panic", func(t *testing.T) {
 		d := reportData{
-			combo:       combo{cl: "teku", vc: "prysm"},
-			cycle:       1,
-			status:      "failed",
-			clImage:     "cl-image",
-			vcImage:     "vc-image",
-			charonImage: "charon-image",
-			window:      "-",
-			errMsg:      "launch failed: boom",
+			combo:   combo{cl: "teku", vc: "prysm"},
+			cycle:   1,
+			status:  "failed",
+			clImage: "cl-image",
+			vcImage: "vc-image",
+			dvImage: "dv-image",
+			window:  "-",
+			errMsg:  "launch failed: boom",
 		}
 		blocks := buildBlocks(d)
 		dump := dumpBlocks(blocks)
@@ -593,7 +593,7 @@ func dumpBlocks(blocks []map[string]any) string {
 func TestLoadImages(t *testing.T) {
 	dir := t.TempDir()
 	content := `{
-		"charon": "obolnetwork/charon:next",
+		"dv": "obolnetwork/charon:next",
 		"el": "ethereum/client-go:v1.17.4",
 		"bootstrap_cl": "sigp/lighthouse:v8.2.1",
 		"cl": {"teku": "consensys/teku:26.7.1"},
@@ -606,8 +606,8 @@ func TestLoadImages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadImages error: %v", err)
 	}
-	if im.Charon != "obolnetwork/charon:next" {
-		t.Errorf("Charon = %q", im.Charon)
+	if im.DV != "obolnetwork/charon:next" {
+		t.Errorf("DV = %q", im.DV)
 	}
 	if im.EL != "ethereum/client-go:v1.17.4" {
 		t.Errorf("EL = %q", im.EL)
@@ -821,15 +821,15 @@ func TestRunOneMidRunFailureTearsDownAndPosts(t *testing.T) {
 	}
 	// This failure happens after loadImages succeeded (mid-run, during
 	// collectReport), so failedReport must carry the real pins through,
-	// not fall back to the short client names / a blank charon image.
+	// not fall back to the short client names / a blank DV image.
 	if data.clImage != im.CL["teku"] {
 		t.Errorf("clImage = %q, want real pin %q", data.clImage, im.CL["teku"])
 	}
 	if data.vcImage != im.VC["prysm"] {
 		t.Errorf("vcImage = %q, want real pin %q", data.vcImage, im.VC["prysm"])
 	}
-	if data.charonImage != im.Charon {
-		t.Errorf("charonImage = %q, want %q", data.charonImage, im.Charon)
+	if data.dvImage != im.DV {
+		t.Errorf("dvImage = %q, want %q", data.dvImage, im.DV)
 	}
 	// Exactly 2 kurtosis-enclave-rm calls are guaranteed on this path: the
 	// guarded pre-clear at the top of runOne, and the deferred teardown

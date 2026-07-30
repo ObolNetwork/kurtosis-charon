@@ -1,5 +1,5 @@
 {
-  "charon": "obolnetwork/charon:next",
+  "dv": "obolnetwork/charon:next",
   "el": "ethereum/client-go:v1.17.4",
   "bootstrap_cl": "sigp/lighthouse:v8.2.1",
   "cl": {

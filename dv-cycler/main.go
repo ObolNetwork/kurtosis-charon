@@ -1,5 +1,5 @@
-// Command charon-cycler cycles the ethereum-package devnet through the
-// CL x VC matrix behind Charon, sampling metrics and posting a Slack report
+// Command dv-cycler cycles the ethereum-package devnet through the
+// CL x VC matrix behind the DV client, sampling metrics and posting a Slack report
 // for each run. This file (main.go) is a script-like Go port of the
 // original Python cycler package: no sub-packages, no interfaces, just plain
 // data records and package-level functions/vars.
@@ -226,7 +226,7 @@ func loadState(path string) (state, error) {
 	// the bad state and start fresh instead.
 	if s.NextIndex < 0 || s.NextIndex >= len(cycle) || s.Cycle < 0 {
 		fmt.Fprintf(os.Stderr,
-			"charon-cycler: state file %s has out-of-range next_index=%d cycle=%d (want 0<=next_index<%d, cycle>=0); starting fresh\n",
+			"dv-cycler: state file %s has out-of-range next_index=%d cycle=%d (want 0<=next_index<%d, cycle>=0); starting fresh\n",
 			path, s.NextIndex, s.Cycle, len(cycle))
 		return state{}, nil
 	}
@@ -296,7 +296,7 @@ func computeBackoff(consecutiveFailures, base, cap int) int {
 // ---------------------------------------------------------------------------
 
 type images struct {
-	Charon      string            `json:"charon"`
+	DV          string            `json:"dv"`
 	EL          string            `json:"el"`
 	BootstrapCL string            `json:"bootstrap_cl"`
 	CL          map[string]string `json:"cl"`
@@ -321,7 +321,7 @@ const validatorKeysMnemonic = "giant issue aisle success illegal bike spike ques
 
 // buildArgsFile reproduces network_params.build_network_params's YAML
 // exactly, with the $PROMETHEUS_REMOTE_WRITE_TOKEN placeholder substituted.
-func buildArgsFile(im images, c combo, token string, charonNodeCount int) string {
+func buildArgsFile(im images, c combo, token string, dvNodeCount int) string {
 	nimbusEnv := ""
 	if c.vc == "nimbus" {
 		nimbusEnv = "    vc_extra_env_vars:\n      CHARON_FEATURE_SET_ENABLE: json_requests\n"
@@ -381,15 +381,15 @@ prometheus_params:
 additional_services:
   - spamoor
   - prometheus
-`, im.EL, im.BootstrapCL, im.BootstrapCL, im.EL, c.cl, im.CL[c.cl], im.Charon, charonNodeCount,
+`, im.EL, im.BootstrapCL, im.BootstrapCL, im.EL, c.cl, im.CL[c.cl], im.DV, dvNodeCount,
 		c.vc, im.VC[c.vc], nimbusEnv, validatorKeysMnemonic)
 
 	return strings.ReplaceAll(raw, "$PROMETHEUS_REMOTE_WRITE_TOKEN", token)
 }
 
 // ---------------------------------------------------------------------------
-// PromQL builders: promDutyExpected, promDutySuccess, promCharonMemPeak,
-// promCharonCPUPeak, promHealthFired, promHealthFiringNow.
+// PromQL builders: promDutyExpected, promDutySuccess, promDVMemPeak,
+// promDVCPUPeak, promHealthFired, promHealthFiringNow.
 // ---------------------------------------------------------------------------
 
 func promSelector(clusterName string) string {
@@ -406,12 +406,12 @@ func promDutySuccess(clusterName string, windowS int) string {
 		promSelector(clusterName), windowS)
 }
 
-func promCharonMemPeak(clusterName string, windowS int) string {
+func promDVMemPeak(clusterName string, windowS int) string {
 	return fmt.Sprintf("max(max_over_time(process_resident_memory_bytes{%s}[%ds])) by (cluster_peer)",
 		promSelector(clusterName), windowS)
 }
 
-func promCharonCPUPeak(clusterName string, windowS int) string {
+func promDVCPUPeak(clusterName string, windowS int) string {
 	return fmt.Sprintf("max(max_over_time(rate(process_cpu_seconds_total{%s}[1m])[%ds:1m])) by (cluster_peer)",
 		promSelector(clusterName), windowS)
 }
@@ -631,26 +631,26 @@ type hostStats struct {
 }
 
 type reportData struct {
-	combo          combo
-	cycle          int
-	status         string
-	clImage        string
-	vcImage        string
-	charonImage    string
-	window         string
-	worst          *worstNode
-	charonMemBytes *float64
-	charonCPU      *float64
-	host           *hostStats
-	health         []healthCheck
-	errMsg         string
+	combo      combo
+	cycle      int
+	status     string
+	clImage    string
+	vcImage    string
+	dvImage    string
+	window     string
+	worst      *worstNode
+	dvMemBytes *float64
+	dvCPU      *float64
+	host       *hostStats
+	health     []healthCheck
+	errMsg     string
 }
 
 var statusEmoji = map[string]string{"ok": "✅", "degraded": "⚠️", "failed": "❌"}
 
 func buildText(d reportData) string {
 	e := statusEmoji[d.status]
-	return fmt.Sprintf("%s %s → charon → %s · cycle %d · %s", e, d.combo.cl, d.combo.vc, d.cycle, d.status)
+	return fmt.Sprintf("%s %s → DV → %s · cycle %d · %s", e, d.combo.cl, d.combo.vc, d.cycle, d.status)
 }
 
 func gbf(x float64) string {
@@ -692,7 +692,7 @@ func healthMD(health []healthCheck) string {
 
 func buildBlocks(d reportData) []map[string]any {
 	e := statusEmoji[d.status]
-	header := fmt.Sprintf("%s %s → charon → %s", e, d.combo.cl, d.combo.vc)
+	header := fmt.Sprintf("%s %s → DV → %s", e, d.combo.cl, d.combo.vc)
 	blocks := []map[string]any{
 		{"type": "header", "text": map[string]any{"type": "plain_text", "text": header}},
 		{"type": "context", "elements": []map[string]any{{
@@ -702,7 +702,7 @@ func buildBlocks(d reportData) []map[string]any {
 		{"type": "section", "fields": []map[string]any{
 			{"type": "mrkdwn", "text": "*CL:* " + d.clImage},
 			{"type": "mrkdwn", "text": "*VC:* " + d.vcImage},
-			{"type": "mrkdwn", "text": "*Charon:* " + d.charonImage},
+			{"type": "mrkdwn", "text": "*DV:* " + d.dvImage},
 		}},
 	}
 
@@ -719,8 +719,8 @@ func buildBlocks(d reportData) []map[string]any {
 	})
 
 	cpuStr := "n/a"
-	if d.charonCPU != nil {
-		cpuStr = fmt.Sprintf("%.2f cores", *d.charonCPU)
+	if d.dvCPU != nil {
+		cpuStr = fmt.Sprintf("%.2f cores", *d.dvCPU)
 	}
 	hostCPUStr := "n/a"
 	hostMemStr := "n/a"
@@ -728,8 +728,8 @@ func buildBlocks(d reportData) []map[string]any {
 		hostCPUStr = fmt.Sprintf("%.0f%% avg / %.0f%% peak", d.host.cpuAvg, d.host.cpuPeak)
 		hostMemStr = fmt.Sprintf("%s avg / %s peak of %s", gbf(d.host.memAvg), gbf(d.host.memPeak), gbf(d.host.memTotal))
 	}
-	res := fmt.Sprintf("*Charon (worst node):* mem %s, cpu %s\n*Host:* cpu %s, mem %s",
-		gb(d.charonMemBytes), cpuStr, hostCPUStr, hostMemStr)
+	res := fmt.Sprintf("*DV (worst node):* mem %s, cpu %s\n*Host:* cpu %s, mem %s",
+		gb(d.dvMemBytes), cpuStr, hostCPUStr, hostMemStr)
 	blocks = append(blocks, map[string]any{
 		"type": "section",
 		"text": map[string]any{"type": "mrkdwn", "text": res},
@@ -1048,7 +1048,7 @@ func collectReport(baseURL string, c combo, cycle, windowS int, host hostStats, 
 		worstPtr = &worst
 	}
 
-	memSamples, err := promQuery(baseURL, promCharonMemPeak(cn, windowS))
+	memSamples, err := promQuery(baseURL, promDVMemPeak(cn, windowS))
 	if err != nil {
 		return reportData{}, err
 	}
@@ -1057,7 +1057,7 @@ func collectReport(baseURL string, c combo, cycle, windowS int, host hostStats, 
 		memPtr = &v
 	}
 
-	cpuSamples, err := promQuery(baseURL, promCharonCPUPeak(cn, windowS))
+	cpuSamples, err := promQuery(baseURL, promDVCPUPeak(cn, windowS))
 	if err != nil {
 		return reportData{}, err
 	}
@@ -1109,17 +1109,17 @@ func collectReport(baseURL string, c combo, cycle, windowS int, host hostStats, 
 
 	h := host
 	return reportData{
-		combo:          c,
-		cycle:          cycle,
-		status:         status,
-		clImage:        clImage,
-		vcImage:        vcImage,
-		charonImage:    im.Charon,
-		worst:          worstPtr,
-		charonMemBytes: memPtr,
-		charonCPU:      cpuPtr,
-		host:           &h,
-		health:         health,
+		combo:      c,
+		cycle:      cycle,
+		status:     status,
+		clImage:    clImage,
+		vcImage:    vcImage,
+		dvImage:    im.DV,
+		worst:      worstPtr,
+		dvMemBytes: memPtr,
+		dvCPU:      cpuPtr,
+		host:       &h,
+		health:     health,
 	}, nil
 }
 
@@ -1127,21 +1127,21 @@ func collectReport(baseURL string, c combo, cycle, windowS int, host hostStats, 
 // runOne: run one combo end to end (with failedReport/postBestEffort helpers).
 // ---------------------------------------------------------------------------
 
-// charonNodeCount is the number of Charon nodes in the generated cluster.
-const charonNodeCount = 4
+// dvNodeCount is the number of DV nodes in the generated cluster.
+const dvNodeCount = 4
 
 func fmtWindow(start, end time.Time) string {
 	return fmt.Sprintf("%s-%s UTC", start.UTC().Format("15:04"), end.UTC().Format("15:04"))
 }
 
 // failedReport builds a failed-status report, always resolving the real
-// CL/VC/Charon image pins even on failure. It loads those pins from the
+// CL/VC/DV image pins even on failure. It loads those pins from the
 // repo's images.json via loadImages, so failedReport takes the
 // already-loaded images and applies the same im.CL[c.cl]-or-c.cl fallback
 // collectReport uses. Callers that haven't loaded images yet (i.e. only the
 // gitPull-failure branch in runOne, before loadImages runs) pass the
 // zero-value images{}, which falls back to the raw client names and a blank
-// charon image -- the only case where the data is genuinely unavailable.
+// DV image -- the only case where the data is genuinely unavailable.
 func failedReport(c combo, cycle int, errMsg string, im images) reportData {
 	clImage := im.CL[c.cl]
 	if clImage == "" {
@@ -1152,14 +1152,14 @@ func failedReport(c combo, cycle int, errMsg string, im images) reportData {
 		vcImage = c.vc
 	}
 	return reportData{
-		combo:       c,
-		cycle:       cycle,
-		status:      "failed",
-		clImage:     clImage,
-		vcImage:     vcImage,
-		charonImage: im.Charon,
-		window:      "-",
-		errMsg:      errMsg,
+		combo:   c,
+		cycle:   cycle,
+		status:  "failed",
+		clImage: clImage,
+		vcImage: vcImage,
+		dvImage: im.DV,
+		window:  "-",
+		errMsg:  errMsg,
 	}
 }
 
@@ -1261,7 +1261,7 @@ func runOne(cfg config, c combo, cycle int) (result reportData) {
 		return data
 	}
 
-	argsYAML := buildArgsFile(im, c, cfg.monitoringToken, charonNodeCount)
+	argsYAML := buildArgsFile(im, c, cfg.monitoringToken, dvNodeCount)
 	argsPath := filepath.Join(os.TempDir(), "network_params.yaml")
 	if err := os.WriteFile(argsPath, []byte(argsYAML), 0o644); err != nil {
 		data := failedReport(c, cycle, fmt.Sprintf("pre-launch failed: %v", err), im)
@@ -1295,13 +1295,13 @@ func runOne(cfg config, c combo, cycle int) (result reportData) {
 func mainLoop(cfg config) {
 	st, err := loadState(cfg.statePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "charon-cycler: failed to load state (starting fresh): %v\n", err)
+		fmt.Fprintf(os.Stderr, "dv-cycler: failed to load state (starting fresh): %v\n", err)
 		st = state{}
 	}
 
 	saveState := func() {
 		if err := st.save(cfg.statePath); err != nil {
-			fmt.Fprintf(os.Stderr, "charon-cycler: failed to save state: %v\n", err)
+			fmt.Fprintf(os.Stderr, "dv-cycler: failed to save state: %v\n", err)
 		}
 	}
 
@@ -1335,7 +1335,7 @@ func mainLoop(cfg config) {
 func main() {
 	cfg, err := loadConfig()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "charon-cycler:", err)
+		fmt.Fprintln(os.Stderr, "dv-cycler:", err)
 		os.Exit(1)
 	}
 	mainLoop(cfg)

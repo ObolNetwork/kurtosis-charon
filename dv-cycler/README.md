@@ -1,7 +1,7 @@
-# Charon matrix cycler
+# DV matrix cycler
 
-A small Go program (`package main`, `charon-cycler/main.go`) that runs the
-Charon 36-combo test matrix (6 CL clients x 6 VC clients: `lighthouse`,
+A small Go program (`package main`, `dv-cycler/main.go`) that runs the
+DV 36-combo test matrix (6 CL clients x 6 VC clients: `lighthouse`,
 `lodestar`, `nimbus`, `teku`, `prysm`, `grandine` for CL, and the same six
 plus `vouch` swapped in for VC) 24/7 on a host machine, using the local
 Kurtosis `ethereum-package` harness.
@@ -11,22 +11,22 @@ Kurtosis `ethereum-package` harness.
 For each combo in the cycle, in sequence, forever:
 
 1. `git pull` the repo (`CYCLER_REPO_PATH`) so the run always picks up the
-   latest client/Charon version pins and any code changes.
+   latest client/DV version pins and any code changes.
 2. Tear down any stale enclave left over from a previous crash, then launch a
-   fresh 4-Charon-node Kurtosis enclave for the combo (native Kurtosis path,
-   no Charon-specific harness changes).
+   fresh 4-DV-node Kurtosis enclave for the combo (native Kurtosis path,
+   no DV-specific harness changes).
 3. Wait for the cluster to become healthy (bounded by
    `CYCLER_STARTUP_DEADLINE_MINUTES`); if it never comes up, the run is
    recorded as `failed`.
 4. Sample host CPU/mem for the duration of the run (`CYCLER_RUN_MINUTES`,
    default 90) at `CYCLER_SAMPLE_INTERVAL_S` intervals.
 5. At the end of the window, query local Prometheus for duty success ratios
-   (worst node), Charon CPU/mem peaks, and `app_health_checks` firing status.
+   (worst node), DV CPU/mem peaks, and `app_health_checks` firing status.
    The scoring window excludes the first `CYCLER_WARMUP_MINUTES` of the run so
    startup noise doesn't count against the combo.
 6. Post one Slack message (via Incoming Webhook) summarizing the run: combo,
    images, status (`ok` / `degraded` / `failed`), worst-node duty ratios,
-   Charon CPU/mem peaks, host stats, and any firing health checks.
+   DV CPU/mem peaks, host stats, and any firing health checks.
 7. Tear down the enclave (best-effort/idempotent) and advance to the next
    combo, backing off (`CYCLER_INTER_RUN_BACKOFF_S`, capped at
    `CYCLER_MAX_BACKOFF_S`) after consecutive failures.
@@ -42,10 +42,10 @@ No build step is required — the cycler is run directly with `go run`, from
 the module directory:
 
 ```bash
-cd charon-cycler
+cd dv-cycler
 CYCLER_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/... \
 CYCLER_REPO_PATH=/opt/kurtosis-charon \
-CYCLER_STATE_PATH=/var/lib/charon-cycler/state.json \
+CYCLER_STATE_PATH=/var/lib/dv-cycler/state.json \
 go run .
 ```
 
@@ -75,8 +75,8 @@ any of the three required variables is unset or empty.
 
 ## Version pins
 
-Client and Charon image pins live in `images.json` at the repo root
-(`charon`, `el`, `bootstrap_cl`, `cl`, `vc`). To bump a version:
+Client and DV image pins live in `images.json` at the repo root
+(`dv`, `el`, `bootstrap_cl`, `cl`, `vc`). To bump a version:
 
 1. Edit the pin in `images.json`.
 2. Commit and push to `CYCLER_REPO_PATH`.
@@ -94,8 +94,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now cycler
 ```
 
-`cycler.service` runs as the `charon` user out of
-`/opt/kurtosis-charon/charon-cycler`, via `go run .`. Adjust `User`,
+`cycler.service` runs as the `dv` user out of
+`/opt/kurtosis-charon/dv-cycler`, via `go run .`. Adjust `User`,
 `WorkingDirectory`, the `Environment=` paths, and the `go` path in
 `ExecStart` if your checkout, service account, or Go install location differ.
 `Restart=always` with `RestartSec=30` means the service comes back on crash
@@ -108,7 +108,7 @@ touches `$HOME/.cache` and module-related state by default). `cycler.service`
 therefore sets:
 
 ```ini
-Environment=GOCACHE=/var/cache/charon-cycler/go-build
+Environment=GOCACHE=/var/cache/dv-cycler/go-build
 Environment=HOME=/opt/kurtosis-charon
 ```
 
@@ -146,6 +146,6 @@ service picks back up where it left off instead of restarting the whole
 ## Running tests
 
 ```bash
-cd charon-cycler
+cd dv-cycler
 go test ./...
 ```

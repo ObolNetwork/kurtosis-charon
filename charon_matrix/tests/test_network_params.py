@@ -24,6 +24,6 @@ def test_pins_come_from_images_json():
     from charon_matrix import network_params as np
     root = os.path.dirname(os.path.dirname(np.__file__))
     data = json.load(open(os.path.join(root, "images.json")))
-    assert np.CHARON_IMAGE == data["charon"]
+    assert np.DV_IMAGE == data["dv"]
     assert np.CL_IMAGES == data["cl"] and np.VC_IMAGES == data["vc"]
     assert data["cl"]["teku"] in np.build_network_params("teku", "prysm")

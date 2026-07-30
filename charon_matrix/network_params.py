@@ -2,7 +2,7 @@ import json as _json
 import os as _os
 
 _IMAGES = _json.load(open(_os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "images.json")))
-CHARON_IMAGE = _IMAGES["charon"]
+DV_IMAGE = _IMAGES["dv"]
 EL_IMAGE = _IMAGES["el"]
 BOOTSTRAP_CL_IMAGE = _IMAGES["bootstrap_cl"]
 CL_IMAGES = _IMAGES["cl"]
@@ -47,7 +47,7 @@ def build_network_params(cl, vc, charon_node_count=3):
     supernode: true
     use_separate_vc: true
     vc_type: charon
-    vc_image: {CHARON_IMAGE}
+    vc_image: {DV_IMAGE}
     charon_node_count: {charon_node_count}
     charon_params:
       charon_vc: {vc}
