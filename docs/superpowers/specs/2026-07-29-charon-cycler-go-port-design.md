@@ -105,6 +105,21 @@ Required: `CYCLER_SLACK_WEBHOOK_URL`, `CYCLER_REPO_PATH`, `CYCLER_STATE_PATH`
 `CYCLER_STARTUP_DEADLINE_MINUTES` (25), `CYCLER_SAMPLE_INTERVAL_S` (15),
 `CYCLER_INTER_RUN_BACKOFF_S` (30), `CYCLER_MAX_BACKOFF_S` (900).
 
+## Update (static params)
+
+The design below (code-generated args-file from `images.json` + a fixed
+36-combo matrix) was superseded shortly after this doc was written. The
+cycler no longer builds args-files or reads `images.json` at all: 36 static,
+committed `dv-cycler/network-params/<cl>-<vc>.yaml` files now carry the full
+args-file (pins inlined, `$PROMETHEUS_REMOTE_WRITE_TOKEN` placeholder
+intact), and the cycler just enumerates `*.yaml` in that directory
+(`CYCLER_PARAMS_DIR`, overridable) each loop iteration, substitutes the
+token, and runs whatever it finds — so a 37th file dropped in runs on the
+next pass with no code change. `cluster_name` is discovered at runtime via
+Prometheus (`group by (cluster_name) (app_version)`) instead of being
+derived from the combo. `images.json` and the Python `charon_matrix` runner
+are unaffected. See `dv-cycler/README.md` for the current model.
+
 ## Behaviour (unchanged from the Python — carried over verbatim in intent)
 
 - Sequential loop over the 36 combos (CL-major); resume from a JSON state file

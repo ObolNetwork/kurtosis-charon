@@ -11,35 +11,81 @@ import (
 	"time"
 )
 
-func TestCycleIs36CLMajor(t *testing.T) {
-	if len(cycle) != 36 {
-		t.Fatalf("len(cycle) = %d, want 36", len(cycle))
+// ---------------------------------------------------------------------------
+// paramFiles / paramStem / enclaveName.
+// ---------------------------------------------------------------------------
+
+func TestParamFiles(t *testing.T) {
+	dir := t.TempDir()
+	names := []string{"b.yaml", "a.yaml", "c.yaml"}
+	for _, n := range names {
+		if err := os.WriteFile(filepath.Join(dir, n), []byte("x: 1\n"), 0o644); err != nil {
+			t.Fatalf("write %s: %v", n, err)
+		}
 	}
-	if cycle[0] != (combo{"lighthouse", "lighthouse"}) {
-		t.Errorf("cycle[0] = %+v, want lighthouse/lighthouse", cycle[0])
+	// non-yaml file: must be ignored.
+	if err := os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("ignore me"), 0o644); err != nil {
+		t.Fatalf("write notes.txt: %v", err)
 	}
-	if cycle[6] != (combo{"lodestar", "lighthouse"}) {
-		t.Errorf("cycle[6] = %+v, want lodestar/lighthouse (CL-major rollover)", cycle[6])
+	// subdir (even one ending in .yaml) must be ignored / non-recursive.
+	if err := os.Mkdir(filepath.Join(dir, "sub.yaml"), 0o755); err != nil {
+		t.Fatalf("mkdir sub.yaml: %v", err)
 	}
-	if cycle[35] != (combo{"grandine", "vouch"}) {
-		t.Errorf("cycle[35] = %+v, want grandine/vouch", cycle[35])
+	if err := os.WriteFile(filepath.Join(dir, "sub.yaml", "nested.yaml"), []byte("x: 1\n"), 0o644); err != nil {
+		t.Fatalf("write nested.yaml: %v", err)
+	}
+
+	got, err := paramFiles(dir)
+	if err != nil {
+		t.Fatalf("paramFiles error: %v", err)
+	}
+	wantAbs := func(n string) string {
+		abs, err := filepath.Abs(filepath.Join(dir, n))
+		if err != nil {
+			t.Fatalf("filepath.Abs: %v", err)
+		}
+		return abs
+	}
+	want := []string{wantAbs("a.yaml"), wantAbs("b.yaml"), wantAbs("c.yaml")}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("paramFiles = %v, want %v", got, want)
 	}
 }
 
-func TestNamesAndEnclave(t *testing.T) {
-	c := combo{cl: "teku", vc: "prysm"}
-	if got := c.name(); got != "teku-prysm" {
-		t.Errorf("name() = %q, want teku-prysm", got)
-	}
-	if got := c.clusterName(); got != "kurtosis-teku-prysm" {
-		t.Errorf("clusterName() = %q, want kurtosis-teku-prysm", got)
-	}
-	if got := enclaveName(3, c); got != "c3-teku-prysm" {
-		t.Errorf("enclaveName(3, c) = %q, want c3-teku-prysm", got)
+func TestParamFilesMissingDir(t *testing.T) {
+	if _, err := paramFiles(filepath.Join(t.TempDir(), "does-not-exist")); err == nil {
+		t.Error("expected error for missing directory")
 	}
 }
 
-func TestStateRoundTripAndAdvanceWrap(t *testing.T) {
+func TestParamStem(t *testing.T) {
+	cases := map[string]string{
+		"/a/b/lighthouse-teku.yaml": "lighthouse-teku",
+		"grandine-vouch.yaml":       "grandine-vouch",
+	}
+	for in, want := range cases {
+		if got := paramStem(in); got != want {
+			t.Errorf("paramStem(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestEnclaveName(t *testing.T) {
+	if got := enclaveName(3, "teku-prysm"); got != "c3-teku-prysm" {
+		t.Errorf("enclaveName(3, teku-prysm) = %q, want c3-teku-prysm", got)
+	}
+	// Sanitization: uppercase and disallowed characters (e.g. from an
+	// unexpectedly-named param file) must not leak into the enclave name.
+	if got := enclaveName(0, "Teku_Prysm!"); got != "c0-teku-prysm-" {
+		t.Errorf("enclaveName sanitization = %q, want c0-teku-prysm-", got)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Config loading.
+// ---------------------------------------------------------------------------
+
+func TestStateRoundTripAndAdvance(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.json")
 
@@ -75,43 +121,26 @@ func TestStateRoundTripAndAdvanceWrap(t *testing.T) {
 		t.Errorf("loadState() = %+v, want %+v", loaded, s2)
 	}
 
-	// advance: 34 -> 35 (no wrap)
+	// advance: plain increment, no wrap (wrap is mainLoop's job now).
 	adv := state{Cycle: 0, NextIndex: 34}
 	adv.advance()
 	if adv.Cycle != 0 || adv.NextIndex != 35 {
 		t.Errorf("advance from 34: got (cycle=%d, idx=%d), want (0, 35)", adv.Cycle, adv.NextIndex)
 	}
-	// advance: 35 -> wrap to (cycle+1, idx 0)
 	adv.advance()
-	if adv.Cycle != 1 || adv.NextIndex != 0 {
-		t.Errorf("advance from 35: got (cycle=%d, idx=%d), want (1, 0)", adv.Cycle, adv.NextIndex)
+	if adv.Cycle != 0 || adv.NextIndex != 36 {
+		t.Errorf("advance from 35: got (cycle=%d, idx=%d), want (0, 36) -- advance itself must not wrap", adv.Cycle, adv.NextIndex)
 	}
 }
 
-// TestLoadStateRejectsOutOfRangeNextIndex guards against a corrupt/
-// hand-edited/forward-incompatible state file crash-looping the process: an
-// out-of-range next_index (too high, or negative) must not panic anything
-// downstream (selectNextCombo's cycle[s.NextIndex] indexing) -- loadState
-// must discard it and hand back a clean zero state instead.
-func TestLoadStateRejectsOutOfRangeNextIndex(t *testing.T) {
+// TestLoadStateRejectsNegativeValues guards against a corrupt/hand-edited/
+// forward-incompatible state file crash-looping the process: a negative
+// next_index or cycle must not propagate downstream -- loadState must
+// discard it and hand back a clean zero state instead. There's no fixed
+// upper bound anymore (mainLoop clamps next_index against the dynamic file
+// count instead), so only negative values are rejected here.
+func TestLoadStateRejectsNegativeValues(t *testing.T) {
 	dir := t.TempDir()
-
-	t.Run("next_index too large", func(t *testing.T) {
-		path := filepath.Join(dir, "too-large.json")
-		if err := os.WriteFile(path, []byte(`{"cycle":0,"next_index":99,"current_enclave":""}`), 0o644); err != nil {
-			t.Fatalf("write state file: %v", err)
-		}
-		s, err := loadState(path)
-		if err != nil {
-			t.Fatalf("loadState error: %v", err)
-		}
-		if s != (state{}) {
-			t.Errorf("loadState(next_index=99) = %+v, want zero state", s)
-		}
-		if got := selectNextCombo(s); got != cycle[0] {
-			t.Errorf("selectNextCombo(zero state) = %+v, want %+v", got, cycle[0])
-		}
-	})
 
 	t.Run("next_index negative", func(t *testing.T) {
 		path := filepath.Join(dir, "negative.json")
@@ -125,19 +154,39 @@ func TestLoadStateRejectsOutOfRangeNextIndex(t *testing.T) {
 		if s != (state{}) {
 			t.Errorf("loadState(next_index=-1) = %+v, want zero state", s)
 		}
-		if got := selectNextCombo(s); got != cycle[0] {
-			t.Errorf("selectNextCombo(zero state) = %+v, want %+v", got, cycle[0])
+	})
+
+	t.Run("cycle negative", func(t *testing.T) {
+		path := filepath.Join(dir, "negative-cycle.json")
+		if err := os.WriteFile(path, []byte(`{"cycle":-1,"next_index":0,"current_enclave":""}`), 0o644); err != nil {
+			t.Fatalf("write state file: %v", err)
+		}
+		s, err := loadState(path)
+		if err != nil {
+			t.Fatalf("loadState error: %v", err)
+		}
+		if s != (state{}) {
+			t.Errorf("loadState(cycle=-1) = %+v, want zero state", s)
 		}
 	})
-}
 
-func TestSelectNextCombo(t *testing.T) {
-	if got := selectNextCombo(state{NextIndex: 6}); got != (combo{"lodestar", "lighthouse"}) {
-		t.Errorf("combo = %+v, want lodestar/lighthouse", got)
-	}
-	if got := selectNextCombo(state{NextIndex: 0}); got != cycle[0] {
-		t.Errorf("combo = %+v, want %+v", got, cycle[0])
-	}
+	t.Run("large next_index is no longer rejected (dynamic file count)", func(t *testing.T) {
+		// Unlike the old fixed-36-combo cycle, an out-of-range-looking
+		// next_index isn't inherently invalid anymore -- mainLoop clamps it
+		// against the current file count on each iteration. loadState must
+		// pass it through unchanged as long as it's non-negative.
+		path := filepath.Join(dir, "large.json")
+		if err := os.WriteFile(path, []byte(`{"cycle":0,"next_index":9999,"current_enclave":""}`), 0o644); err != nil {
+			t.Fatalf("write state file: %v", err)
+		}
+		s, err := loadState(path)
+		if err != nil {
+			t.Fatalf("loadState error: %v", err)
+		}
+		if s.NextIndex != 9999 {
+			t.Errorf("loadState(next_index=9999).NextIndex = %d, want 9999 (unchanged)", s.NextIndex)
+		}
+	})
 }
 
 func TestComputeBackoff(t *testing.T) {
@@ -167,82 +216,6 @@ func TestComputeBackoff(t *testing.T) {
 			t.Errorf("computeBackoff(%d,%d,%d) = %d, out of range (0,%d]", c.failures, c.base, c.cap, got, c.cap)
 		}
 	}
-}
-
-func testImages() images {
-	return images{
-		DV:          "obolnetwork/charon:next",
-		EL:          "ethereum/client-go:v1.17.4",
-		BootstrapCL: "sigp/lighthouse:v8.2.1",
-		CL: map[string]string{
-			"lighthouse": "sigp/lighthouse:v8.2.1",
-			"lodestar":   "chainsafe/lodestar:v1.45.0",
-			"nimbus":     "statusim/nimbus-eth2:multiarch-v26.7.0",
-			"teku":       "consensys/teku:26.7.1",
-			"prysm":      "gcr.io/prysmaticlabs/prysm/beacon-chain:v7.1.8",
-			"grandine":   "sifrai/grandine:2.0.5",
-		},
-		VC: map[string]string{
-			"lighthouse": "sigp/lighthouse:v8.2.1",
-			"lodestar":   "chainsafe/lodestar:v1.45.0",
-			"nimbus":     "statusim/nimbus-validator-client:multiarch-v26.7.0",
-			"teku":       "consensys/teku:26.7.1",
-			"prysm":      "gcr.io/prysmaticlabs/prysm/validator:v7.1.8",
-			"vouch":      "attestant/vouch:1.13.1",
-		},
-	}
-}
-
-func TestBuildArgsFile(t *testing.T) {
-	im := testImages()
-
-	t.Run("four nodes and token substituted", func(t *testing.T) {
-		y := buildArgsFile(im, combo{cl: "lighthouse", vc: "teku"}, "SECRET123", 4)
-		if !strings.Contains(y, "charon_node_count: 4") {
-			t.Errorf("missing charon_node_count: 4")
-		}
-		if strings.Contains(y, "$PROMETHEUS_REMOTE_WRITE_TOKEN") {
-			t.Errorf("token placeholder not substituted")
-		}
-		if !strings.Contains(y, "SECRET123") {
-			t.Errorf("token not present in output")
-		}
-	})
-
-	t.Run("nimbus vc gets json_requests", func(t *testing.T) {
-		y := buildArgsFile(im, combo{cl: "teku", vc: "nimbus"}, "tok", 4)
-		if !strings.Contains(y, "vc_extra_env_vars:") || !strings.Contains(y, "CHARON_FEATURE_SET_ENABLE: json_requests") {
-			t.Errorf("missing nimbus vc_extra_env_vars block, got:\n%s", y)
-		}
-	})
-
-	t.Run("non-nimbus vc has no json_requests", func(t *testing.T) {
-		y := buildArgsFile(im, combo{cl: "teku", vc: "prysm"}, "tok", 4)
-		if strings.Contains(y, "json_requests") {
-			t.Errorf("unexpected vc_extra_env_vars for non-nimbus vc")
-		}
-	})
-
-	t.Run("teku pin present and charon_vc set", func(t *testing.T) {
-		y := buildArgsFile(im, combo{cl: "prysm", vc: "vouch"}, "tok", 4)
-		if !strings.Contains(y, im.CL["prysm"]) {
-			t.Errorf("missing prysm CL pin")
-		}
-		if !strings.Contains(y, "charon_vc: vouch") {
-			t.Errorf("missing charon_vc: vouch")
-		}
-		y2 := buildArgsFile(im, combo{cl: "teku", vc: "prysm"}, "tok", 4)
-		if !strings.Contains(y2, im.CL["teku"]) {
-			t.Errorf("missing teku CL pin: %s", im.CL["teku"])
-		}
-	})
-
-	t.Run("storage_tsdb_retention_time kept at 3h", func(t *testing.T) {
-		y := buildArgsFile(im, combo{cl: "lighthouse", vc: "lighthouse"}, "tok", 4)
-		if !strings.Contains(y, "storage_tsdb_retention_time: 3h") {
-			t.Errorf("missing storage_tsdb_retention_time: 3h")
-		}
-	})
 }
 
 func TestPromQLBuilders(t *testing.T) {
@@ -413,10 +386,11 @@ func TestParseMeminfo(t *testing.T) {
 }
 
 func TestLoadConfig(t *testing.T) {
-	t.Run("required present -> defaults applied", func(t *testing.T) {
+	t.Run("required present -> defaults applied, paramsDir derived from repoPath", func(t *testing.T) {
 		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "http://hook")
 		t.Setenv("CYCLER_REPO_PATH", "/srv/kurtosis-charon")
 		t.Setenv("CYCLER_STATE_PATH", "/var/lib/cycler/state.json")
+		t.Setenv("CYCLER_PARAMS_DIR", "")
 		t.Setenv("CYCLER_MONITORING_TOKEN", "")
 		t.Setenv("CYCLER_PACKAGE_REF", "")
 		t.Setenv("CYCLER_RUN_MINUTES", "")
@@ -439,6 +413,10 @@ func TestLoadConfig(t *testing.T) {
 		if cfg.statePath != "/var/lib/cycler/state.json" {
 			t.Errorf("statePath = %q", cfg.statePath)
 		}
+		wantParamsDir := filepath.Join("/srv/kurtosis-charon", "dv-cycler", "network-params")
+		if cfg.paramsDir != wantParamsDir {
+			t.Errorf("paramsDir = %q, want %q", cfg.paramsDir, wantParamsDir)
+		}
 		if cfg.runMinutes != 90 || cfg.warmupMinutes != 15 {
 			t.Errorf("runMinutes/warmupMinutes = %d/%d, want 90/15", cfg.runMinutes, cfg.warmupMinutes)
 		}
@@ -450,6 +428,21 @@ func TestLoadConfig(t *testing.T) {
 		}
 		if cfg.interRunBackoffS != 30 || cfg.maxBackoffS != 900 {
 			t.Errorf("interRunBackoffS/maxBackoffS = %d/%d, want 30/900", cfg.interRunBackoffS, cfg.maxBackoffS)
+		}
+	})
+
+	t.Run("CYCLER_PARAMS_DIR override wins over the derived default", func(t *testing.T) {
+		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "h")
+		t.Setenv("CYCLER_REPO_PATH", "/srv/kurtosis-charon")
+		t.Setenv("CYCLER_STATE_PATH", "st")
+		t.Setenv("CYCLER_PARAMS_DIR", "/custom/params")
+
+		cfg, err := loadConfig()
+		if err != nil {
+			t.Fatalf("loadConfig error: %v", err)
+		}
+		if cfg.paramsDir != "/custom/params" {
+			t.Errorf("paramsDir = %q, want /custom/params", cfg.paramsDir)
 		}
 	})
 
@@ -503,13 +496,11 @@ func TestBuildBlocksStatuses(t *testing.T) {
 		mem := 512.0 * 1024 * 1024
 		cpu := 1.4
 		return reportData{
-			combo:   combo{cl: "teku", vc: "prysm"},
-			cycle:   3,
-			status:  status,
-			clImage: "consensys/teku:26.7.1",
-			vcImage: "gcr.io/.../validator:v7.1.8",
-			dvImage: "obolnetwork/charon:next",
-			window:  "12:00-13:30 UTC",
+			name:        "teku-prysm",
+			clusterName: "kurtosis-teku-prysm",
+			cycle:       3,
+			status:      status,
+			window:      "12:00-13:30 UTC",
 			worst: &worstNode{peer: "1", duties: []dutyResult{
 				{duty: "attester", expected: 780, success: 780},
 				{duty: "aggregator", expected: 150, success: 130},
@@ -521,7 +512,7 @@ func TestBuildBlocksStatuses(t *testing.T) {
 		}
 	}
 
-	t.Run("ok status renders duty ratios and worst peer", func(t *testing.T) {
+	t.Run("ok status renders duty ratios, worst peer, and cluster name", func(t *testing.T) {
 		blocks := buildBlocks(base("ok"))
 		dump := dumpBlocks(blocks)
 		if !strings.Contains(dump, "780/780") {
@@ -539,8 +530,11 @@ func TestBuildBlocksStatuses(t *testing.T) {
 		if !strings.Contains(dump, "high-inclusion-delay") {
 			t.Errorf("missing health check name in %s", dump)
 		}
+		if !strings.Contains(dump, "kurtosis-teku-prysm") {
+			t.Errorf("missing discovered cluster name in %s", dump)
+		}
 		text := buildText(base("ok"))
-		if !strings.Contains(text, "teku") || !strings.Contains(text, "prysm") || !strings.Contains(strings.ToLower(text), "cycle 3") {
+		if !strings.Contains(text, "teku-prysm") || !strings.Contains(strings.ToLower(text), "cycle 3") {
 			t.Errorf("buildText = %q", text)
 		}
 	})
@@ -555,14 +549,11 @@ func TestBuildBlocksStatuses(t *testing.T) {
 
 	t.Run("failed status shows error and nil optionals don't panic", func(t *testing.T) {
 		d := reportData{
-			combo:   combo{cl: "teku", vc: "prysm"},
-			cycle:   1,
-			status:  "failed",
-			clImage: "cl-image",
-			vcImage: "vc-image",
-			dvImage: "dv-image",
-			window:  "-",
-			errMsg:  "launch failed: boom",
+			name:   "teku-prysm",
+			cycle:  1,
+			status: "failed",
+			window: "-",
+			errMsg: "launch failed: boom",
 		}
 		blocks := buildBlocks(d)
 		dump := dumpBlocks(blocks)
@@ -588,52 +579,6 @@ func dumpBlocks(blocks []map[string]any) string {
 		return fmt.Sprint(blocks)
 	}
 	return string(b)
-}
-
-func TestLoadImages(t *testing.T) {
-	dir := t.TempDir()
-	content := `{
-		"dv": "obolnetwork/charon:next",
-		"el": "ethereum/client-go:v1.17.4",
-		"bootstrap_cl": "sigp/lighthouse:v8.2.1",
-		"cl": {"teku": "consensys/teku:26.7.1"},
-		"vc": {"vouch": "attestant/vouch:1.13.1"}
-	}`
-	if err := os.WriteFile(filepath.Join(dir, "images.json"), []byte(content), 0o644); err != nil {
-		t.Fatalf("write images.json: %v", err)
-	}
-	im, err := loadImages(dir)
-	if err != nil {
-		t.Fatalf("loadImages error: %v", err)
-	}
-	if im.DV != "obolnetwork/charon:next" {
-		t.Errorf("DV = %q", im.DV)
-	}
-	if im.EL != "ethereum/client-go:v1.17.4" {
-		t.Errorf("EL = %q", im.EL)
-	}
-	if im.BootstrapCL != "sigp/lighthouse:v8.2.1" {
-		t.Errorf("BootstrapCL = %q", im.BootstrapCL)
-	}
-	if im.CL["teku"] != "consensys/teku:26.7.1" {
-		t.Errorf("CL[teku] = %q", im.CL["teku"])
-	}
-	if im.VC["vouch"] != "attestant/vouch:1.13.1" {
-		t.Errorf("VC[vouch] = %q", im.VC["vouch"])
-	}
-}
-
-// writeTestImages writes testImages() as images.json into dir, for tests
-// that exercise runOne's loadImages(cfg.repoPath) step.
-func writeTestImages(t *testing.T, dir string) {
-	t.Helper()
-	data, err := json.Marshal(testImages())
-	if err != nil {
-		t.Fatalf("marshal images: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "images.json"), data, 0o644); err != nil {
-		t.Fatalf("write images.json: %v", err)
-	}
 }
 
 func TestPromQueryParsesAndErrors(t *testing.T) {
@@ -662,6 +607,58 @@ func TestPromQueryParsesAndErrors(t *testing.T) {
 	} else if !strings.Contains(err.Error(), "bad_data") {
 		t.Errorf("error = %v, want mention of errorType bad_data", err)
 	}
+}
+
+// ---------------------------------------------------------------------------
+// discoverClusterName.
+// ---------------------------------------------------------------------------
+
+func TestDiscoverClusterName(t *testing.T) {
+	old := httpGet
+	defer func() { httpGet = old }()
+
+	t.Run("exactly one cluster_name -> returned", func(t *testing.T) {
+		httpGet = func(string) ([]byte, int, error) {
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_name":"kurtosis-teku-prysm"},"value":[1,"1"]}]}}`), 200, nil
+		}
+		got, err := discoverClusterName("http://x")
+		if err != nil {
+			t.Fatalf("discoverClusterName error: %v", err)
+		}
+		if got != "kurtosis-teku-prysm" {
+			t.Errorf("discoverClusterName = %q, want kurtosis-teku-prysm", got)
+		}
+	})
+
+	t.Run("zero cluster_name values -> error", func(t *testing.T) {
+		httpGet = func(string) ([]byte, int, error) {
+			return []byte(`{"status":"success","data":{"result":[]}}`), 200, nil
+		}
+		if _, err := discoverClusterName("http://x"); err == nil {
+			t.Fatal("expected error for zero cluster_name values")
+		}
+	})
+
+	t.Run("two distinct cluster_name values -> error", func(t *testing.T) {
+		httpGet = func(string) ([]byte, int, error) {
+			return []byte(`{"status":"success","data":{"result":[
+				{"metric":{"cluster_name":"kurtosis-a"},"value":[1,"1"]},
+				{"metric":{"cluster_name":"kurtosis-b"},"value":[1,"1"]}
+			]}}`), 200, nil
+		}
+		if _, err := discoverClusterName("http://x"); err == nil {
+			t.Fatal("expected error for two distinct cluster_name values")
+		}
+	})
+
+	t.Run("promQuery error propagates", func(t *testing.T) {
+		httpGet = func(string) ([]byte, int, error) {
+			return []byte(`{"status":"error","errorType":"timeout"}`), 200, nil
+		}
+		if _, err := discoverClusterName("http://x"); err == nil {
+			t.Fatal("expected error propagated from promQuery")
+		}
+	})
 }
 
 func TestSlackPostPayloadAndNon200(t *testing.T) {
@@ -746,6 +743,39 @@ func TestPrometheusBaseURLParse(t *testing.T) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// runOne, via a temp param-files dir and fakes.
+// ---------------------------------------------------------------------------
+
+// writeParamFile writes a minimal static args-file (with the token
+// placeholder, mirroring the real network-params/*.yaml files) into dir and
+// returns its path.
+func writeParamFile(t *testing.T, dir, name string) string {
+	t.Helper()
+	content := "prometheus_params:\n  remote_write_token: \"$PROMETHEUS_REMOTE_WRITE_TOKEN\"\ncharon_node_count: 4\n"
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", name, err)
+	}
+	return path
+}
+
+func TestTokenSubstitution(t *testing.T) {
+	dir := t.TempDir()
+	path := writeParamFile(t, dir, "teku-prysm.yaml")
+	raw, err := readFileFn(path)
+	if err != nil {
+		t.Fatalf("readFileFn: %v", err)
+	}
+	got := strings.ReplaceAll(string(raw), "$PROMETHEUS_REMOTE_WRITE_TOKEN", "SECRET123")
+	if strings.Contains(got, "$PROMETHEUS_REMOTE_WRITE_TOKEN") {
+		t.Errorf("token placeholder not substituted: %s", got)
+	}
+	if !strings.Contains(got, "SECRET123") {
+		t.Errorf("token not present in output: %s", got)
+	}
+}
+
 func TestRunOnePreLaunchFailurePostsFailed(t *testing.T) {
 	oldRun, oldPost := runCommand, httpPost
 	defer func() { runCommand, httpPost = oldRun, oldPost }()
@@ -762,11 +792,14 @@ func TestRunOnePreLaunchFailurePostsFailed(t *testing.T) {
 		return 200, nil
 	}
 
+	dir := t.TempDir()
+	paramFile := writeParamFile(t, dir, "teku-prysm.yaml")
+
 	cfg := config{
 		slackWebhookURL: "http://hook", repoPath: "/nonexistent", packageRef: "pkg",
 		runMinutes: 1, warmupMinutes: 0, startupDeadlineMinutes: 1, sampleIntervalS: 1,
 	}
-	data := runOne(cfg, combo{cl: "teku", vc: "prysm"}, 1)
+	data := runOne(cfg, paramFile, "teku-prysm", 1)
 	if data.status != "failed" {
 		t.Errorf("status = %q, want failed", data.status)
 	}
@@ -781,7 +814,7 @@ func TestRunOneMidRunFailureTearsDownAndPosts(t *testing.T) {
 	sleepFn = func(time.Duration) {}
 
 	dir := t.TempDir()
-	writeTestImages(t, dir)
+	paramFile := writeParamFile(t, dir, "teku-prysm.yaml")
 
 	removeCalls := 0
 	runCommand = func(name string, args ...string) (string, error) {
@@ -801,7 +834,7 @@ func TestRunOneMidRunFailureTearsDownAndPosts(t *testing.T) {
 		if strings.Contains(u, "core_scheduler_validators_active") {
 			return []byte(`{"status":"success","data":{"result":[{"metric":{},"value":[1,"1"]}]}}`), 200, nil
 		}
-		// Everything queried during collectReport fails.
+		// Everything queried after health (cluster discovery, duties, etc) fails.
 		return []byte(`{"status":"error","errorType":"timeout"}`), 200, nil
 	}
 	postCount := 0
@@ -811,25 +844,15 @@ func TestRunOneMidRunFailureTearsDownAndPosts(t *testing.T) {
 		slackWebhookURL: "http://hook", repoPath: dir, packageRef: "pkg",
 		runMinutes: 1, warmupMinutes: 0, startupDeadlineMinutes: 1, sampleIntervalS: 1,
 	}
-	im := testImages()
-	data := runOne(cfg, combo{cl: "teku", vc: "prysm"}, 1)
+	data := runOne(cfg, paramFile, "teku-prysm", 1)
 	if data.status != "failed" {
 		t.Errorf("status = %q, want failed", data.status)
 	}
 	if postCount != 1 {
 		t.Errorf("slackPost called %d times, want 1", postCount)
 	}
-	// This failure happens after loadImages succeeded (mid-run, during
-	// collectReport), so failedReport must carry the real pins through,
-	// not fall back to the short client names / a blank DV image.
-	if data.clImage != im.CL["teku"] {
-		t.Errorf("clImage = %q, want real pin %q", data.clImage, im.CL["teku"])
-	}
-	if data.vcImage != im.VC["prysm"] {
-		t.Errorf("vcImage = %q, want real pin %q", data.vcImage, im.VC["prysm"])
-	}
-	if data.dvImage != im.DV {
-		t.Errorf("dvImage = %q, want %q", data.dvImage, im.DV)
+	if data.name != "teku-prysm" {
+		t.Errorf("name = %q, want teku-prysm", data.name)
 	}
 	// Exactly 2 kurtosis-enclave-rm calls are guaranteed on this path: the
 	// guarded pre-clear at the top of runOne, and the deferred teardown
@@ -852,7 +875,7 @@ func TestRunOneRecoversFromPanicAfterLaunch(t *testing.T) {
 	sleepFn = func(time.Duration) {}
 
 	dir := t.TempDir()
-	writeTestImages(t, dir)
+	paramFile := writeParamFile(t, dir, "teku-prysm.yaml")
 
 	removeCalls := 0
 	runCommand = func(name string, args ...string) (string, error) {
@@ -872,7 +895,7 @@ func TestRunOneRecoversFromPanicAfterLaunch(t *testing.T) {
 		if strings.Contains(u, "core_scheduler_validators_active") {
 			// Let waitHealthy succeed so we get past launch into the
 			// post-launch phase, then panic on the very next query
-			// (the first one collectReport issues).
+			// (discoverClusterName's).
 			return []byte(`{"status":"success","data":{"result":[{"metric":{},"value":[1,"1"]}]}}`), 200, nil
 		}
 		panic("simulated metrics client panic")
@@ -885,7 +908,7 @@ func TestRunOneRecoversFromPanicAfterLaunch(t *testing.T) {
 		runMinutes: 1, warmupMinutes: 0, startupDeadlineMinutes: 1, sampleIntervalS: 1,
 	}
 
-	data := runOne(cfg, combo{cl: "teku", vc: "prysm"}, 1) // must not panic out of this call
+	data := runOne(cfg, paramFile, "teku-prysm", 1) // must not panic out of this call
 	if data.status != "failed" {
 		t.Errorf("status = %q, want failed", data.status)
 	}
@@ -911,7 +934,7 @@ func TestRunOneHappyPathOK(t *testing.T) {
 	defer func() { runCommand, httpPost, httpGet, sleepFn, nowFn = oldRun, oldPost, oldGet, oldSleep, oldNow }()
 
 	dir := t.TempDir()
-	writeTestImages(t, dir)
+	paramFile := writeParamFile(t, dir, "teku-prysm.yaml")
 
 	runCommand = func(name string, args ...string) (string, error) {
 		if name == "kurtosis" && len(args) > 0 && args[0] == "port" {
@@ -923,6 +946,8 @@ func TestRunOneHappyPathOK(t *testing.T) {
 		switch {
 		case strings.Contains(u, "core_scheduler_validators_active"):
 			return []byte(`{"status":"success","data":{"result":[{"metric":{},"value":[1,"1"]}]}}`), 200, nil
+		case strings.Contains(u, "cluster_name") && strings.Contains(u, "app_version"):
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_name":"kurtosis-teku-prysm"},"value":[1,"1"]}]}}`), 200, nil
 		case strings.Contains(u, "core_tracker_expect_duties_total"):
 			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"780"]}]}}`), 200, nil
 		case strings.Contains(u, "core_tracker_success_duties_total"):
@@ -945,9 +970,12 @@ func TestRunOneHappyPathOK(t *testing.T) {
 		slackWebhookURL: "http://hook", repoPath: dir, packageRef: "pkg",
 		runMinutes: 2, warmupMinutes: 1, startupDeadlineMinutes: 1, sampleIntervalS: 1,
 	}
-	data := runOne(cfg, combo{cl: "teku", vc: "prysm"}, 1)
+	data := runOne(cfg, paramFile, "teku-prysm", 1)
 	if data.status != "ok" {
 		t.Fatalf("status = %q, want ok (errMsg=%q)", data.status, data.errMsg)
+	}
+	if data.clusterName != "kurtosis-teku-prysm" {
+		t.Errorf("clusterName = %q, want kurtosis-teku-prysm", data.clusterName)
 	}
 	windowS := cfg.runMinutes*60 - cfg.warmupMinutes*60
 	wantWindow := fmtWindow(fixedNow.Add(-time.Duration(windowS)*time.Second), fixedNow)
@@ -960,7 +988,6 @@ func TestDegradedTolerance(t *testing.T) {
 	old := httpGet
 	defer func() { httpGet = old }()
 
-	im := testImages()
 	mkResp := func(pct float64) func(string) ([]byte, int, error) {
 		expected := 1000.0
 		success := expected * pct / 100
@@ -977,7 +1004,7 @@ func TestDegradedTolerance(t *testing.T) {
 	}
 
 	httpGet = mkResp(99.9)
-	data, err := collectReport("http://x", combo{cl: "teku", vc: "prysm"}, 1, 60, hostStats{}, im)
+	data, err := collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
@@ -986,7 +1013,7 @@ func TestDegradedTolerance(t *testing.T) {
 	}
 
 	httpGet = mkResp(95)
-	data, err = collectReport("http://x", combo{cl: "teku", vc: "prysm"}, 1, 60, hostStats{}, im)
+	data, err = collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
