@@ -9,10 +9,8 @@ User=dv
 WorkingDirectory=/opt/kurtosis-charon/dv-cycler
 Environment=GOCACHE=/var/cache/dv-cycler/go-build
 Environment=HOME=/opt/kurtosis-charon
-Environment=CYCLER_SLACK_WEBHOOK_URL=
-Environment=CYCLER_REPO_PATH=/opt/kurtosis-charon
-Environment=CYCLER_STATE_PATH=/var/lib/dv-cycler/state.json
-Environment=CYCLER_MONITORING_TOKEN=
+# CYCLER_* config (webhook, repo/state paths, token, ...) is read from a .env
+# file in WorkingDirectory at startup. Copy .env.example -> .env and fill it in.
 ExecStart=/opt/homebrew/bin/go run .
 Restart=always
 RestartSec=30

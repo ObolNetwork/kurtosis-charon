@@ -385,6 +385,38 @@ func TestParseMeminfo(t *testing.T) {
 	}
 }
 
+func TestLoadDotEnv(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, ".env")
+	content := "# a comment\n\nexport DOTENV_TEST_A=hello\nDOTENV_TEST_B=\"quoted val\"\nDOTENV_TEST_C='x'\nno_equals_line\n"
+	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A is already set -> the file must NOT override it.
+	t.Setenv("DOTENV_TEST_A", "preset")
+	os.Unsetenv("DOTENV_TEST_B")
+	os.Unsetenv("DOTENV_TEST_C")
+	defer os.Unsetenv("DOTENV_TEST_B")
+	defer os.Unsetenv("DOTENV_TEST_C")
+
+	if err := loadDotEnv(p); err != nil {
+		t.Fatalf("loadDotEnv: %v", err)
+	}
+	if got := os.Getenv("DOTENV_TEST_A"); got != "preset" {
+		t.Errorf("A = %q, want preset (pre-set env must win over .env)", got)
+	}
+	if got := os.Getenv("DOTENV_TEST_B"); got != "quoted val" {
+		t.Errorf("B = %q, want %q (double-quotes stripped)", got, "quoted val")
+	}
+	if got := os.Getenv("DOTENV_TEST_C"); got != "x" {
+		t.Errorf("C = %q, want x (single-quotes stripped)", got)
+	}
+	// A missing file is a no-op, not an error.
+	if err := loadDotEnv(filepath.Join(dir, "does-not-exist.env")); err != nil {
+		t.Errorf("missing file should be a no-op, got %v", err)
+	}
+}
+
 func TestLoadConfig(t *testing.T) {
 	t.Run("required present -> defaults applied, paramsDir derived from repoPath", func(t *testing.T) {
 		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "http://hook")

@@ -76,7 +76,15 @@ must never block teardown.
 ## Running it
 
 No build step is required — the cycler is run directly with `go run`, from
-the module directory:
+the module directory. Put config in a `.env` file:
+
+```bash
+cd dv-cycler
+cp .env.example .env      # then edit .env (webhook, paths, token)
+go run .
+```
+
+Or set the `CYCLER_*` variables in the environment (these override `.env`):
 
 ```bash
 cd dv-cycler
@@ -92,9 +100,13 @@ binary is committed or needs to be rebuilt after a `git pull`.
 
 ## Configuration
 
-All configuration is via `CYCLER_*` environment variables (there is no config
-file). `loadConfig()` returns an error naming every missing required key if
-any of the three required variables is unset or empty.
+Configuration is via `CYCLER_*` environment variables. At startup the cycler
+also loads a `.env` file (`KEY=value`) from its working directory — copy
+`.env.example` to `.env` and fill it in (point elsewhere with
+`CYCLER_ENV_FILE`). Real environment variables and `--flags` take precedence
+over `.env`, and `.env` is gitignored so secrets stay out of the repo.
+`loadConfig()` returns an error naming every missing required key if any of
+the three required variables is unset or empty.
 
 | Env var | Required | Default | Description |
 |---|---|---|---|
@@ -123,6 +135,9 @@ sudo systemctl enable --now cycler
 `/opt/kurtosis-charon/dv-cycler`, via `go run .`. Adjust `User`,
 `WorkingDirectory`, the `Environment=` paths, and the `go` path in
 `ExecStart` if your checkout, service account, or Go install location differ.
+The `CYCLER_*` configuration is read from a `.env` file in `WorkingDirectory`
+(`/opt/kurtosis-charon/dv-cycler/.env`) — create it there from `.env.example`
+before enabling the service (the unit itself carries no secrets).
 `Restart=always` with `RestartSec=30` means the service comes back on crash
 or reboot; state/resume behavior (below) makes that safe.
 
