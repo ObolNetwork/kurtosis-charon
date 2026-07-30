@@ -559,8 +559,8 @@ func TestBuildBlocksStatuses(t *testing.T) {
 		if !strings.Contains(strings.ToLower(dump), "node 1") {
 			t.Errorf("missing worst node reference in %s", dump)
 		}
-		if !strings.Contains(dump, "high-inclusion-delay") {
-			t.Errorf("missing health check name in %s", dump)
+		if strings.Contains(dump, "high-inclusion-delay") || strings.Contains(strings.ToLower(dump), "health check") {
+			t.Errorf("health section should be omitted while reportHealthChecks is off: %s", dump)
 		}
 		if !strings.Contains(dump, "kurtosis-teku-prysm") {
 			t.Errorf("missing discovered cluster name in %s", dump)
@@ -568,6 +568,16 @@ func TestBuildBlocksStatuses(t *testing.T) {
 		text := buildText(base("ok"))
 		if !strings.Contains(text, "teku-prysm") || !strings.Contains(strings.ToLower(text), "cycle 3") {
 			t.Errorf("buildText = %q", text)
+		}
+	})
+
+	t.Run("health section renders when reportHealthChecks enabled", func(t *testing.T) {
+		old := reportHealthChecks
+		reportHealthChecks = true
+		defer func() { reportHealthChecks = old }()
+		dump := dumpBlocks(buildBlocks(base("ok")))
+		if !strings.Contains(dump, "high-inclusion-delay") {
+			t.Errorf("health check name missing when reportHealthChecks enabled: %s", dump)
 		}
 	})
 
@@ -1057,6 +1067,46 @@ func TestRunOneHappyPathOK(t *testing.T) {
 	wantWindow := fmtWindow(fixedNow.Add(-time.Duration(windowS)*time.Second), fixedNow)
 	if data.window != wantWindow {
 		t.Errorf("window = %q, want %q", data.window, wantWindow)
+	}
+}
+
+func TestHealthCheckStatusGatedByToggle(t *testing.T) {
+	old := httpGet
+	defer func() { httpGet = old }()
+	httpGet = func(u string) ([]byte, int, error) {
+		switch {
+		case strings.Contains(u, "core_tracker_expect_duties_total"):
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"1000"]}]}}`), 200, nil
+		case strings.Contains(u, "core_tracker_success_duties_total"):
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"1000"]}]}}`), 200, nil
+		case strings.Contains(u, "app_health_checks"):
+			// A check that is both fired and firing now.
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"name":"peer-count","severity":"error"},"value":[1,"1"]}]}}`), 200, nil
+		default:
+			return []byte(`{"status":"success","data":{"result":[]}}`), 200, nil
+		}
+	}
+
+	// Default (disabled): a firing health check must NOT downgrade an otherwise
+	// healthy run.
+	data, err := collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, hostStats{})
+	if err != nil {
+		t.Fatalf("collectReport error: %v", err)
+	}
+	if data.status != "ok" {
+		t.Errorf("with health disabled, firing check gave status %q, want ok", data.status)
+	}
+
+	// Enabled: the same firing check downgrades to degraded.
+	oldFlag := reportHealthChecks
+	reportHealthChecks = true
+	defer func() { reportHealthChecks = oldFlag }()
+	data, err = collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, hostStats{})
+	if err != nil {
+		t.Fatalf("collectReport error: %v", err)
+	}
+	if data.status != "degraded" {
+		t.Errorf("with health enabled, firing check gave status %q, want degraded", data.status)
 	}
 }
 

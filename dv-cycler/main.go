@@ -689,6 +689,14 @@ func healthMD(health []healthCheck) string {
 	return strings.Join(lines, "\n")
 }
 
+// reportHealthChecks gates whether charon app_health_checks are surfaced at
+// all: when false (current default), the Slack report omits the health-check
+// section and a firing check does NOT downgrade a run to "degraded" (so status
+// reflects duty ratios only). The checks are still queried and populated on
+// reportData, so re-enabling is just flipping this to true. Disabled for now
+// because the health checks are noisy in these matrix runs.
+var reportHealthChecks = false
+
 func buildBlocks(d reportData) []map[string]any {
 	e := statusEmoji[d.status]
 	header := fmt.Sprintf("%s %s", e, d.name)
@@ -735,10 +743,12 @@ func buildBlocks(d reportData) []map[string]any {
 		"text": map[string]any{"type": "mrkdwn", "text": res},
 	})
 
-	blocks = append(blocks, map[string]any{
-		"type": "section",
-		"text": map[string]any{"type": "mrkdwn", "text": healthMD(d.health)},
-	})
+	if reportHealthChecks {
+		blocks = append(blocks, map[string]any{
+			"type": "section",
+			"text": map[string]any{"type": "mrkdwn", "text": healthMD(d.health)},
+		})
+	}
 
 	return blocks
 }
@@ -1117,7 +1127,7 @@ func collectReport(baseURL, name, clusterName string, cycle, windowS int, host h
 			}
 		}
 	}
-	if !degraded {
+	if reportHealthChecks && !degraded {
 		for _, h := range health {
 			if h.firingNow {
 				degraded = true
