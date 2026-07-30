@@ -211,6 +211,19 @@ func loadState(path string) (state, error) {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return state{}, err
 	}
+	// A corrupt/hand-edited/forward-incompatible state file with an
+	// out-of-range next_index (or a negative cycle) would otherwise panic
+	// in selectNextCombo's cycle[s.NextIndex] indexing. That call happens in
+	// mainLoop, outside runOne's recover, so an unguarded panic here would
+	// kill main -- and since a process supervisor (e.g. systemd) would just
+	// restart it to re-read the same bad file, that's a crash-loop. Discard
+	// the bad state and start fresh instead.
+	if s.NextIndex < 0 || s.NextIndex >= len(cycle) || s.Cycle < 0 {
+		fmt.Fprintf(os.Stderr,
+			"charon-cycler: state file %s has out-of-range next_index=%d cycle=%d (want 0<=next_index<%d, cycle>=0); starting fresh\n",
+			path, s.NextIndex, s.Cycle, len(cycle))
+		return state{}, nil
+	}
 	return s, nil
 }
 
@@ -254,9 +267,27 @@ func selectNextCombo(s state) (combo, string) {
 // cycler.py -> compute_backoff
 // ---------------------------------------------------------------------------
 
+// computeBackoff mirrors cycler.py's compute_backoff (min(cap, base*2**n)),
+// but Python's ints are arbitrary-precision so base*2**n never overflows;
+// Go's int does. consecutiveFailures grows unbounded across a sustained
+// outage (mainLoop has no ceiling on it), so for large n "1 << uint(n)"
+// eventually overflows and the multiply can wrap to a negative or zero
+// result -- which would make sleepFn return instantly, hot-spinning the
+// loop against git/kurtosis. Guard against that in two layers: short-circuit
+// before the shift once n is large enough that the result must already
+// exceed cap (base=30 reaches cap=900 by n=5, so n>=30 is a generous, safe
+// threshold with headroom to spare before any overflow could occur), and
+// double-check the computed value afterwards in case some other base/cap
+// combination could still overflow.
 func computeBackoff(consecutiveFailures, base, cap int) int {
+	if consecutiveFailures < 0 {
+		consecutiveFailures = 0
+	}
+	if consecutiveFailures >= 30 {
+		return cap
+	}
 	v := base * (1 << uint(consecutiveFailures))
-	if v > cap {
+	if v <= 0 || v > cap {
 		return cap
 	}
 	return v

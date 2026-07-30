@@ -88,6 +88,49 @@ func TestStateRoundTripAndAdvanceWrap(t *testing.T) {
 	}
 }
 
+// TestLoadStateRejectsOutOfRangeNextIndex guards against a corrupt/
+// hand-edited/forward-incompatible state file crash-looping the process: an
+// out-of-range next_index (too high, or negative) must not panic anything
+// downstream (selectNextCombo's cycle[s.NextIndex] indexing) -- loadState
+// must discard it and hand back a clean zero state instead.
+func TestLoadStateRejectsOutOfRangeNextIndex(t *testing.T) {
+	dir := t.TempDir()
+
+	t.Run("next_index too large", func(t *testing.T) {
+		path := filepath.Join(dir, "too-large.json")
+		if err := os.WriteFile(path, []byte(`{"cycle":0,"next_index":99,"current_enclave":""}`), 0o644); err != nil {
+			t.Fatalf("write state file: %v", err)
+		}
+		s, err := loadState(path)
+		if err != nil {
+			t.Fatalf("loadState error: %v", err)
+		}
+		if s != (state{}) {
+			t.Errorf("loadState(next_index=99) = %+v, want zero state", s)
+		}
+		if got, origin := selectNextCombo(s); origin != "cycle" || got != cycle[0] {
+			t.Errorf("selectNextCombo(zero state) = (%+v,%q), want (%+v,cycle)", got, origin, cycle[0])
+		}
+	})
+
+	t.Run("next_index negative", func(t *testing.T) {
+		path := filepath.Join(dir, "negative.json")
+		if err := os.WriteFile(path, []byte(`{"cycle":0,"next_index":-1,"current_enclave":""}`), 0o644); err != nil {
+			t.Fatalf("write state file: %v", err)
+		}
+		s, err := loadState(path)
+		if err != nil {
+			t.Fatalf("loadState error: %v", err)
+		}
+		if s != (state{}) {
+			t.Errorf("loadState(next_index=-1) = %+v, want zero state", s)
+		}
+		if got, origin := selectNextCombo(s); origin != "cycle" || got != cycle[0] {
+			t.Errorf("selectNextCombo(zero state) = (%+v,%q), want (%+v,cycle)", got, origin, cycle[0])
+		}
+	})
+}
+
 func TestSelectNextCombo(t *testing.T) {
 	old := readOverride
 	defer func() { readOverride = old }()
@@ -135,10 +178,23 @@ func TestComputeBackoff(t *testing.T) {
 		{1, 30, 900, 60},
 		{2, 30, 900, 120},
 		{20, 30, 900, 900},
+		{-5, 30, 900, 30}, // negative consecutiveFailures treated as 0
+		// Large/overflow-prone consecutiveFailures values (reachable across a
+		// sustained multi-hour outage, since mainLoop never caps the
+		// counter): "1 << uint(n)" would overflow int for n around the word
+		// size, and base*that could wrap to <=0. Every one of these must
+		// still land exactly at cap, never <=0 and never >cap.
+		{59, 30, 900, 900},
+		{1000, 30, 900, 900},
+		{1 << 20, 30, 900, 900},
 	}
 	for _, c := range cases {
-		if got := computeBackoff(c.failures, c.base, c.cap); got != c.want {
+		got := computeBackoff(c.failures, c.base, c.cap)
+		if got != c.want {
 			t.Errorf("computeBackoff(%d,%d,%d) = %d, want %d", c.failures, c.base, c.cap, got, c.want)
+		}
+		if got <= 0 || got > c.cap {
+			t.Errorf("computeBackoff(%d,%d,%d) = %d, out of range (0,%d]", c.failures, c.base, c.cap, got, c.cap)
 		}
 	}
 }
@@ -811,6 +867,72 @@ func TestRunOneMidRunFailureTearsDownAndPosts(t *testing.T) {
 	// should fail this count.
 	if removeCalls != 2 {
 		t.Errorf("kurtosisRemove (via runCommand enclave rm) called %d times, want 2 (pre-clear + deferred teardown)", removeCalls)
+	}
+}
+
+// TestRunOneRecoversFromPanicAfterLaunch exercises runOne's top-level
+// recover(): a fake (httpGet, called via promQuery during collectReport,
+// well after a successful kurtosisRun) panics instead of erroring. runOne
+// must not let that panic escape -- it must produce a "failed" reportData,
+// post it exactly once, and still tear down the enclave (pre-clear +
+// deferred teardown), exactly as if collectReport had returned an error.
+func TestRunOneRecoversFromPanicAfterLaunch(t *testing.T) {
+	oldRun, oldPost, oldGet, oldSleep := runCommand, httpPost, httpGet, sleepFn
+	defer func() { runCommand, httpPost, httpGet, sleepFn = oldRun, oldPost, oldGet, oldSleep }()
+	sleepFn = func(time.Duration) {}
+
+	dir := t.TempDir()
+	writeTestImages(t, dir)
+
+	removeCalls := 0
+	runCommand = func(name string, args ...string) (string, error) {
+		if name != "kurtosis" {
+			return "", nil // git pull, etc.
+		}
+		switch {
+		case len(args) > 0 && args[0] == "port":
+			return "http://127.0.0.1:9999\n", nil
+		case len(args) > 0 && args[0] == "enclave":
+			removeCalls++
+			return "", nil
+		}
+		return "", nil // "kurtosis run"
+	}
+	httpGet = func(u string) ([]byte, int, error) {
+		if strings.Contains(u, "core_scheduler_validators_active") {
+			// Let waitHealthy succeed so we get past launch into the
+			// post-launch phase, then panic on the very next query
+			// (the first one collectReport issues).
+			return []byte(`{"status":"success","data":{"result":[{"metric":{},"value":[1,"1"]}]}}`), 200, nil
+		}
+		panic("simulated metrics client panic")
+	}
+	postCount := 0
+	httpPost = func(string, []byte) (int, error) { postCount++; return 200, nil }
+
+	cfg := config{
+		slackWebhookURL: "http://hook", repoPath: dir, packageRef: "pkg",
+		runMinutes: 1, warmupMinutes: 0, startupDeadlineMinutes: 1, sampleIntervalS: 1,
+	}
+
+	data := runOne(cfg, combo{cl: "teku", vc: "prysm"}, 1) // must not panic out of this call
+	if data.status != "failed" {
+		t.Errorf("status = %q, want failed", data.status)
+	}
+	if !strings.Contains(data.errMsg, "simulated metrics client panic") {
+		t.Errorf("errMsg = %q, want it to mention the panic value", data.errMsg)
+	}
+	if postCount != 1 {
+		t.Errorf("slackPost called %d times, want 1", postCount)
+	}
+	// 3 calls on this path: the guarded pre-clear, the plain `defer
+	// kurtosisRemove(enclave)` registered right after the successful
+	// kurtosisRun, and the recover handler's own guarded kurtosisRemove
+	// (which exists to cover panics that happen *before* that plain defer
+	// is registered, e.g. during pre-launch -- it's redundant-but-harmless,
+	// idempotent/best-effort, when a panic happens after launch instead).
+	if removeCalls != 3 {
+		t.Errorf("kurtosisRemove called %d times, want 3 (pre-clear + deferred teardown + recover handler)", removeCalls)
 	}
 }
 
