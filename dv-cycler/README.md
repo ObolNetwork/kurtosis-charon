@@ -123,39 +123,46 @@ the three required variables is unset or empty.
 | `CYCLER_INTER_RUN_BACKOFF_S` | no | `30` | Base backoff between runs after a failure. |
 | `CYCLER_MAX_BACKOFF_S` | no | `900` | Cap on the (doubling) backoff after consecutive failures. |
 
-## systemd install
+## Running as a systemd service (optional)
 
-```bash
-sudo cp cycler.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now cycler
-```
-
-`cycler.service` runs as the `dv` user out of
-`/opt/kurtosis-charon/dv-cycler`, via `go run .`. Adjust `User`,
-`WorkingDirectory`, the `Environment=` paths, and the `go` path in
-`ExecStart` if your checkout, service account, or Go install location differ.
-The `CYCLER_*` configuration is read from a `.env` file in `WorkingDirectory`
-(`/opt/kurtosis-charon/dv-cycler/.env`) — create it there from `.env.example`
-before enabling the service (the unit itself carries no secrets).
-`Restart=always` with `RestartSec=30` means the service comes back on crash
-or reboot; state/resume behavior (below) makes that safe.
-
-**Important — `GOCACHE`/`HOME`:** `go run .` compiles the program into the
-build cache on every start (there's no prebuilt binary), so the service user
-needs a writable `GOCACHE` and, in practice, a writable `HOME` (Go also
-touches `$HOME/.cache` and module-related state by default). `cycler.service`
-therefore sets:
+For unattended 24/7 operation, run it under a supervisor. There's no committed
+unit file — create one like the following, adjusting `User`, the paths, and the
+`go` binary location for your host:
 
 ```ini
+[Unit]
+Description=DV 36-combo test cycler
+After=docker.service network-online.target
+Wants=docker.service network-online.target
+
+[Service]
+Type=simple
+User=dv
+WorkingDirectory=/opt/kurtosis-charon/dv-cycler
 Environment=GOCACHE=/var/cache/dv-cycler/go-build
 Environment=HOME=/opt/kurtosis-charon
+ExecStart=/usr/local/go/bin/go run .
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-Both directories must exist and be writable by the `User=` the service runs
-as, or `go run` fails immediately and the unit crash-loops. If you change
-`User=` or relocate the checkout, update these paths (and their on-disk
-permissions) to match.
+Save it as `/etc/systemd/system/dv-cycler.service`, then
+`sudo systemctl daemon-reload && sudo systemctl enable --now dv-cycler`.
+
+Notes:
+
+- **Config comes from `.env`** in `WorkingDirectory` — create it there from
+  `.env.example` before enabling; the unit carries no secrets.
+- **`GOCACHE`/`HOME` must exist and be writable by `User=`.** `go run .`
+  compiles into the build cache on every start (no prebuilt binary) and Go
+  touches `$HOME/.cache`; if these aren't writable the unit crash-loops.
+- **`Restart=always` + `RestartSec=30`** brings it back on crash/reboot; the
+  state file (below) makes resume safe.
 
 ## Logs
 
