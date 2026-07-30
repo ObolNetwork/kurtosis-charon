@@ -52,6 +52,55 @@ type config struct {
 	maxBackoffS            int
 }
 
+// dotEnvPath returns the .env file to load: $CYCLER_ENV_FILE if set, else
+// ".env" in the current working directory (under systemd that's the unit's
+// WorkingDirectory; under a manual `go run .` it's the module dir).
+func dotEnvPath() string {
+	if p := os.Getenv("CYCLER_ENV_FILE"); p != "" {
+		return p
+	}
+	return ".env"
+}
+
+// loadDotEnv reads a simple KEY=VALUE .env file and sets any variable NOT
+// already present in the environment, so real env vars (and --flags) still
+// win over the file. A missing file is not an error. Blank lines and
+// #-comments are skipped; a leading "export " and matching surrounding single
+// or double quotes around the value are stripped.
+func loadDotEnv(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		line = strings.TrimPrefix(line, "export ")
+		eq := strings.IndexByte(line, '=')
+		if eq < 0 {
+			continue
+		}
+		key := strings.TrimSpace(line[:eq])
+		val := strings.TrimSpace(line[eq+1:])
+		if len(val) >= 2 && (val[0] == '"' && val[len(val)-1] == '"' ||
+			val[0] == '\'' && val[len(val)-1] == '\'') {
+			val = val[1 : len(val)-1]
+		}
+		if key == "" {
+			continue
+		}
+		if _, ok := os.LookupEnv(key); !ok {
+			os.Setenv(key, val)
+		}
+	}
+	return nil
+}
+
 // envInt reads an integer env var (CYCLER_<name>) into *dst if present and
 // non-empty and parses cleanly; otherwise dst is left untouched.
 func envInt(name string, dst *int) {
@@ -474,6 +523,14 @@ func selectWorstNode(expected, success []sample) (worstNode, bool) {
 	results := make([]dutyResult, 0, len(dutyNames))
 	for _, d := range dutyNames {
 		v := dutiesMap[d]
+		// Drop duties with no expected occurrences in the window (e.g. exit,
+		// info_sync, signature, builder_*). Their 0/0 ratio is not a real
+		// signal, and since pct() reports 0% for them, keeping them would both
+		// clutter the report and wrongly trip the degraded check. A duty with
+		// expected>0 but success=0 (a genuine miss) is kept.
+		if v.expected == 0 {
+			continue
+		}
 		results = append(results, dutyResult{duty: d, expected: v.expected, success: v.success})
 	}
 
@@ -640,6 +697,14 @@ func healthMD(health []healthCheck) string {
 	return strings.Join(lines, "\n")
 }
 
+// reportHealthChecks gates whether charon app_health_checks are surfaced at
+// all: when false (current default), the Slack report omits the health-check
+// section and a firing check does NOT downgrade a run to "degraded" (so status
+// reflects duty ratios only). The checks are still queried and populated on
+// reportData, so re-enabling is just flipping this to true. Disabled for now
+// because the health checks are noisy in these matrix runs.
+var reportHealthChecks = false
+
 func buildBlocks(d reportData) []map[string]any {
 	e := statusEmoji[d.status]
 	header := fmt.Sprintf("%s %s", e, d.name)
@@ -686,10 +751,12 @@ func buildBlocks(d reportData) []map[string]any {
 		"text": map[string]any{"type": "mrkdwn", "text": res},
 	})
 
-	blocks = append(blocks, map[string]any{
-		"type": "section",
-		"text": map[string]any{"type": "mrkdwn", "text": healthMD(d.health)},
-	})
+	if reportHealthChecks {
+		blocks = append(blocks, map[string]any{
+			"type": "section",
+			"text": map[string]any{"type": "mrkdwn", "text": healthMD(d.health)},
+		})
+	}
 
 	return blocks
 }
@@ -1068,7 +1135,7 @@ func collectReport(baseURL, name, clusterName string, cycle, windowS int, host h
 			}
 		}
 	}
-	if !degraded {
+	if reportHealthChecks && !degraded {
 		for _, h := range health {
 			if h.firingNow {
 				degraded = true
@@ -1240,6 +1307,11 @@ func runOne(cfg config, paramFile, name string, cycle int) (result reportData) {
 	defer os.Remove(tmpArgsPath)
 
 	if err := kurtosisRun(enclave, cfg.packageRef, tmpArgsPath); err != nil {
+		// kurtosis run can exit non-zero while still leaving the enclave and its
+		// containers behind (e.g. a service readiness check timing out under
+		// load). Tear it down so a failed launch doesn't leak an enclave and
+		// compound resource pressure on the next combo's run.
+		kurtosisRemove(enclave)
 		data := failedReport(name, cycle, fmt.Sprintf("launch failed: %v", err))
 		postBestEffort(cfg, data)
 		return data
@@ -1317,6 +1389,10 @@ func mainLoop(cfg config) {
 }
 
 func main() {
+	if err := loadDotEnv(dotEnvPath()); err != nil {
+		fmt.Fprintln(os.Stderr, "dv-cycler: failed to read .env:", err)
+		os.Exit(1)
+	}
 	cfg, err := loadConfig()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "dv-cycler:", err)

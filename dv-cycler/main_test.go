@@ -318,6 +318,34 @@ func TestSelectWorstNode(t *testing.T) {
 		}
 	})
 
+	t.Run("zero-expected (0/0) duties are dropped, genuine misses kept", func(t *testing.T) {
+		expected := []sample{
+			s(map[string]string{"duty": "attester", "cluster_peer": "0"}, 100),
+			s(map[string]string{"duty": "proposer", "cluster_peer": "0"}, 5), // genuine miss below
+			s(map[string]string{"duty": "exit", "cluster_peer": "0"}, 0),     // idle 0/0
+			s(map[string]string{"duty": "info_sync", "cluster_peer": "0"}, 0),
+		}
+		success := []sample{
+			s(map[string]string{"duty": "attester", "cluster_peer": "0"}, 100),
+			s(map[string]string{"duty": "exit", "cluster_peer": "0"}, 0),
+			s(map[string]string{"duty": "info_sync", "cluster_peer": "0"}, 0),
+		}
+		wn, ok := selectWorstNode(expected, success)
+		if !ok {
+			t.Fatal("expected ok=true")
+		}
+		names := map[string]bool{}
+		for _, d := range wn.duties {
+			names[d.duty] = true
+		}
+		if !names["attester"] || !names["proposer"] {
+			t.Errorf("expected>0 duties must be kept, got %+v", wn.duties)
+		}
+		if names["exit"] || names["info_sync"] {
+			t.Errorf("0/0 duties must be dropped, got %+v", wn.duties)
+		}
+	})
+
 	t.Run("empty samples -> ok false", func(t *testing.T) {
 		_, ok := selectWorstNode(nil, nil)
 		if ok {
@@ -382,6 +410,38 @@ func TestParseMeminfo(t *testing.T) {
 	}
 	if used != 750*1024 {
 		t.Errorf("used = %v, want %v", used, 750*1024)
+	}
+}
+
+func TestLoadDotEnv(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, ".env")
+	content := "# a comment\n\nexport DOTENV_TEST_A=hello\nDOTENV_TEST_B=\"quoted val\"\nDOTENV_TEST_C='x'\nno_equals_line\n"
+	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A is already set -> the file must NOT override it.
+	t.Setenv("DOTENV_TEST_A", "preset")
+	os.Unsetenv("DOTENV_TEST_B")
+	os.Unsetenv("DOTENV_TEST_C")
+	defer os.Unsetenv("DOTENV_TEST_B")
+	defer os.Unsetenv("DOTENV_TEST_C")
+
+	if err := loadDotEnv(p); err != nil {
+		t.Fatalf("loadDotEnv: %v", err)
+	}
+	if got := os.Getenv("DOTENV_TEST_A"); got != "preset" {
+		t.Errorf("A = %q, want preset (pre-set env must win over .env)", got)
+	}
+	if got := os.Getenv("DOTENV_TEST_B"); got != "quoted val" {
+		t.Errorf("B = %q, want %q (double-quotes stripped)", got, "quoted val")
+	}
+	if got := os.Getenv("DOTENV_TEST_C"); got != "x" {
+		t.Errorf("C = %q, want x (single-quotes stripped)", got)
+	}
+	// A missing file is a no-op, not an error.
+	if err := loadDotEnv(filepath.Join(dir, "does-not-exist.env")); err != nil {
+		t.Errorf("missing file should be a no-op, got %v", err)
 	}
 }
 
@@ -527,8 +587,8 @@ func TestBuildBlocksStatuses(t *testing.T) {
 		if !strings.Contains(strings.ToLower(dump), "node 1") {
 			t.Errorf("missing worst node reference in %s", dump)
 		}
-		if !strings.Contains(dump, "high-inclusion-delay") {
-			t.Errorf("missing health check name in %s", dump)
+		if strings.Contains(dump, "high-inclusion-delay") || strings.Contains(strings.ToLower(dump), "health check") {
+			t.Errorf("health section should be omitted while reportHealthChecks is off: %s", dump)
 		}
 		if !strings.Contains(dump, "kurtosis-teku-prysm") {
 			t.Errorf("missing discovered cluster name in %s", dump)
@@ -536,6 +596,16 @@ func TestBuildBlocksStatuses(t *testing.T) {
 		text := buildText(base("ok"))
 		if !strings.Contains(text, "teku-prysm") || !strings.Contains(strings.ToLower(text), "cycle 3") {
 			t.Errorf("buildText = %q", text)
+		}
+	})
+
+	t.Run("health section renders when reportHealthChecks enabled", func(t *testing.T) {
+		old := reportHealthChecks
+		reportHealthChecks = true
+		defer func() { reportHealthChecks = old }()
+		dump := dumpBlocks(buildBlocks(base("ok")))
+		if !strings.Contains(dump, "high-inclusion-delay") {
+			t.Errorf("health check name missing when reportHealthChecks enabled: %s", dump)
 		}
 	})
 
@@ -808,6 +878,50 @@ func TestRunOnePreLaunchFailurePostsFailed(t *testing.T) {
 	}
 }
 
+func TestRunOneLaunchFailureTearsDown(t *testing.T) {
+	oldRun, oldPost := runCommand, httpPost
+	defer func() { runCommand, httpPost = oldRun, oldPost }()
+
+	dir := t.TempDir()
+	paramFile := writeParamFile(t, dir, "teku-prysm.yaml")
+
+	removeCalls := 0
+	runCommand = func(name string, args ...string) (string, error) {
+		if name != "kurtosis" {
+			return "", nil // git pull etc.
+		}
+		switch {
+		case len(args) > 0 && args[0] == "run":
+			// kurtosis run fails but (as in production) may have left containers.
+			return "a service did not become available", fmt.Errorf("exit status 1")
+		case len(args) > 0 && args[0] == "enclave":
+			removeCalls++
+			return "", nil
+		}
+		return "", nil
+	}
+	postCount := 0
+	httpPost = func(string, []byte) (int, error) { postCount++; return 200, nil }
+
+	cfg := config{
+		slackWebhookURL: "http://hook", repoPath: dir, packageRef: "pkg",
+		runMinutes: 1, warmupMinutes: 0, startupDeadlineMinutes: 1, sampleIntervalS: 1,
+	}
+	data := runOne(cfg, paramFile, "teku-prysm", 1)
+	if data.status != "failed" {
+		t.Errorf("status = %q, want failed", data.status)
+	}
+	if postCount != 1 {
+		t.Errorf("slackPost called %d times, want 1", postCount)
+	}
+	// A failed kurtosis run must still tear the enclave down: pre-clear at the top
+	// of runOne + the explicit teardown in the launch-failure branch = 2. Before
+	// the fix this was 1 (the enclave leaked), so this guards the regression.
+	if removeCalls != 2 {
+		t.Errorf("kurtosisRemove called %d times, want 2 (pre-clear + launch-failure teardown)", removeCalls)
+	}
+}
+
 func TestRunOneMidRunFailureTearsDownAndPosts(t *testing.T) {
 	oldRun, oldPost, oldGet, oldSleep := runCommand, httpPost, httpGet, sleepFn
 	defer func() { runCommand, httpPost, httpGet, sleepFn = oldRun, oldPost, oldGet, oldSleep }()
@@ -981,6 +1095,46 @@ func TestRunOneHappyPathOK(t *testing.T) {
 	wantWindow := fmtWindow(fixedNow.Add(-time.Duration(windowS)*time.Second), fixedNow)
 	if data.window != wantWindow {
 		t.Errorf("window = %q, want %q", data.window, wantWindow)
+	}
+}
+
+func TestHealthCheckStatusGatedByToggle(t *testing.T) {
+	old := httpGet
+	defer func() { httpGet = old }()
+	httpGet = func(u string) ([]byte, int, error) {
+		switch {
+		case strings.Contains(u, "core_tracker_expect_duties_total"):
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"1000"]}]}}`), 200, nil
+		case strings.Contains(u, "core_tracker_success_duties_total"):
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"1000"]}]}}`), 200, nil
+		case strings.Contains(u, "app_health_checks"):
+			// A check that is both fired and firing now.
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"name":"peer-count","severity":"error"},"value":[1,"1"]}]}}`), 200, nil
+		default:
+			return []byte(`{"status":"success","data":{"result":[]}}`), 200, nil
+		}
+	}
+
+	// Default (disabled): a firing health check must NOT downgrade an otherwise
+	// healthy run.
+	data, err := collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, hostStats{})
+	if err != nil {
+		t.Fatalf("collectReport error: %v", err)
+	}
+	if data.status != "ok" {
+		t.Errorf("with health disabled, firing check gave status %q, want ok", data.status)
+	}
+
+	// Enabled: the same firing check downgrades to degraded.
+	oldFlag := reportHealthChecks
+	reportHealthChecks = true
+	defer func() { reportHealthChecks = oldFlag }()
+	data, err = collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, hostStats{})
+	if err != nil {
+		t.Fatalf("collectReport error: %v", err)
+	}
+	if data.status != "degraded" {
+		t.Errorf("with health enabled, firing check gave status %q, want degraded", data.status)
 	}
 }
 
