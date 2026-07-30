@@ -523,6 +523,14 @@ func selectWorstNode(expected, success []sample) (worstNode, bool) {
 	results := make([]dutyResult, 0, len(dutyNames))
 	for _, d := range dutyNames {
 		v := dutiesMap[d]
+		// Drop duties with no expected occurrences in the window (e.g. exit,
+		// info_sync, signature, builder_*). Their 0/0 ratio is not a real
+		// signal, and since pct() reports 0% for them, keeping them would both
+		// clutter the report and wrongly trip the degraded check. A duty with
+		// expected>0 but success=0 (a genuine miss) is kept.
+		if v.expected == 0 {
+			continue
+		}
 		results = append(results, dutyResult{duty: d, expected: v.expected, success: v.success})
 	}
 

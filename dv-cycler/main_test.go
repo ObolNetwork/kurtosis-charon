@@ -318,6 +318,34 @@ func TestSelectWorstNode(t *testing.T) {
 		}
 	})
 
+	t.Run("zero-expected (0/0) duties are dropped, genuine misses kept", func(t *testing.T) {
+		expected := []sample{
+			s(map[string]string{"duty": "attester", "cluster_peer": "0"}, 100),
+			s(map[string]string{"duty": "proposer", "cluster_peer": "0"}, 5), // genuine miss below
+			s(map[string]string{"duty": "exit", "cluster_peer": "0"}, 0),     // idle 0/0
+			s(map[string]string{"duty": "info_sync", "cluster_peer": "0"}, 0),
+		}
+		success := []sample{
+			s(map[string]string{"duty": "attester", "cluster_peer": "0"}, 100),
+			s(map[string]string{"duty": "exit", "cluster_peer": "0"}, 0),
+			s(map[string]string{"duty": "info_sync", "cluster_peer": "0"}, 0),
+		}
+		wn, ok := selectWorstNode(expected, success)
+		if !ok {
+			t.Fatal("expected ok=true")
+		}
+		names := map[string]bool{}
+		for _, d := range wn.duties {
+			names[d.duty] = true
+		}
+		if !names["attester"] || !names["proposer"] {
+			t.Errorf("expected>0 duties must be kept, got %+v", wn.duties)
+		}
+		if names["exit"] || names["info_sync"] {
+			t.Errorf("0/0 duties must be dropped, got %+v", wn.duties)
+		}
+	})
+
 	t.Run("empty samples -> ok false", func(t *testing.T) {
 		_, ok := selectWorstNode(nil, nil)
 		if ok {
