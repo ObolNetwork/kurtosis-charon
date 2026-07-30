@@ -22,7 +22,7 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// combos.py -> combo, cycle, enclaveName
+// Combo matrix: combo, cycle, enclaveName.
 // ---------------------------------------------------------------------------
 
 type combo struct {
@@ -46,7 +46,7 @@ func enclaveName(cycleNum int, c combo) string {
 var clientsCL = []string{"lighthouse", "lodestar", "nimbus", "teku", "prysm", "grandine"}
 var clientsVC = []string{"lighthouse", "lodestar", "nimbus", "teku", "prysm", "vouch"}
 
-// cycle is the fixed 36-entry CL-major combo matrix (CYCLE in combos.py).
+// cycle is the fixed 36-entry CL-major combo matrix.
 var cycle []combo
 
 func init() {
@@ -58,13 +58,11 @@ func init() {
 }
 
 // ---------------------------------------------------------------------------
-// config.py -> config, loadConfig
+// Config loading: config, loadConfig.
 //
-// Deviation from the Python reference (documented in task-2-report.md): the
-// committed Python's load_config(path) reads a YAML file. Task 2's brief
-// mandates a no-argument `func loadConfig() (config, error)` reading from
-// env vars + flags instead, so this is a deliberate redesign of the config
-// source for the Go port, not a behavior port.
+// loadConfig is a no-argument `func loadConfig() (config, error)` that reads
+// from env vars + flags rather than a config file -- a deliberate design
+// choice for this port, not something derived from prior behavior.
 // ---------------------------------------------------------------------------
 
 type config struct {
@@ -190,7 +188,7 @@ func loadConfig() (config, error) {
 }
 
 // ---------------------------------------------------------------------------
-// state.py -> state, loadState, save, advance
+// Run state: state, loadState, save, advance.
 // ---------------------------------------------------------------------------
 
 type state struct {
@@ -248,7 +246,7 @@ func (s *state) advance() {
 }
 
 // ---------------------------------------------------------------------------
-// selection.py -> readOverride, selectNextCombo
+// Combo selection: readOverride, selectNextCombo.
 // ---------------------------------------------------------------------------
 
 // readOverride is a var (not a plain func) so tests can substitute an
@@ -264,13 +262,13 @@ func selectNextCombo(s state) (combo, string) {
 }
 
 // ---------------------------------------------------------------------------
-// cycler.py -> compute_backoff
+// Inter-run backoff.
 // ---------------------------------------------------------------------------
 
-// computeBackoff mirrors cycler.py's compute_backoff (min(cap, base*2**n)),
-// but Python's ints are arbitrary-precision so base*2**n never overflows;
-// Go's int does. consecutiveFailures grows unbounded across a sustained
-// outage (mainLoop has no ceiling on it), so for large n "1 << uint(n)"
+// computeBackoff returns min(cap, base*2**n). Unlike an arbitrary-precision
+// integer, for which base*2**n could never overflow, Go's int can.
+// consecutiveFailures grows unbounded across a sustained outage (mainLoop
+// has no ceiling on it), so for large n "1 << uint(n)"
 // eventually overflows and the multiply can wrap to a negative or zero
 // result -- which would make sleepFn return instantly, hot-spinning the
 // loop against git/kurtosis. Guard against that in two layers: short-circuit
@@ -294,7 +292,7 @@ func computeBackoff(consecutiveFailures, base, cap int) int {
 }
 
 // ---------------------------------------------------------------------------
-// params.py + network_params.py -> images, loadImages, buildArgsFile
+// Args-file generation: images, loadImages, buildArgsFile.
 // ---------------------------------------------------------------------------
 
 type images struct {
@@ -390,8 +388,8 @@ additional_services:
 }
 
 // ---------------------------------------------------------------------------
-// promql.py -> promDutyExpected, promDutySuccess, promCharonMemPeak,
-// promCharonCPUPeak, promHealthFired, promHealthFiringNow
+// PromQL builders: promDutyExpected, promDutySuccess, promCharonMemPeak,
+// promCharonCPUPeak, promHealthFired, promHealthFiringNow.
 // ---------------------------------------------------------------------------
 
 func promSelector(clusterName string) string {
@@ -427,8 +425,8 @@ func promHealthFiringNow(clusterName string) string {
 }
 
 // ---------------------------------------------------------------------------
-// metrics.py -> sample, dutyResult, worstNode, healthCheck, selectWorstNode,
-// maxValue, parseHealth
+// Metrics processing: sample, dutyResult, worstNode, healthCheck,
+// selectWorstNode, maxValue, parseHealth.
 // ---------------------------------------------------------------------------
 
 type sample struct {
@@ -562,7 +560,7 @@ func parseHealth(fired, firingNow []sample) []healthCheck {
 }
 
 // ---------------------------------------------------------------------------
-// host_sampler.py -> parseCPULine, cpuPercent, parseMeminfo
+// /proc parsing: parseCPULine, cpuPercent, parseMeminfo.
 // ---------------------------------------------------------------------------
 
 func parseCPULine(text string) (busy, total float64) {
@@ -625,7 +623,7 @@ func parseMeminfo(text string) (used, total float64) {
 }
 
 // ---------------------------------------------------------------------------
-// report.py -> hostStats, reportData, buildText, buildBlocks
+// Slack report building: hostStats, reportData, buildText, buildBlocks.
 // ---------------------------------------------------------------------------
 
 type hostStats struct {
@@ -783,13 +781,12 @@ var (
 )
 
 // ---------------------------------------------------------------------------
-// metrics.py -> PrometheusClient.query -> promQuery
+// promQuery: query the in-enclave Prometheus.
 // ---------------------------------------------------------------------------
 
 // promQuery GETs Prometheus's instant-query endpoint and parses the result
-// into samples, mirroring PrometheusClient.query. It returns an error
-// (including errorType/error from the response body) whenever the JSON
-// "status" field isn't "success".
+// into samples. It returns an error (including errorType/error from the
+// response body) whenever the JSON "status" field isn't "success".
 func promQuery(baseURL, promQL string) ([]sample, error) {
 	u := strings.TrimRight(baseURL, "/") + "/api/v1/query?query=" + url.QueryEscape(promQL)
 	body, _, err := httpGet(u)
@@ -831,7 +828,7 @@ func promQuery(baseURL, promQL string) ([]sample, error) {
 }
 
 // ---------------------------------------------------------------------------
-// slack.py -> slackPost
+// Slack webhook posting: slackPost.
 // ---------------------------------------------------------------------------
 
 func slackPost(webhookURL, text string, blocks []map[string]any) error {
@@ -851,7 +848,8 @@ func slackPost(webhookURL, text string, blocks []map[string]any) error {
 }
 
 // ---------------------------------------------------------------------------
-// kurtosis.py -> kurtosisRun, kurtosisRemove, prometheusBaseURL, gitPull
+// Kurtosis/git shell-outs: kurtosisRun, kurtosisRemove, prometheusBaseURL,
+// gitPull.
 // ---------------------------------------------------------------------------
 
 // kurtosisRun launches an enclave via `kurtosis run`. It returns an error on
@@ -900,7 +898,7 @@ func gitPull(repoPath string) error {
 }
 
 // ---------------------------------------------------------------------------
-// host_sampler.py -> Sampler -> sampleHost
+// sampleHost: background /proc sampler.
 //
 // sampleHost is a plain function (not an interface/struct) run as a
 // goroutine: it samples /proc/stat and /proc/meminfo via readFileFn every
@@ -989,17 +987,15 @@ loop:
 }
 
 // ---------------------------------------------------------------------------
-// cycler.py -> wait_healthy -> waitHealthy
+// waitHealthy: poll until the cluster is healthy or the deadline expires.
 // ---------------------------------------------------------------------------
 
 // waitHealthy polls core_scheduler_validators_active>0 until deadlineS
-// elapses, sleeping sampleIntervalS-independent 15s steps between polls
-// (matching _default_deps.wait_healthy). A promQuery error ends the wait
-// early (returns false) rather than retrying -- this is a deliberate change
-// from Python's behavior of letting the exception propagate out of
-// wait_healthy and fail the whole run, since this Go signature returns a
-// bool rather than (bool, error); the net effect on run_one is the same
-// (the run is treated as unhealthy/failed).
+// elapses, sleeping 15s between polls regardless of sampleIntervalS. A
+// promQuery error ends the wait early (returns false) rather than retrying,
+// since this function's bool-only signature has no way to distinguish "not
+// yet healthy" from "query failed" -- either way, runOne treats the run as
+// unhealthy/failed.
 func waitHealthy(baseURL, clusterName string, deadlineS int) bool {
 	promQL := fmt.Sprintf(`core_scheduler_validators_active{cluster_name="%s"}`, clusterName)
 	waited := 0
@@ -1020,12 +1016,12 @@ func waitHealthy(baseURL, clusterName string, deadlineS int) bool {
 }
 
 // ---------------------------------------------------------------------------
-// cycler.py -> collect_report -> collectReport
+// collectReport: assemble the post-run report.
 // ---------------------------------------------------------------------------
 
-// degradedPctThreshold mirrors cycler.py's DEGRADED_PCT_THRESHOLD: below
-// this per-duty success pct on the worst node, or with any health check
-// firing now, a run's status is downgraded from "ok" to "degraded".
+// degradedPctThreshold: below this per-duty success pct on the worst node,
+// or with any health check firing now, a run's status is downgraded from
+// "ok" to "degraded".
 const degradedPctThreshold = 99.5
 
 // collectReport queries Prometheus for duty/mem/cpu/health data over the
@@ -1128,25 +1124,24 @@ func collectReport(baseURL string, c combo, cycle, windowS int, host hostStats, 
 }
 
 // ---------------------------------------------------------------------------
-// cycler.py -> run_one -> runOne (+ helpers _failed_report, _post_best_effort)
+// runOne: run one combo end to end (with failedReport/postBestEffort helpers).
 // ---------------------------------------------------------------------------
 
-// charonNodeCount mirrors params.py's write_args_file default.
+// charonNodeCount is the number of Charon nodes in the generated cluster.
 const charonNodeCount = 4
 
 func fmtWindow(start, end time.Time) string {
 	return fmt.Sprintf("%s-%s UTC", start.UTC().Format("15:04"), end.UTC().Format("15:04"))
 }
 
-// failedReport mirrors cycler.py's _failed_report, which always resolves the
-// real CL/VC/Charon image pins (from a static charon_matrix import) even on
-// failure. The Go port loads those pins from the repo's images.json via
-// loadImages, so failedReport takes the already-loaded images and applies
-// the same im.CL[c.cl]-or-c.cl fallback collectReport uses. Callers that
-// haven't loaded images yet (i.e. only the gitPull-failure branch in runOne,
-// before loadImages runs) pass the zero-value images{}, which falls back to
-// the raw client names and a blank charon image -- the only case where the
-// data is genuinely unavailable.
+// failedReport builds a failed-status report, always resolving the real
+// CL/VC/Charon image pins even on failure. It loads those pins from the
+// repo's images.json via loadImages, so failedReport takes the
+// already-loaded images and applies the same im.CL[c.cl]-or-c.cl fallback
+// collectReport uses. Callers that haven't loaded images yet (i.e. only the
+// gitPull-failure branch in runOne, before loadImages runs) pass the
+// zero-value images{}, which falls back to the raw client names and a blank
+// charon image -- the only case where the data is genuinely unavailable.
 func failedReport(c combo, cycle int, errMsg string, im images) reportData {
 	clImage := im.CL[c.cl]
 	if clImage == "" {
@@ -1168,8 +1163,9 @@ func failedReport(c combo, cycle int, errMsg string, im images) reportData {
 	}
 }
 
-// postBestEffort mirrors _post_best_effort: Slack failures (including a
-// panic from a misbehaving fake) must never break runOne.
+// postBestEffort posts the run's Slack report on a best-effort basis: Slack
+// failures (including a panic from a misbehaving fake) must never break
+// runOne.
 func postBestEffort(cfg config, d reportData) {
 	defer func() { _ = recover() }()
 	_ = slackPost(cfg.slackWebhookURL, buildText(d), buildBlocks(d))
@@ -1221,14 +1217,13 @@ func runWindow(cfg config, c combo, cycle int, enclave string, im images) report
 	return data
 }
 
-// runOne mirrors cycler.py's run_one exactly: a guarded pre-clear, then
-// pre-launch (git pull + build/write args file) failures produce a failed
-// report and return before anything was launched; a launch failure tears
-// down and returns; after a successful launch, teardown is guaranteed via
-// defer, and any failure from there on (unhealthy startup, sampling,
-// metrics query, report assembly) still produces a failed report. The
-// top-level recover is an extra safety net beyond the Python reference (it
-// has no direct analogue) so that even an unexpected panic from a fake or a
+// runOne executes one combo: a guarded pre-clear, then pre-launch (git pull
+// + build/write args file) failures produce a failed report and return
+// before anything was launched; a launch failure tears down and returns;
+// after a successful launch, teardown is guaranteed via defer, and any
+// failure from there on (unhealthy startup, sampling, metrics query, report
+// assembly) still produces a failed report. The top-level recover is an
+// extra safety net so that even an unexpected panic from a fake or a
 // bug never escapes to kill the caller's loop.
 func runOne(cfg config, c combo, cycle int) (result reportData) {
 	enclave := enclaveName(cycle, c)
@@ -1289,15 +1284,14 @@ func runOne(cfg config, c combo, cycle int) (result reportData) {
 }
 
 // ---------------------------------------------------------------------------
-// cycler.py -> main, _default_deps -> mainLoop, main
+// The 24/7 driver loop: mainLoop, main.
 // ---------------------------------------------------------------------------
 
-// mainLoop mirrors cycler.py's main(): resume from a possibly-interrupted
-// run, then loop forever selecting the next combo, running it, and backing
-// off according to consecutive failures. State-save errors are logged and
-// otherwise ignored (best-effort) -- unlike the Python reference, which
-// would let an unhandled exception from state.save crash the process --
-// since this whole task's mandate is that the loop must never die.
+// mainLoop drives the 24/7 loop: resume from a possibly-interrupted run,
+// then loop forever selecting the next combo, running it, and backing off
+// according to consecutive failures. State-save errors are logged and
+// otherwise ignored (best-effort), since this whole task's mandate is that
+// the loop must never die.
 func mainLoop(cfg config) {
 	st, err := loadState(cfg.statePath)
 	if err != nil {
