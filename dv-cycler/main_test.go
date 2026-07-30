@@ -840,6 +840,50 @@ func TestRunOnePreLaunchFailurePostsFailed(t *testing.T) {
 	}
 }
 
+func TestRunOneLaunchFailureTearsDown(t *testing.T) {
+	oldRun, oldPost := runCommand, httpPost
+	defer func() { runCommand, httpPost = oldRun, oldPost }()
+
+	dir := t.TempDir()
+	paramFile := writeParamFile(t, dir, "teku-prysm.yaml")
+
+	removeCalls := 0
+	runCommand = func(name string, args ...string) (string, error) {
+		if name != "kurtosis" {
+			return "", nil // git pull etc.
+		}
+		switch {
+		case len(args) > 0 && args[0] == "run":
+			// kurtosis run fails but (as in production) may have left containers.
+			return "a service did not become available", fmt.Errorf("exit status 1")
+		case len(args) > 0 && args[0] == "enclave":
+			removeCalls++
+			return "", nil
+		}
+		return "", nil
+	}
+	postCount := 0
+	httpPost = func(string, []byte) (int, error) { postCount++; return 200, nil }
+
+	cfg := config{
+		slackWebhookURL: "http://hook", repoPath: dir, packageRef: "pkg",
+		runMinutes: 1, warmupMinutes: 0, startupDeadlineMinutes: 1, sampleIntervalS: 1,
+	}
+	data := runOne(cfg, paramFile, "teku-prysm", 1)
+	if data.status != "failed" {
+		t.Errorf("status = %q, want failed", data.status)
+	}
+	if postCount != 1 {
+		t.Errorf("slackPost called %d times, want 1", postCount)
+	}
+	// A failed kurtosis run must still tear the enclave down: pre-clear at the top
+	// of runOne + the explicit teardown in the launch-failure branch = 2. Before
+	// the fix this was 1 (the enclave leaked), so this guards the regression.
+	if removeCalls != 2 {
+		t.Errorf("kurtosisRemove called %d times, want 2 (pre-clear + launch-failure teardown)", removeCalls)
+	}
+}
+
 func TestRunOneMidRunFailureTearsDownAndPosts(t *testing.T) {
 	oldRun, oldPost, oldGet, oldSleep := runCommand, httpPost, httpGet, sleepFn
 	defer func() { runCommand, httpPost, httpGet, sleepFn = oldRun, oldPost, oldGet, oldSleep }()

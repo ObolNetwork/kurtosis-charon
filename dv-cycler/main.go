@@ -1289,6 +1289,11 @@ func runOne(cfg config, paramFile, name string, cycle int) (result reportData) {
 	defer os.Remove(tmpArgsPath)
 
 	if err := kurtosisRun(enclave, cfg.packageRef, tmpArgsPath); err != nil {
+		// kurtosis run can exit non-zero while still leaving the enclave and its
+		// containers behind (e.g. a service readiness check timing out under
+		// load). Tear it down so a failed launch doesn't leak an enclave and
+		// compound resource pressure on the next combo's run.
+		kurtosisRemove(enclave)
 		data := failedReport(name, cycle, fmt.Sprintf("launch failed: %v", err))
 		postBestEffort(cfg, data)
 		return data
