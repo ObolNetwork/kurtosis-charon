@@ -1,8 +1,16 @@
-// Command dv-cycler cycles the ethereum-package devnet through the
-// CL x VC matrix behind the DV client, sampling metrics and posting a Slack report
-// for each run. This file (main.go) is a script-like Go port of the
-// original Python cycler package: no sub-packages, no interfaces, just plain
-// data records and package-level functions/vars.
+// Command dv-cycler cycles the ethereum-package devnet through every static
+// args-file in network-params/ (one per CL x VC pairing behind the DV client),
+// sampling metrics and posting a Slack report for each run. This file
+// (main.go) is a script-like Go port of the original Python cycler package:
+// no sub-packages, no interfaces, just plain data records and package-level
+// functions/vars.
+//
+// Unlike the earlier code-generated-args-file design, the cycler no longer
+// builds args-files itself: network-params/*.yaml are static, committed
+// files with pins inlined and a literal $PROMETHEUS_REMOTE_WRITE_TOKEN
+// placeholder. The cycler enumerates whatever *.yaml files exist in that
+// directory on every loop iteration, runs each one in turn, and picks up
+// newly added files automatically (no restart needed).
 package main
 
 import (
@@ -22,42 +30,6 @@ import (
 )
 
 // ---------------------------------------------------------------------------
-// Combo matrix: combo, cycle, enclaveName.
-// ---------------------------------------------------------------------------
-
-type combo struct {
-	cl, vc string
-}
-
-func (c combo) name() string {
-	return c.cl + "-" + c.vc
-}
-
-func (c combo) clusterName() string {
-	return "kurtosis-" + c.cl + "-" + c.vc
-}
-
-func enclaveName(cycleNum int, c combo) string {
-	return fmt.Sprintf("c%d-%s-%s", cycleNum, c.cl, c.vc)
-}
-
-// clientsCL/clientsVC mirror charon_matrix.network_params.CLS/VCS. Order is
-// fixed here (CL-major), not derived from any JSON.
-var clientsCL = []string{"lighthouse", "lodestar", "nimbus", "teku", "prysm", "grandine"}
-var clientsVC = []string{"lighthouse", "lodestar", "nimbus", "teku", "prysm", "vouch"}
-
-// cycle is the fixed 36-entry CL-major combo matrix.
-var cycle []combo
-
-func init() {
-	for _, cl := range clientsCL {
-		for _, vc := range clientsVC {
-			cycle = append(cycle, combo{cl: cl, vc: vc})
-		}
-	}
-}
-
-// ---------------------------------------------------------------------------
 // Config loading: config, loadConfig.
 //
 // loadConfig is a no-argument `func loadConfig() (config, error)` that reads
@@ -69,6 +41,7 @@ type config struct {
 	slackWebhookURL        string
 	repoPath               string
 	statePath              string
+	paramsDir              string
 	monitoringToken        string
 	packageRef             string
 	runMinutes             int
@@ -120,6 +93,8 @@ func applyFlags(cfg *config, args []string) {
 			cfg.repoPath = val
 		case "state-path":
 			cfg.statePath = val
+		case "params-dir":
+			cfg.paramsDir = val
 		case "monitoring-token":
 			cfg.monitoringToken = val
 		case "package-ref":
@@ -166,6 +141,7 @@ func loadConfig() (config, error) {
 	envStr("SLACK_WEBHOOK_URL", &cfg.slackWebhookURL)
 	envStr("REPO_PATH", &cfg.repoPath)
 	envStr("STATE_PATH", &cfg.statePath)
+	envStr("PARAMS_DIR", &cfg.paramsDir)
 	envStr("MONITORING_TOKEN", &cfg.monitoringToken)
 	envStr("PACKAGE_REF", &cfg.packageRef)
 	envInt("RUN_MINUTES", &cfg.runMinutes)
@@ -177,6 +153,14 @@ func loadConfig() (config, error) {
 
 	if len(os.Args) > 1 {
 		applyFlags(&cfg, os.Args[1:])
+	}
+
+	// paramsDir's default is derived from repoPath, so it's computed after
+	// both env vars and flags have had a chance to set repoPath (whichever
+	// value wins there is the one the default is based on) -- but only if
+	// paramsDir itself wasn't explicitly overridden.
+	if cfg.paramsDir == "" && cfg.repoPath != "" {
+		cfg.paramsDir = filepath.Join(cfg.repoPath, "dv-cycler", "network-params")
 	}
 
 	var missing []string
@@ -193,6 +177,76 @@ func loadConfig() (config, error) {
 		return config{}, fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))
 	}
 	return cfg, nil
+}
+
+// ---------------------------------------------------------------------------
+// Param files: paramFiles, paramStem.
+// ---------------------------------------------------------------------------
+
+// paramFiles returns the sorted (lexical) absolute paths of *.yaml files
+// directly in dir (non-recursive) -- subdirectories and non-.yaml entries
+// are ignored. Re-running this on every mainLoop iteration is what lets a
+// newly dropped-in file get picked up without a restart.
+func paramFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		if filepath.Ext(e.Name()) != ".yaml" {
+			continue
+		}
+		names = append(names, e.Name())
+	}
+	sort.Strings(names)
+
+	paths := make([]string, 0, len(names))
+	for _, n := range names {
+		abs, err := filepath.Abs(filepath.Join(dir, n))
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, abs)
+	}
+	return paths, nil
+}
+
+// paramStem returns path's filename without its .yaml extension, e.g.
+// "/a/b/lighthouse-teku.yaml" -> "lighthouse-teku". This is the raw,
+// human-readable name used for Slack reports and passed into enclaveName
+// (which does its own separate sanitization for the enclave name itself).
+func paramStem(path string) string {
+	return strings.TrimSuffix(filepath.Base(path), ".yaml")
+}
+
+// ---------------------------------------------------------------------------
+// enclaveName.
+// ---------------------------------------------------------------------------
+
+// sanitizeEnclaveStem lowercases stem and replaces any character outside
+// [a-z0-9-] with '-', since it feeds a Kurtosis enclave name (which has its
+// own naming restrictions) -- unlike the human-readable report name, this
+// value must be enclave-safe regardless of what the param file happens to be
+// named.
+func sanitizeEnclaveStem(stem string) string {
+	stem = strings.ToLower(stem)
+	var b strings.Builder
+	for _, r := range stem {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			b.WriteRune(r)
+		} else {
+			b.WriteRune('-')
+		}
+	}
+	return b.String()
+}
+
+func enclaveName(cycleNum int, stem string) string {
+	return fmt.Sprintf("c%d-%s", cycleNum, sanitizeEnclaveStem(stem))
 }
 
 // ---------------------------------------------------------------------------
@@ -217,17 +271,14 @@ func loadState(path string) (state, error) {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return state{}, err
 	}
-	// A corrupt/hand-edited/forward-incompatible state file with an
-	// out-of-range next_index (or a negative cycle) would otherwise panic
-	// in selectNextCombo's cycle[s.NextIndex] indexing. That call happens in
-	// mainLoop, outside runOne's recover, so an unguarded panic here would
-	// kill main -- and since a process supervisor (e.g. systemd) would just
-	// restart it to re-read the same bad file, that's a crash-loop. Discard
-	// the bad state and start fresh instead.
-	if s.NextIndex < 0 || s.NextIndex >= len(cycle) || s.Cycle < 0 {
+	// A corrupt/hand-edited/forward-incompatible state file with a negative
+	// next_index or cycle would misbehave downstream. There's no fixed
+	// upper bound to check anymore (the file count is dynamic, checked/
+	// clamped in mainLoop instead), but negative values are never valid.
+	if s.NextIndex < 0 || s.Cycle < 0 {
 		fmt.Fprintf(os.Stderr,
-			"dv-cycler: state file %s has out-of-range next_index=%d cycle=%d (want 0<=next_index<%d, cycle>=0); starting fresh\n",
-			path, s.NextIndex, s.Cycle, len(cycle))
+			"dv-cycler: state file %s has a negative next_index=%d or cycle=%d; starting fresh\n",
+			path, s.NextIndex, s.Cycle)
 		return state{}, nil
 	}
 	return s, nil
@@ -245,20 +296,11 @@ func (s *state) save(path string) error {
 	return os.Rename(tmp, path)
 }
 
+// advance moves to the next index. Wrapping back to index 0 and bumping
+// Cycle happens in mainLoop instead, since it depends on the current
+// (dynamic) count of param files, which advance itself has no access to.
 func (s *state) advance() {
 	s.NextIndex++
-	if s.NextIndex >= len(cycle) {
-		s.NextIndex = 0
-		s.Cycle++
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Combo selection.
-// ---------------------------------------------------------------------------
-
-func selectNextCombo(s state) combo {
-	return cycle[s.NextIndex]
 }
 
 // ---------------------------------------------------------------------------
@@ -289,102 +331,6 @@ func computeBackoff(consecutiveFailures, base, cap int) int {
 		return cap
 	}
 	return v
-}
-
-// ---------------------------------------------------------------------------
-// Args-file generation: images, loadImages, buildArgsFile.
-// ---------------------------------------------------------------------------
-
-type images struct {
-	DV          string            `json:"dv"`
-	EL          string            `json:"el"`
-	BootstrapCL string            `json:"bootstrap_cl"`
-	CL          map[string]string `json:"cl"`
-	VC          map[string]string `json:"vc"`
-}
-
-func loadImages(repoPath string) (images, error) {
-	data, err := readFileFn(filepath.Join(repoPath, "images.json"))
-	if err != nil {
-		return images{}, err
-	}
-	var im images
-	if err := json.Unmarshal(data, &im); err != nil {
-		return images{}, err
-	}
-	return im, nil
-}
-
-// validatorKeysMnemonic mirrors network_params.VALIDATOR_KEYS_MNEMONIC.
-const validatorKeysMnemonic = "giant issue aisle success illegal bike spike question tent bar rely arctic " +
-	"volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
-
-// buildArgsFile reproduces network_params.build_network_params's YAML
-// exactly, with the $PROMETHEUS_REMOTE_WRITE_TOKEN placeholder substituted.
-func buildArgsFile(im images, c combo, token string, dvNodeCount int) string {
-	nimbusEnv := ""
-	if c.vc == "nimbus" {
-		nimbusEnv = "    vc_extra_env_vars:\n      CHARON_FEATURE_SET_ENABLE: json_requests\n"
-	}
-	raw := fmt.Sprintf(`participants:
-  - el_type: geth
-    el_image: %s
-    cl_type: lighthouse
-    cl_image: %s
-    use_separate_vc: true
-    vc_type: lighthouse
-    vc_image: %s
-    count: 2
-    supernode: true
-
-  - el_type: geth
-    el_image: %s
-    cl_type: %s
-    cl_image: %s
-    supernode: true
-    use_separate_vc: true
-    vc_type: charon
-    vc_image: %s
-    charon_node_count: %d
-    charon_params:
-      charon_vc: %s
-      charon_vc_image: %s
-%s    count: 1
-network_params:
-  network: kurtosis
-  network_id: "3151908"
-  deposit_contract_address: "0x4242424242424242424242424242424242424242"
-  seconds_per_slot: 12
-  num_validator_keys_per_node: 128
-  preregistered_validator_keys_mnemonic: "%s"
-  shard_committee_period: 1
-  prefunded_accounts: '{"0xb9e79D19f651a941757b35830232E7EFC77E1c79": {"balance": "100000ETH"}}'
-wait_for_finalization: false
-global_log_level: info
-parallel_keystore_generation: false
-mev_type: flashbots
-mev_params:
-  mev_builder_subsidy: 1
-prometheus_params:
-  storage_tsdb_retention_time: 3h
-  remote_write_url: "https://vm.monitoring.gcp.obol.tech/write"
-  remote_write_token: "$PROMETHEUS_REMOTE_WRITE_TOKEN"
-  remote_write_relabel_configs:
-    - SourceLabels: ["job"]
-      Regex: ".*charon.*"
-      Action: keep
-    - SourceLabels: ["client_name"]
-      Regex: "charon"
-      TargetLabel: job
-      Replacement: charon
-      Action: replace
-additional_services:
-  - spamoor
-  - prometheus
-`, im.EL, im.BootstrapCL, im.BootstrapCL, im.EL, c.cl, im.CL[c.cl], im.DV, dvNodeCount,
-		c.vc, im.VC[c.vc], nimbusEnv, validatorKeysMnemonic)
-
-	return strings.ReplaceAll(raw, "$PROMETHEUS_REMOTE_WRITE_TOKEN", token)
 }
 
 // ---------------------------------------------------------------------------
@@ -423,6 +369,12 @@ func promHealthFired(clusterName string, windowS int) string {
 func promHealthFiringNow(clusterName string) string {
 	return fmt.Sprintf("app_health_checks{%s} == 1", promSelector(clusterName))
 }
+
+// promClusterNameGroups is the PromQL used to discover the single charon
+// cluster present in an enclave: app_version is emitted by every app
+// (including the bootstrap lighthouse VCs), but grouping by cluster_name
+// collapses that down to the distinct cluster_name label values seen.
+const promClusterNameGroups = "group by (cluster_name) (app_version)"
 
 // ---------------------------------------------------------------------------
 // Metrics processing: sample, dutyResult, worstNode, healthCheck,
@@ -631,26 +583,24 @@ type hostStats struct {
 }
 
 type reportData struct {
-	combo      combo
-	cycle      int
-	status     string
-	clImage    string
-	vcImage    string
-	dvImage    string
-	window     string
-	worst      *worstNode
-	dvMemBytes *float64
-	dvCPU      *float64
-	host       *hostStats
-	health     []healthCheck
-	errMsg     string
+	name        string
+	clusterName string
+	cycle       int
+	status      string
+	window      string
+	worst       *worstNode
+	dvMemBytes  *float64
+	dvCPU       *float64
+	host        *hostStats
+	health      []healthCheck
+	errMsg      string
 }
 
 var statusEmoji = map[string]string{"ok": "✅", "degraded": "⚠️", "failed": "❌"}
 
 func buildText(d reportData) string {
 	e := statusEmoji[d.status]
-	return fmt.Sprintf("%s %s → DV → %s · cycle %d · %s", e, d.combo.cl, d.combo.vc, d.cycle, d.status)
+	return fmt.Sprintf("%s %s · cycle %d · %s", e, d.name, d.cycle, d.status)
 }
 
 func gbf(x float64) string {
@@ -692,18 +642,19 @@ func healthMD(health []healthCheck) string {
 
 func buildBlocks(d reportData) []map[string]any {
 	e := statusEmoji[d.status]
-	header := fmt.Sprintf("%s %s → DV → %s", e, d.combo.cl, d.combo.vc)
+	header := fmt.Sprintf("%s %s", e, d.name)
+
+	contextText := fmt.Sprintf("cycle %d · %s · status *%s*", d.cycle, d.window, d.status)
+	if d.clusterName != "" {
+		contextText = fmt.Sprintf("cluster `%s` · cycle %d · %s · status *%s*", d.clusterName, d.cycle, d.window, d.status)
+	}
+
 	blocks := []map[string]any{
 		{"type": "header", "text": map[string]any{"type": "plain_text", "text": header}},
 		{"type": "context", "elements": []map[string]any{{
 			"type": "mrkdwn",
-			"text": fmt.Sprintf("cycle %d · %s · status *%s*", d.cycle, d.window, d.status),
+			"text": contextText,
 		}}},
-		{"type": "section", "fields": []map[string]any{
-			{"type": "mrkdwn", "text": "*CL:* " + d.clImage},
-			{"type": "mrkdwn", "text": "*VC:* " + d.vcImage},
-			{"type": "mrkdwn", "text": "*DV:* " + d.dvImage},
-		}},
 	}
 
 	if d.errMsg != "" {
@@ -825,6 +776,42 @@ func promQuery(baseURL, promQL string) ([]sample, error) {
 		samples = append(samples, sample{labels: item.Metric, value: v})
 	}
 	return samples, nil
+}
+
+// ---------------------------------------------------------------------------
+// discoverClusterName: identify the single charon cluster in an enclave.
+// ---------------------------------------------------------------------------
+
+// discoverClusterName queries the enclave Prometheus for the distinct
+// cluster_name label values present (via app_version, grouped by
+// cluster_name) and returns the one charon cluster_name found. There is
+// exactly one charon cluster per enclave -- the bootstrap lighthouse VCs are
+// not charon and don't count as a second cluster here since they still share
+// no distinguishing extra cluster_name of their own in this query -- so
+// zero or more than one distinct value found is an error.
+func discoverClusterName(baseURL string) (string, error) {
+	samples, err := promQuery(baseURL, promClusterNameGroups)
+	if err != nil {
+		return "", err
+	}
+	names := map[string]bool{}
+	for _, sm := range samples {
+		if cn, ok := sm.labels["cluster_name"]; ok && cn != "" {
+			names[cn] = true
+		}
+	}
+	if len(names) != 1 {
+		list := make([]string, 0, len(names))
+		for n := range names {
+			list = append(list, n)
+		}
+		sort.Strings(list)
+		return "", fmt.Errorf("discoverClusterName: expected exactly one cluster_name, found %d: %v", len(names), list)
+	}
+	for n := range names {
+		return n, nil
+	}
+	panic("unreachable") // len(names) == 1 guarantees a single iteration above
 }
 
 // ---------------------------------------------------------------------------
@@ -990,24 +977,23 @@ loop:
 // waitHealthy: poll until the cluster is healthy or the deadline expires.
 // ---------------------------------------------------------------------------
 
-// waitHealthy polls core_scheduler_validators_active>0 until deadlineS
+// waitHealthy polls core_scheduler_validators_active>0 (cluster-agnostic --
+// we don't yet know cluster_name at this point in runOne) until deadlineS
 // elapses, sleeping 15s between polls regardless of sampleIntervalS. A
 // promQuery error ends the wait early (returns false) rather than retrying,
 // since this function's bool-only signature has no way to distinguish "not
 // yet healthy" from "query failed" -- either way, runOne treats the run as
 // unhealthy/failed.
-func waitHealthy(baseURL, clusterName string, deadlineS int) bool {
-	promQL := fmt.Sprintf(`core_scheduler_validators_active{cluster_name="%s"}`, clusterName)
+func waitHealthy(baseURL string, deadlineS int) bool {
+	const promQL = "core_scheduler_validators_active > 0"
 	waited := 0
 	for waited < deadlineS {
 		samples, err := promQuery(baseURL, promQL)
 		if err != nil {
 			return false
 		}
-		for _, sm := range samples {
-			if sm.value > 0 {
-				return true
-			}
+		if len(samples) > 0 {
+			return true
 		}
 		sleepFn(15 * time.Second)
 		waited += 15
@@ -1027,18 +1013,15 @@ const degradedPctThreshold = 99.5
 // collectReport queries Prometheus for duty/mem/cpu/health data over the
 // scored window and assembles a reportData, applying the ok/degraded
 // classification (never "failed" -- a query error is returned to the
-// caller, which builds the failed report). window/status are always
-// computed here as "ok" or "degraded"; runOne fills in the human-readable
-// window label afterwards since it's derived from wall-clock time, not from
+// caller, which builds the failed report). window is always filled in by
+// the caller afterwards, since it's derived from wall-clock time, not from
 // anything collectReport queries.
-func collectReport(baseURL string, c combo, cycle, windowS int, host hostStats, im images) (reportData, error) {
-	cn := c.clusterName()
-
-	expected, err := promQuery(baseURL, promDutyExpected(cn, windowS))
+func collectReport(baseURL, name, clusterName string, cycle, windowS int, host hostStats) (reportData, error) {
+	expected, err := promQuery(baseURL, promDutyExpected(clusterName, windowS))
 	if err != nil {
 		return reportData{}, err
 	}
-	success, err := promQuery(baseURL, promDutySuccess(cn, windowS))
+	success, err := promQuery(baseURL, promDutySuccess(clusterName, windowS))
 	if err != nil {
 		return reportData{}, err
 	}
@@ -1048,7 +1031,7 @@ func collectReport(baseURL string, c combo, cycle, windowS int, host hostStats, 
 		worstPtr = &worst
 	}
 
-	memSamples, err := promQuery(baseURL, promDVMemPeak(cn, windowS))
+	memSamples, err := promQuery(baseURL, promDVMemPeak(clusterName, windowS))
 	if err != nil {
 		return reportData{}, err
 	}
@@ -1057,7 +1040,7 @@ func collectReport(baseURL string, c combo, cycle, windowS int, host hostStats, 
 		memPtr = &v
 	}
 
-	cpuSamples, err := promQuery(baseURL, promDVCPUPeak(cn, windowS))
+	cpuSamples, err := promQuery(baseURL, promDVCPUPeak(clusterName, windowS))
 	if err != nil {
 		return reportData{}, err
 	}
@@ -1066,11 +1049,11 @@ func collectReport(baseURL string, c combo, cycle, windowS int, host hostStats, 
 		cpuPtr = &v
 	}
 
-	fired, err := promQuery(baseURL, promHealthFired(cn, windowS))
+	fired, err := promQuery(baseURL, promHealthFired(clusterName, windowS))
 	if err != nil {
 		return reportData{}, err
 	}
-	firingNow, err := promQuery(baseURL, promHealthFiringNow(cn))
+	firingNow, err := promQuery(baseURL, promHealthFiringNow(clusterName))
 	if err != nil {
 		return reportData{}, err
 	}
@@ -1098,68 +1081,40 @@ func collectReport(baseURL string, c combo, cycle, windowS int, host hostStats, 
 		status = "degraded"
 	}
 
-	clImage := im.CL[c.cl]
-	if clImage == "" {
-		clImage = c.cl
-	}
-	vcImage := im.VC[c.vc]
-	if vcImage == "" {
-		vcImage = c.vc
-	}
-
 	h := host
 	return reportData{
-		combo:      c,
-		cycle:      cycle,
-		status:     status,
-		clImage:    clImage,
-		vcImage:    vcImage,
-		dvImage:    im.DV,
-		worst:      worstPtr,
-		dvMemBytes: memPtr,
-		dvCPU:      cpuPtr,
-		host:       &h,
-		health:     health,
+		name:        name,
+		clusterName: clusterName,
+		cycle:       cycle,
+		status:      status,
+		worst:       worstPtr,
+		dvMemBytes:  memPtr,
+		dvCPU:       cpuPtr,
+		host:        &h,
+		health:      health,
 	}, nil
 }
 
 // ---------------------------------------------------------------------------
-// runOne: run one combo end to end (with failedReport/postBestEffort helpers).
+// runOne: run one param file end to end (with failedReport/postBestEffort
+// helpers).
 // ---------------------------------------------------------------------------
-
-// dvNodeCount is the number of DV nodes in the generated cluster.
-const dvNodeCount = 4
 
 func fmtWindow(start, end time.Time) string {
 	return fmt.Sprintf("%s-%s UTC", start.UTC().Format("15:04"), end.UTC().Format("15:04"))
 }
 
-// failedReport builds a failed-status report, always resolving the real
-// CL/VC/DV image pins even on failure. It loads those pins from the
-// repo's images.json via loadImages, so failedReport takes the
-// already-loaded images and applies the same im.CL[c.cl]-or-c.cl fallback
-// collectReport uses. Callers that haven't loaded images yet (i.e. only the
-// gitPull-failure branch in runOne, before loadImages runs) pass the
-// zero-value images{}, which falls back to the raw client names and a blank
-// DV image -- the only case where the data is genuinely unavailable.
-func failedReport(c combo, cycle int, errMsg string, im images) reportData {
-	clImage := im.CL[c.cl]
-	if clImage == "" {
-		clImage = c.cl
-	}
-	vcImage := im.VC[c.vc]
-	if vcImage == "" {
-		vcImage = c.vc
-	}
+// failedReport builds a failed-status report for name/cycle. There are no
+// image pins to carry through anymore (those used to live in a separate
+// pins file the cycler no longer reads -- pins are now inline in each
+// static network-params file), so this is now a plain constructor.
+func failedReport(name string, cycle int, errMsg string) reportData {
 	return reportData{
-		combo:   c,
-		cycle:   cycle,
-		status:  "failed",
-		clImage: clImage,
-		vcImage: vcImage,
-		dvImage: im.DV,
-		window:  "-",
-		errMsg:  errMsg,
+		name:   name,
+		cycle:  cycle,
+		status: "failed",
+		window: "-",
+		errMsg: errMsg,
 	}
 }
 
@@ -1171,15 +1126,38 @@ func postBestEffort(cfg config, d reportData) {
 	_ = slackPost(cfg.slackWebhookURL, buildText(d), buildBlocks(d))
 }
 
-// runWindow performs the post-launch phase of runOne: wait for health, run
-// the sampler across the wait window, then collect the report. The sampler
-// is always started right before, and stopped right after, the wait loop --
-// there is no early return in between, so teardown is unconditional in the
-// only case where it was started.
-func runWindow(cfg config, c combo, cycle int, enclave string, im images) reportData {
+// writeTempArgsFile writes yaml to a fresh temp file and returns its path.
+func writeTempArgsFile(yaml string) (path string, err error) {
+	f, err := os.CreateTemp("", "dv-cycler-args-*.yaml")
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	if _, err := f.WriteString(yaml); err != nil {
+		return "", err
+	}
+	return f.Name(), nil
+}
+
+// runWindow performs the post-launch phase of runOne: resolve the
+// Prometheus URL, wait for health, discover the cluster_name, run the
+// sampler across the wait window, then collect the report. The sampler is
+// always started right before, and stopped right after, the wait loop --
+// there is no early return in between, so teardown of the sampler goroutine
+// is unconditional in the only case where it was started.
+func runWindow(cfg config, name string, cycle int, enclave string) reportData {
 	baseURL := prometheusBaseURL(enclave)
-	if baseURL == "" || !waitHealthy(baseURL, c.clusterName(), cfg.startupDeadlineMinutes*60) {
-		return failedReport(c, cycle, "cluster did not become healthy before deadline", im)
+	if baseURL == "" {
+		return failedReport(name, cycle, "could not resolve prometheus base URL")
+	}
+
+	if !waitHealthy(baseURL, cfg.startupDeadlineMinutes*60) {
+		return failedReport(name, cycle, "cluster did not become healthy before deadline")
+	}
+
+	clusterName, err := discoverClusterName(baseURL)
+	if err != nil {
+		return failedReport(name, cycle, fmt.Sprintf("cluster name discovery failed: %v", err))
 	}
 
 	stopCh := make(chan struct{})
@@ -1209,33 +1187,29 @@ func runWindow(cfg config, c combo, cycle int, enclave string, im images) report
 	close(stopCh)
 	host := <-sampleDone
 
-	data, err := collectReport(baseURL, c, cycle, windowS, host, im)
+	data, err := collectReport(baseURL, name, clusterName, cycle, windowS, host)
 	if err != nil {
-		return failedReport(c, cycle, err.Error(), im)
+		return failedReport(name, cycle, err.Error())
 	}
 	data.window = windowLabel
 	return data
 }
 
-// runOne executes one combo: a guarded pre-clear, then pre-launch (git pull
-// + build/write args file) failures produce a failed report and return
-// before anything was launched; a launch failure tears down and returns;
-// after a successful launch, teardown is guaranteed via defer, and any
-// failure from there on (unhealthy startup, sampling, metrics query, report
-// assembly) still produces a failed report. The top-level recover is an
-// extra safety net so that even an unexpected panic from a fake or a
-// bug never escapes to kill the caller's loop.
-func runOne(cfg config, c combo, cycle int) (result reportData) {
-	enclave := enclaveName(cycle, c)
-	// im is declared here (rather than via := at its loadImages call site
-	// below) so the recover handler can reference it too: whatever im holds
-	// at the point of a panic (zero-value before loadImages succeeds, fully
-	// populated after) is the most accurate pins failedReport can use.
-	var im images
+// runOne executes one param file: a guarded pre-clear, then pre-launch (git
+// pull + read/substitute/write the args file) failures produce a failed
+// report and return before anything was launched; a launch failure produces
+// a failed report and returns; after a successful launch, teardown is
+// guaranteed via defer, and any failure from there on (resolving
+// Prometheus, unhealthy startup, cluster discovery, sampling, metrics
+// query, report assembly) still produces a failed report. The top-level
+// recover is an extra safety net so that even an unexpected panic from a
+// fake or a bug never escapes to kill the caller's loop.
+func runOne(cfg config, paramFile, name string, cycle int) (result reportData) {
+	enclave := enclaveName(cycle, name)
 
 	defer func() {
 		if r := recover(); r != nil {
-			result = failedReport(c, cycle, fmt.Sprintf("panic: %v", r), im)
+			result = failedReport(name, cycle, fmt.Sprintf("panic: %v", r))
 			postBestEffort(cfg, result)
 			kurtosisRemove(enclave)
 		}
@@ -1244,41 +1218,35 @@ func runOne(cfg config, c combo, cycle int) (result reportData) {
 	kurtosisRemove(enclave) // idempotent: clear any stale enclave from a previous run
 
 	if err := gitPull(cfg.repoPath); err != nil {
-		// images.json hasn't been read yet, so there are no real pins
-		// available -- im is still its zero value here.
-		data := failedReport(c, cycle, fmt.Sprintf("pre-launch failed: %v", err), im)
+		data := failedReport(name, cycle, fmt.Sprintf("pre-launch failed: %v", err))
 		postBestEffort(cfg, data)
-		kurtosisRemove(enclave)
 		return data
 	}
 
-	var err error
-	im, err = loadImages(cfg.repoPath)
+	raw, err := readFileFn(paramFile)
 	if err != nil {
-		data := failedReport(c, cycle, fmt.Sprintf("pre-launch failed: %v", err), im)
+		data := failedReport(name, cycle, fmt.Sprintf("pre-launch failed: %v", err))
 		postBestEffort(cfg, data)
-		kurtosisRemove(enclave)
 		return data
 	}
+	argsYAML := strings.ReplaceAll(string(raw), "$PROMETHEUS_REMOTE_WRITE_TOKEN", cfg.monitoringToken)
 
-	argsYAML := buildArgsFile(im, c, cfg.monitoringToken, dvNodeCount)
-	argsPath := filepath.Join(os.TempDir(), "network_params.yaml")
-	if err := os.WriteFile(argsPath, []byte(argsYAML), 0o644); err != nil {
-		data := failedReport(c, cycle, fmt.Sprintf("pre-launch failed: %v", err), im)
+	tmpArgsPath, err := writeTempArgsFile(argsYAML)
+	if err != nil {
+		data := failedReport(name, cycle, fmt.Sprintf("pre-launch failed: %v", err))
 		postBestEffort(cfg, data)
-		kurtosisRemove(enclave)
 		return data
 	}
+	defer os.Remove(tmpArgsPath)
 
-	if err := kurtosisRun(enclave, cfg.packageRef, argsPath); err != nil {
-		data := failedReport(c, cycle, fmt.Sprintf("launch failed: %v", err), im)
+	if err := kurtosisRun(enclave, cfg.packageRef, tmpArgsPath); err != nil {
+		data := failedReport(name, cycle, fmt.Sprintf("launch failed: %v", err))
 		postBestEffort(cfg, data)
-		kurtosisRemove(enclave)
 		return data
 	}
 	defer kurtosisRemove(enclave) // guaranteed teardown after a successful launch
 
-	data := runWindow(cfg, c, cycle, enclave, im)
+	data := runWindow(cfg, name, cycle, enclave)
 	postBestEffort(cfg, data)
 	return data
 }
@@ -1288,10 +1256,12 @@ func runOne(cfg config, c combo, cycle int) (result reportData) {
 // ---------------------------------------------------------------------------
 
 // mainLoop drives the 24/7 loop: resume from a possibly-interrupted run,
-// then loop forever selecting the next combo, running it, and backing off
-// according to consecutive failures. State-save errors are logged and
-// otherwise ignored (best-effort), since this whole task's mandate is that
-// the loop must never die.
+// then loop forever re-enumerating network-params/*.yaml, running the next
+// one, and backing off according to consecutive failures. Re-enumerating on
+// every iteration (rather than once at startup) is what makes a newly
+// dropped-in file get picked up without restarting the service.
+// State-save errors are logged and otherwise ignored (best-effort), since
+// this whole task's mandate is that the loop must never die.
 func mainLoop(cfg config) {
 	st, err := loadState(cfg.statePath)
 	if err != nil {
@@ -1313,11 +1283,25 @@ func mainLoop(cfg config) {
 
 	consecutiveFailures := 0
 	for {
-		c := selectNextCombo(st)
-		st.CurrentEnclave = enclaveName(st.Cycle, c)
+		files, err := paramFiles(cfg.paramsDir)
+		if err != nil || len(files) == 0 {
+			fmt.Fprintf(os.Stderr, "dv-cycler: no param files found in %s (err=%v); backing off\n", cfg.paramsDir, err)
+			sleepFn(time.Duration(computeBackoff(consecutiveFailures, cfg.interRunBackoffS, cfg.maxBackoffS)) * time.Second)
+			continue
+		}
+
+		if st.NextIndex >= len(files) {
+			st.NextIndex = 0
+			st.Cycle++
+		}
+
+		f := files[st.NextIndex]
+		name := paramStem(f)
+
+		st.CurrentEnclave = enclaveName(st.Cycle, name)
 		saveState()
 
-		data := runOne(cfg, c, st.Cycle)
+		data := runOne(cfg, f, name, st.Cycle)
 
 		st.CurrentEnclave = ""
 		st.advance()
