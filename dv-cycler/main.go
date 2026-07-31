@@ -14,10 +14,13 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -50,6 +53,9 @@ type config struct {
 	sampleIntervalS        int
 	interRunBackoffS       int
 	maxBackoffS            int
+	logDir                 string
+	slackBotToken          string
+	slackChannelID         string
 }
 
 // dotEnvPath returns the .env file to load: $CYCLER_ENV_FILE if set, else
@@ -148,6 +154,12 @@ func applyFlags(cfg *config, args []string) {
 			cfg.monitoringToken = val
 		case "package-ref":
 			cfg.packageRef = val
+		case "log-dir":
+			cfg.logDir = val
+		case "slack-bot-token":
+			cfg.slackBotToken = val
+		case "slack-channel-id":
+			cfg.slackChannelID = val
 		case "run-minutes":
 			if n, err := strconv.Atoi(val); err == nil {
 				cfg.runMinutes = n
@@ -193,6 +205,9 @@ func loadConfig() (config, error) {
 	envStr("PARAMS_DIR", &cfg.paramsDir)
 	envStr("MONITORING_TOKEN", &cfg.monitoringToken)
 	envStr("PACKAGE_REF", &cfg.packageRef)
+	envStr("LOG_DIR", &cfg.logDir)
+	envStr("SLACK_BOT_TOKEN", &cfg.slackBotToken)
+	envStr("SLACK_CHANNEL_ID", &cfg.slackChannelID)
 	envInt("RUN_MINUTES", &cfg.runMinutes)
 	envInt("WARMUP_MINUTES", &cfg.warmupMinutes)
 	envInt("STARTUP_DEADLINE_MINUTES", &cfg.startupDeadlineMinutes)
@@ -210,6 +225,14 @@ func loadConfig() (config, error) {
 	// paramsDir itself wasn't explicitly overridden.
 	if cfg.paramsDir == "" && cfg.repoPath != "" {
 		cfg.paramsDir = filepath.Join(cfg.repoPath, "dv-cycler", "network-params")
+	}
+
+	if cfg.logDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil || home == "" {
+			home = "."
+		}
+		cfg.logDir = filepath.Join(home, "dv-cycler-logs")
 	}
 
 	var missing []string
@@ -651,6 +674,9 @@ type reportData struct {
 	host        *hostStats
 	health      []healthCheck
 	errMsg      string
+
+	logArchivePath string // local path to the captured-logs tarball (failing runs)
+	logExcerpt     string // short excerpt (Charon error lines) for the Slack message
 }
 
 var statusEmoji = map[string]string{"ok": "✅", "degraded": "⚠️", "failed": "❌"}
@@ -758,6 +784,17 @@ func buildBlocks(d reportData) []map[string]any {
 		})
 	}
 
+	if d.logArchivePath != "" {
+		txt := fmt.Sprintf("*Logs:* `%s`", d.logArchivePath)
+		if d.logExcerpt != "" {
+			txt += "\n```" + d.logExcerpt + "```"
+		}
+		blocks = append(blocks, map[string]any{
+			"type": "section",
+			"text": map[string]any{"type": "mrkdwn", "text": txt},
+		})
+	}
+
 	return blocks
 }
 
@@ -791,6 +828,29 @@ var (
 		}
 		defer resp.Body.Close()
 		return resp.StatusCode, nil
+	}
+
+	// httpDo is a general request seam (method + headers + body -> body +
+	// status), used by the Slack file-upload flow which needs Bearer auth,
+	// varied content types, and the response body.
+	httpDo = func(method, reqURL string, headers map[string]string, body []byte) ([]byte, int, error) {
+		req, err := http.NewRequest(method, reqURL, bytes.NewReader(body))
+		if err != nil {
+			return nil, 0, err
+		}
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer resp.Body.Close()
+		rb, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, resp.StatusCode, err
+		}
+		return rb, resp.StatusCode, nil
 	}
 
 	nowFn      = time.Now
@@ -1193,6 +1253,264 @@ func postBestEffort(cfg config, d reportData) {
 	_ = slackPost(cfg.slackWebhookURL, buildText(d), buildBlocks(d))
 }
 
+// ---------------------------------------------------------------------------
+// Failure log capture + Slack upload: on a non-ok run, dump the logs of one
+// beacon node, all Charon nodes, and all DV validator clients to a gzipped
+// tarball under cfg.logDir, and (if a bot token is configured) upload it to
+// Slack. Everything here is best-effort: it must never break runOne.
+// ---------------------------------------------------------------------------
+
+// serviceLabel strips kurtosis's "--<hash>" suffix from a container name,
+// leaving the readable service name (used for log file names).
+func serviceLabel(container string) string {
+	if i := strings.LastIndex(container, "--"); i > 0 {
+		return container[:i]
+	}
+	return container
+}
+
+// selectLogTargets picks, from a list of container names, the log targets for
+// a failing run: one beacon node (the lexically-first "cl-*"), all Charon
+// nodes ("*-charon-charon-*"), and all DV validator clients ("*-charon-vc-*").
+func selectLogTargets(containers []string) (bn string, dvNodes, vcs []string) {
+	sorted := append([]string(nil), containers...)
+	sort.Strings(sorted)
+	for _, c := range sorted {
+		switch {
+		case strings.Contains(c, "-charon-charon-"):
+			dvNodes = append(dvNodes, c)
+		case strings.Contains(c, "-charon-vc-"):
+			vcs = append(vcs, c)
+		case bn == "" && strings.HasPrefix(serviceLabel(c), "cl-"):
+			bn = c
+		}
+	}
+	return bn, dvNodes, vcs
+}
+
+// captureFailureLogs dumps the targeted logs for a failing run into a gzipped
+// tarball under cfg.logDir and returns its path plus a short excerpt (error
+// lines from a Charon node) for the Slack message. Best-effort: on any problem
+// it returns whatever it managed (possibly ""), never panicking. Assumes a
+// single enclave is running (the cycler tears down between runs), so it scopes
+// targets by service-name pattern rather than by enclave label.
+func captureFailureLogs(cfg config, name string, cycle int) (archivePath, excerpt string) {
+	defer func() { _ = recover() }()
+
+	out, err := runCommand("docker", "ps", "-a", "--format", "{{.Names}}")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: log capture: docker ps failed: %v\n", err)
+		return "", ""
+	}
+	var containers []string
+	for _, ln := range strings.Split(out, "\n") {
+		if ln = strings.TrimSpace(ln); ln != "" {
+			containers = append(containers, ln)
+		}
+	}
+	bn, dvNodes, vcs := selectLogTargets(containers)
+
+	var targets []string
+	if bn != "" {
+		targets = append(targets, bn)
+	}
+	targets = append(targets, dvNodes...)
+	targets = append(targets, vcs...)
+	if len(targets) == 0 {
+		fmt.Fprintln(os.Stderr, "dv-cycler: log capture: no BN/Charon/VC containers found")
+		return "", ""
+	}
+
+	staging, err := os.MkdirTemp("", "dv-cycler-logs-*")
+	if err != nil {
+		return "", ""
+	}
+	defer os.RemoveAll(staging)
+
+	for _, c := range targets {
+		logs, _ := runCommand("docker", "logs", c) // capture whatever exists
+		_ = os.WriteFile(filepath.Join(staging, serviceLabel(c)+".log"), []byte(logs), 0o644)
+	}
+
+	if err := os.MkdirAll(cfg.logDir, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: log capture: mkdir %s failed: %v\n", cfg.logDir, err)
+		return "", ""
+	}
+	ts := nowFn().UTC().Format("20060102-150405")
+	archivePath = filepath.Join(cfg.logDir, fmt.Sprintf("cycle%d-%s-%s.tar.gz", cycle, name, ts))
+	if err := makeTarGz(staging, archivePath); err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: log capture: archive failed: %v\n", err)
+		return "", ""
+	}
+
+	return archivePath, extractExcerpt(staging, dvNodes)
+}
+
+// extractExcerpt reads the first Charon node's captured log and returns up to
+// ~25 recent noteworthy lines (error/warn/fatal/panic/doppelganger), capped in
+// length, for inlining into the Slack message.
+func extractExcerpt(staging string, dvNodes []string) string {
+	if len(dvNodes) == 0 {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Join(staging, serviceLabel(dvNodes[0])+".log"))
+	if err != nil {
+		return ""
+	}
+	var hits []string
+	for _, ln := range strings.Split(string(data), "\n") {
+		low := strings.ToLower(ln)
+		if strings.Contains(low, "error") || strings.Contains(low, "erro ") ||
+			strings.Contains(low, "warn") || strings.Contains(low, "fatal") ||
+			strings.Contains(low, "panic") || strings.Contains(low, "doppelganger") {
+			hits = append(hits, ln)
+		}
+	}
+	if len(hits) == 0 {
+		return ""
+	}
+	if len(hits) > 25 {
+		hits = hits[len(hits)-25:]
+	}
+	out := strings.Join(hits, "\n")
+	const maxLen = 1500
+	if len(out) > maxLen {
+		out = out[len(out)-maxLen:]
+	}
+	return serviceLabel(dvNodes[0]) + ":\n" + out
+}
+
+// makeTarGz writes a gzipped tarball of every regular file directly in srcDir
+// to destPath.
+func makeTarGz(srcDir, destPath string) error {
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return err
+	}
+	f, err := os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	gz := gzip.NewWriter(f)
+	defer gz.Close()
+	tw := tar.NewWriter(gz)
+	defer tw.Close()
+
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(srcDir, e.Name()))
+		if err != nil {
+			return err
+		}
+		if err := tw.WriteHeader(&tar.Header{Name: e.Name(), Mode: 0o644, Size: int64(len(data))}); err != nil {
+			return err
+		}
+		if _, err := tw.Write(data); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// uploadLogsBestEffort uploads the failure-log archive to Slack (if a bot
+// token + channel are configured). Best-effort: never breaks runOne.
+func uploadLogsBestEffort(cfg config, d reportData) {
+	defer func() { _ = recover() }()
+	comment := fmt.Sprintf("Logs for %s (cycle %d, %s)", d.name, d.cycle, d.status)
+	if err := uploadLogsToSlack(cfg, d.logArchivePath, comment); err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: slack log upload failed: %v\n", err)
+	}
+}
+
+// uploadLogsToSlack uploads archivePath to Slack via the external-upload flow
+// (files.getUploadURLExternal -> POST to the returned upload_url ->
+// files.completeUploadExternal) and shares it into cfg.slackChannelID with an
+// initial comment. It is a no-op if the bot token or channel id is unset (the
+// local save has already happened either way).
+func uploadLogsToSlack(cfg config, archivePath, comment string) error {
+	if cfg.slackBotToken == "" || cfg.slackChannelID == "" {
+		return nil
+	}
+	data, err := os.ReadFile(archivePath)
+	if err != nil {
+		return err
+	}
+	filename := filepath.Base(archivePath)
+	bearer := "Bearer " + cfg.slackBotToken
+
+	// 1. Reserve an upload URL.
+	form := url.Values{"filename": {filename}, "length": {strconv.Itoa(len(data))}}.Encode()
+	body, _, err := httpDo("POST", "https://slack.com/api/files.getUploadURLExternal",
+		map[string]string{"Authorization": bearer, "Content-Type": "application/x-www-form-urlencoded"},
+		[]byte(form))
+	if err != nil {
+		return err
+	}
+	var got struct {
+		OK        bool   `json:"ok"`
+		Error     string `json:"error"`
+		UploadURL string `json:"upload_url"`
+		FileID    string `json:"file_id"`
+	}
+	if err := json.Unmarshal(body, &got); err != nil {
+		return err
+	}
+	if !got.OK {
+		return fmt.Errorf("files.getUploadURLExternal: %s", got.Error)
+	}
+
+	// 2. Upload the bytes to the reserved URL (multipart form field "file").
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	part, err := mw.CreateFormFile("file", filename)
+	if err != nil {
+		return err
+	}
+	if _, err := part.Write(data); err != nil {
+		return err
+	}
+	if err := mw.Close(); err != nil {
+		return err
+	}
+	_, status, err := httpDo("POST", got.UploadURL,
+		map[string]string{"Content-Type": mw.FormDataContentType()}, buf.Bytes())
+	if err != nil {
+		return err
+	}
+	if status != 200 {
+		return fmt.Errorf("upload POST returned HTTP %d", status)
+	}
+
+	// 3. Complete the upload and share it into the channel.
+	cbody, err := json.Marshal(map[string]any{
+		"files":           []map[string]string{{"id": got.FileID, "title": filename}},
+		"channel_id":      cfg.slackChannelID,
+		"initial_comment": comment,
+	})
+	if err != nil {
+		return err
+	}
+	rb, _, err := httpDo("POST", "https://slack.com/api/files.completeUploadExternal",
+		map[string]string{"Authorization": bearer, "Content-Type": "application/json"}, cbody)
+	if err != nil {
+		return err
+	}
+	var done struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(rb, &done); err != nil {
+		return err
+	}
+	if !done.OK {
+		return fmt.Errorf("files.completeUploadExternal: %s", done.Error)
+	}
+	return nil
+}
+
 // writeTempArgsFile writes yaml to a fresh temp file and returns its path.
 func writeTempArgsFile(yaml string) (path string, err error) {
 	f, err := os.CreateTemp("", "dv-cycler-args-*.yaml")
@@ -1319,7 +1637,15 @@ func runOne(cfg config, paramFile, name string, cycle int) (result reportData) {
 	defer kurtosisRemove(enclave) // guaranteed teardown after a successful launch
 
 	data := runWindow(cfg, name, cycle, enclave)
+	if data.status != "ok" {
+		// Capture BN/Charon/VC logs while the enclave is still up (teardown is
+		// deferred), for post-mortem of a failing/degraded combo.
+		data.logArchivePath, data.logExcerpt = captureFailureLogs(cfg, name, cycle)
+	}
 	postBestEffort(cfg, data)
+	if data.logArchivePath != "" {
+		uploadLogsBestEffort(cfg, data)
+	}
 	return data
 }
 

@@ -1,11 +1,15 @@
 package main
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -488,6 +492,41 @@ func TestLoadConfig(t *testing.T) {
 		}
 		if cfg.interRunBackoffS != 30 || cfg.maxBackoffS != 900 {
 			t.Errorf("interRunBackoffS/maxBackoffS = %d/%d, want 30/900", cfg.interRunBackoffS, cfg.maxBackoffS)
+		}
+	})
+
+	t.Run("logDir default + slack bot token/channel from env", func(t *testing.T) {
+		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "h")
+		t.Setenv("CYCLER_REPO_PATH", "r")
+		t.Setenv("CYCLER_STATE_PATH", "s")
+		t.Setenv("CYCLER_LOG_DIR", "")
+		t.Setenv("CYCLER_SLACK_BOT_TOKEN", "xoxb-abc")
+		t.Setenv("CYCLER_SLACK_CHANNEL_ID", "C123")
+
+		cfg, err := loadConfig()
+		if err != nil {
+			t.Fatalf("loadConfig error: %v", err)
+		}
+		if !strings.HasSuffix(cfg.logDir, "dv-cycler-logs") {
+			t.Errorf("logDir default = %q, want suffix dv-cycler-logs", cfg.logDir)
+		}
+		if cfg.slackBotToken != "xoxb-abc" || cfg.slackChannelID != "C123" {
+			t.Errorf("bot token/channel = %q/%q", cfg.slackBotToken, cfg.slackChannelID)
+		}
+	})
+
+	t.Run("CYCLER_LOG_DIR override wins over the default", func(t *testing.T) {
+		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "h")
+		t.Setenv("CYCLER_REPO_PATH", "r")
+		t.Setenv("CYCLER_STATE_PATH", "s")
+		t.Setenv("CYCLER_LOG_DIR", "/var/log/dvc")
+
+		cfg, err := loadConfig()
+		if err != nil {
+			t.Fatalf("loadConfig error: %v", err)
+		}
+		if cfg.logDir != "/var/log/dvc" {
+			t.Errorf("logDir = %q, want /var/log/dvc", cfg.logDir)
 		}
 	})
 
@@ -1173,5 +1212,203 @@ func TestDegradedTolerance(t *testing.T) {
 	}
 	if data.status != "degraded" {
 		t.Errorf("status at 95%% pct = %q, want degraded", data.status)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Failure log capture + Slack upload.
+// ---------------------------------------------------------------------------
+
+func readTarGz(t *testing.T, path string) map[string]string {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open archive: %v", err)
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	defer gz.Close()
+	tr := tar.NewReader(gz)
+	out := map[string]string{}
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("tar next: %v", err)
+		}
+		b, _ := io.ReadAll(tr)
+		out[h.Name] = string(b)
+	}
+	return out
+}
+
+func keysOf(m map[string]string) []string {
+	ks := make([]string, 0, len(m))
+	for k := range m {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	return ks
+}
+
+func TestSelectLogTargets(t *testing.T) {
+	containers := []string{
+		"vc-3-geth-lighthouse-charon-vc-2-nimbus--hh2",
+		"cl-2-lighthouse-geth--x",
+		"vc-3-geth-lighthouse-charon-charon-1--h1",
+		"cl-1-lighthouse-geth--y",
+		"el-1-geth-lighthouse--z",
+		"vc-3-geth-lighthouse-charon-vc-0-nimbus--hh0",
+		"vc-3-geth-lighthouse-charon-charon-0--h0",
+		"prometheus--p",
+		"vc-1-geth-lighthouse--boot", // bootstrap (non-DV) VC: must NOT be picked
+	}
+	bn, dv, vcs := selectLogTargets(containers)
+	if bn != "cl-1-lighthouse-geth--y" {
+		t.Errorf("bn = %q, want the lexically-first cl-* (cl-1)", bn)
+	}
+	if len(dv) != 2 || !strings.Contains(dv[0], "charon-charon-0") || !strings.Contains(dv[1], "charon-charon-1") {
+		t.Errorf("dvNodes = %v, want the two charon-charon nodes sorted", dv)
+	}
+	if len(vcs) != 2 || !strings.Contains(vcs[0], "-vc-0-") || !strings.Contains(vcs[1], "-vc-2-") {
+		t.Errorf("vcs = %v, want the two charon-vc clients sorted", vcs)
+	}
+}
+
+func TestCaptureFailureLogs(t *testing.T) {
+	oldRun, oldNow := runCommand, nowFn
+	defer func() { runCommand, nowFn = oldRun, oldNow }()
+	nowFn = func() time.Time { return time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC) }
+
+	psOut := strings.Join([]string{
+		"cl-1-lighthouse-geth--a",
+		"el-1-geth-lighthouse--b",
+		"vc-3-geth-lighthouse-charon-charon-0--c",
+		"vc-3-geth-lighthouse-charon-vc-0-nimbus--d",
+		"prometheus--e",
+	}, "\n")
+	runCommand = func(name string, args ...string) (string, error) {
+		if name == "docker" && len(args) > 0 && args[0] == "ps" {
+			return psOut + "\n", nil
+		}
+		if name == "docker" && len(args) > 0 && args[0] == "logs" {
+			c := args[len(args)-1]
+			if strings.Contains(c, "charon-charon-0") {
+				return "INFO all good\nERRO something bad happened\n", nil
+			}
+			return "log for " + c + "\n", nil
+		}
+		return "", nil
+	}
+
+	logDir := t.TempDir()
+	archive, excerpt := captureFailureLogs(config{logDir: logDir}, "lighthouse-nimbus", 2)
+	if archive == "" {
+		t.Fatal("archive path empty")
+	}
+	if filepath.Dir(archive) != logDir {
+		t.Errorf("archive %q not under logDir %q", archive, logDir)
+	}
+	if base := filepath.Base(archive); base != "cycle2-lighthouse-nimbus-20260731-120000.tar.gz" {
+		t.Errorf("archive name = %q", base)
+	}
+
+	got := readTarGz(t, archive)
+	for _, want := range []string{
+		"cl-1-lighthouse-geth.log",
+		"vc-3-geth-lighthouse-charon-charon-0.log",
+		"vc-3-geth-lighthouse-charon-vc-0-nimbus.log",
+	} {
+		if _, ok := got[want]; !ok {
+			t.Errorf("archive missing %s; has %v", want, keysOf(got))
+		}
+	}
+	if _, bad := got["el-1-geth-lighthouse.log"]; bad {
+		t.Error("EL log should NOT be captured (only BN/Charon/VC)")
+	}
+	if _, bad := got["prometheus.log"]; bad {
+		t.Error("prometheus log should NOT be captured")
+	}
+	if !strings.Contains(got["vc-3-geth-lighthouse-charon-charon-0.log"], "something bad happened") {
+		t.Error("charon-0 log content missing from archive")
+	}
+	if !strings.Contains(excerpt, "something bad happened") {
+		t.Errorf("excerpt missing the error line: %q", excerpt)
+	}
+}
+
+func TestUploadLogsToSlack(t *testing.T) {
+	oldDo := httpDo
+	defer func() { httpDo = oldDo }()
+
+	// Unconfigured (no token/channel) is a silent no-op.
+	if err := uploadLogsToSlack(config{}, "/does/not/matter", "c"); err != nil {
+		t.Errorf("unconfigured upload should be a no-op, got %v", err)
+	}
+
+	dir := t.TempDir()
+	arch := filepath.Join(dir, "a.tar.gz")
+	if err := os.WriteFile(arch, []byte("PAYLOAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var calls []string
+	httpDo = func(method, reqURL string, headers map[string]string, body []byte) ([]byte, int, error) {
+		calls = append(calls, reqURL)
+		switch {
+		case strings.Contains(reqURL, "getUploadURLExternal"):
+			if headers["Authorization"] != "Bearer xoxb-tok" {
+				t.Errorf("step1 missing bearer auth: %v", headers)
+			}
+			if !strings.Contains(string(body), "filename=a.tar.gz") || !strings.Contains(string(body), "length=7") {
+				t.Errorf("step1 body = %q", body)
+			}
+			return []byte(`{"ok":true,"upload_url":"https://files.slack/upload/xyz","file_id":"F1"}`), 200, nil
+		case strings.Contains(reqURL, "files.slack/upload"):
+			if !strings.Contains(string(body), "PAYLOAD") {
+				t.Error("upload POST body missing the file bytes")
+			}
+			return []byte("OK"), 200, nil
+		case strings.Contains(reqURL, "completeUploadExternal"):
+			if !strings.Contains(string(body), `"channel_id":"C42"`) {
+				t.Errorf("complete body missing channel: %q", body)
+			}
+			if !strings.Contains(string(body), `"F1"`) {
+				t.Errorf("complete body missing file id: %q", body)
+			}
+			return []byte(`{"ok":true}`), 200, nil
+		}
+		return []byte(`{"ok":false,"error":"unexpected url"}`), 200, nil
+	}
+
+	cfg := config{slackBotToken: "xoxb-tok", slackChannelID: "C42"}
+	if err := uploadLogsToSlack(cfg, arch, "logs for x"); err != nil {
+		t.Fatalf("uploadLogsToSlack error: %v", err)
+	}
+	if len(calls) != 3 {
+		t.Errorf("expected 3 HTTP calls (reserve/upload/complete), got %d: %v", len(calls), calls)
+	}
+}
+
+func TestBuildBlocksLogsSection(t *testing.T) {
+	d := reportData{
+		name: "x", cycle: 1, status: "failed", window: "-",
+		logArchivePath: "/home/u/dv-cycler-logs/cycle1-x-ts.tar.gz",
+		logExcerpt:     "charon-0:\nERRO boom",
+	}
+	dump := dumpBlocks(buildBlocks(d))
+	if !strings.Contains(dump, "cycle1-x-ts.tar.gz") {
+		t.Errorf("logs section missing archive path: %s", dump)
+	}
+	if !strings.Contains(dump, "ERRO boom") {
+		t.Errorf("logs section missing excerpt: %s", dump)
+	}
+	if strings.Contains(dumpBlocks(buildBlocks(reportData{name: "x", status: "ok", window: "-"})), "*Logs:*") {
+		t.Error("logs section should be absent when no archive was captured")
 	}
 }

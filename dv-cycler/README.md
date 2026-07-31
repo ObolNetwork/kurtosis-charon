@@ -73,6 +73,27 @@ warning is logged, the loop backs off, and it retries (re-scanning the
 directory) rather than exiting. Slack-post failures are swallowed too; they
 must never block teardown.
 
+## Failure log capture
+
+When a run ends **non-`ok`** (`failed` or `degraded`), the cycler captures the
+logs of the relevant services *before tearing the enclave down* — one beacon
+node (`cl-*`), all Charon nodes (`*-charon-charon-*`), and all DV validator
+clients (`*-charon-vc-*`) — and writes them to a gzipped tarball under
+`CYCLER_LOG_DIR` named `cycle<N>-<combo>-<UTC-timestamp>.tar.gz`. The Slack
+report for that run includes the archive path and a short excerpt (recent
+error/warn/fatal lines from a Charon node).
+
+Capture is best-effort — a problem gathering logs never breaks the run or the
+loop. It relies on `docker` being available to the service user and assumes a
+single enclave is running (true for the cycler, which tears down between runs),
+so it scopes targets by service-name pattern.
+
+If `CYCLER_SLACK_BOT_TOKEN` and `CYCLER_SLACK_CHANNEL_ID` are set, the archive
+is also uploaded to that Slack channel via the Web API
+(`files.getUploadURLExternal` → upload → `files.completeUploadExternal`). The
+incoming webhook used for the report itself cannot attach files, so without a
+bot token the logs are saved locally only (the report still links the path).
+
 ## Running it
 
 No build step is required — the cycler is run directly with `go run`, from
@@ -133,6 +154,9 @@ the three required variables is unset or empty.
 | `CYCLER_PARAMS_DIR` | no | `<CYCLER_REPO_PATH>/dv-cycler/network-params` | Directory scanned for `*.yaml` param files every loop iteration. |
 | `CYCLER_MONITORING_TOKEN` | no | `""` | Prometheus remote-write auth token (substituted for `$PROMETHEUS_REMOTE_WRITE_TOKEN` in each param file); empty disables remote-write auth. |
 | `CYCLER_PACKAGE_REF` | no | `github.com/ObolNetwork/ethereum-package@charon` | Kurtosis package reference to run. |
+| `CYCLER_LOG_DIR` | no | `<home>/dv-cycler-logs` | Directory where failing-run log archives (`.tar.gz`) are written. |
+| `CYCLER_SLACK_BOT_TOKEN` | no | `""` | Slack bot token (`files:write` scope) for uploading failing-run log archives. Empty = local save only. |
+| `CYCLER_SLACK_CHANNEL_ID` | no | `""` | Slack channel id to upload failing-run log archives into (needs `CYCLER_SLACK_BOT_TOKEN`). |
 | `CYCLER_RUN_MINUTES` | no | `90` | Length of each run's window. |
 | `CYCLER_WARMUP_MINUTES` | no | `15` | Leading portion of the run window excluded from duty/health scoring. |
 | `CYCLER_STARTUP_DEADLINE_MINUTES` | no | `25` | How long to wait for the enclave to become healthy before recording the run `failed`. |
