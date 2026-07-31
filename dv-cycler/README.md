@@ -98,6 +98,22 @@ Requires a Go toolchain (matching `go.mod`'s `go 1.26` directive or newer) on
 the host; `go run .` compiles and runs `main.go` on every invocation, so no
 binary is committed or needs to be rebuilt after a `git pull`.
 
+### Start/stop scripts
+
+For a host without a supervisor, three helper scripts wrap the manual launch:
+
+```bash
+./start.sh    # launch detached (setsid+nohup; survives logout); idempotent
+./status.sh   # show process, enclaves, and recent log (webhook masked)
+./stop.sh     # SIGTERM the cycler and tear down its in-flight enclave
+```
+
+`start.sh` reads `.env` from this directory, logs to `$CYCLER_LOG` (default
+`~/dv-cycler.log`), and adds `$HOME/sdk/go/bin` or `/usr/local/go/bin` to `PATH`
+if `go` isn't already resolvable. `stop.sh` preserves the state file, so a later
+`start.sh` resumes at the same rotation position. These are a convenience for
+manual operation; for unattended 24/7 use prefer the systemd unit below.
+
 ## Configuration
 
 Configuration is via `CYCLER_*` environment variables. At startup the cycler
