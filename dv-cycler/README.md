@@ -105,13 +105,14 @@ For a host without a supervisor, three helper scripts wrap the manual launch:
 ```bash
 ./start.sh    # launch detached (setsid+nohup; survives logout); idempotent
 ./status.sh   # show process, enclaves, and recent log (webhook masked)
-./stop.sh     # SIGTERM the cycler and tear down its in-flight enclave
+./stop.sh     # stop the loop AND tear down the current run's enclave
 ```
 
 `start.sh` reads `.env` from this directory, logs to `$CYCLER_LOG` (default
 `~/dv-cycler.log`), and adds `$HOME/sdk/go/bin` or `/usr/local/go/bin` to `PATH`
-if `go` isn't already resolvable. `stop.sh` preserves the state file, so a later
-`start.sh` resumes at the same rotation position. These are a convenience for
+if `go` isn't already resolvable. `stop.sh` stops the loop process and tears
+down the in-flight enclave; the state file is preserved, so a later `start.sh`
+resumes at the same rotation position. These are a convenience for
 manual operation; for unattended 24/7 use prefer the systemd unit below.
 
 ## Configuration
