@@ -26,6 +26,12 @@ The directory is re-scanned (sorted lexically) on every loop iteration, so:
   pins. Edit the file, commit, push to `CYCLER_REPO_PATH`; the next time
   that file comes up in rotation (after the cycler's per-run `git pull`) it
   launches with the new pin.
+- **Moving tags are always re-pulled.** The cycler runs `kurtosis run` with
+  `--image-download always`, so a moving tag like `obolnetwork/charon:next`
+  picks up a freshly-built image on the next run rather than reusing a stale
+  locally-cached one (Kurtosis's default `missing` policy would never re-pull
+  it). A rebuilt `:next` therefore lands on the next combo launch — no param
+  file edit needed.
 - **Removing a file removes it from rotation** the same way, on the next
   full pass.
 
@@ -72,6 +78,71 @@ or unreadable `network-params/` directory is treated the same way: a
 warning is logged, the loop backs off, and it retries (re-scanning the
 directory) rather than exiting. Slack-post failures are swallowed too; they
 must never block teardown.
+
+## Failure log capture
+
+When a run ends **non-`ok`** (`failed` or `degraded`), the cycler captures the
+logs of the relevant services *before tearing the enclave down* — the DV
+participant's own beacon node, all Charon nodes (`*-charon-charon-<N>`), and all
+DV validator clients (`*-charon-vc-*`) — and writes them to a gzipped tarball
+under `CYCLER_LOG_DIR` named `cycle<N>-<combo>-<UTC-timestamp>.tar.gz`. The Slack
+report for that run includes the archive path and a short excerpt (recent
+error/warn/fatal lines from a Charon node).
+
+The beacon node captured is the one the Charon cluster actually uses — the CL
+sharing the Charon nodes' participant index (`vc-3-…` → `cl-3-…`), *not* the
+fixed lighthouse bootstrap node (`cl-1`), which is a different client than most
+combos. Containers are scoped to the current enclave via kurtosis's
+`enclave-name` label, so a leftover container from a prior run is never
+captured.
+
+Capture is best-effort — a problem gathering logs never breaks the run or the
+loop. It relies on `docker` being available to the service user and assumes a
+single enclave is running (true for the cycler, which tears down between runs),
+so it scopes targets by service-name pattern.
+
+If `CYCLER_SLACK_BOT_TOKEN` and `CYCLER_SLACK_CHANNEL_ID` are set, the archive
+is also uploaded to that Slack channel via the Web API
+(`files.getUploadURLExternal` → upload → `files.completeUploadExternal`). The
+incoming webhook used for the report itself cannot attach files, so without a
+bot token the logs are saved locally only (the report still links the path).
+
+**Local cleanup:** on a *successful* upload the local archive is **deleted** —
+Slack becomes the durable store, so `CYCLER_LOG_DIR` doesn't grow over time. If
+upload isn't configured, or an upload fails, the local archive is **kept** (it's
+then the only copy). So a healthy, upload-configured deployment leaves
+`CYCLER_LOG_DIR` empty between failures; anything lingering there is a run whose
+upload didn't go through.
+
+## Results matrix
+
+Alongside the per-run reports, the cycler maintains a **single persistent
+matrix** (one row per combo) in `CYCLER_RESULTS_PATH`, so it survives restarts.
+Each row holds the combo's latest result — status, duty success %, Charon peak
+mem/cpu, host peak cpu/mem — plus the **versions it ran with**: the DV
+beacon-node image (`cl`), the Charon-managed VC image (`vc`), and the **Charon
+git commit** (`charon`, captured from `charon version` in the container).
+
+**Invalidation & re-test.** On each `git pull` the cycler diffs the current
+param-file pins (each combo's DV `cl_image` and `charon_vc_image`) against what
+each row last ran with. Any combo whose CL or VC version changed is
+**invalidated**, and the scheduler **prioritises** those combos (runs them
+ahead of the normal rotation) so a version bump is re-tested quickly. A combo
+counts as filled once it has run on the current pins, regardless of
+ok/degraded/failed (a persistently-failing combo shows its failure but doesn't
+block completion). Example: bumping Lodestar (CL **and** VC) invalidates the 11
+combos where Lodestar is the beacon node or the VC.
+
+**Posting.** Once every combo is valid again (the matrix is whole), the cycler
+posts the full matrix to Slack as a **fresh message** (via the webhook) —
+columns `combo | cl | vc | charon | status | duty% | chn-mem | chn-cpu |
+host-cpu | host-mem`, one message (the wide table is split across code blocks
+to fit Slack's limits). So you get a new, notified matrix each time a version
+change finishes testing; normal rotation between changes refreshes rows quietly
+without re-posting. A new Charon `:next` build is *not* an invalidation trigger
+— it only updates the `charon` column opportunistically as combos re-run. Set
+`CYCLER_SUMMARY_MENTION` to a Slack mention (e.g. `<!subteam^S123>`) to prepend
+a ping to the matrix message.
 
 ## Running it
 
@@ -133,6 +204,11 @@ the three required variables is unset or empty.
 | `CYCLER_PARAMS_DIR` | no | `<CYCLER_REPO_PATH>/dv-cycler/network-params` | Directory scanned for `*.yaml` param files every loop iteration. |
 | `CYCLER_MONITORING_TOKEN` | no | `""` | Prometheus remote-write auth token (substituted for `$PROMETHEUS_REMOTE_WRITE_TOKEN` in each param file); empty disables remote-write auth. |
 | `CYCLER_PACKAGE_REF` | no | `github.com/ObolNetwork/ethereum-package@charon` | Kurtosis package reference to run. |
+| `CYCLER_LOG_DIR` | no | `<home>/dv-cycler-logs` | Directory where failing-run log archives (`.tar.gz`) are written. |
+| `CYCLER_SLACK_BOT_TOKEN` | no | `""` | Slack bot token (`files:write` scope) for uploading failing-run log archives. Empty = local save only. |
+| `CYCLER_SLACK_CHANNEL_ID` | no | `""` | Slack channel id to upload failing-run log archives into (needs `CYCLER_SLACK_BOT_TOKEN`). |
+| `CYCLER_RESULTS_PATH` | no | `<state-dir>/cycler-results.json` | Persistent results-matrix file (one row per combo + versions). |
+| `CYCLER_SUMMARY_MENTION` | no | `""` | Slack mention prepended to the matrix message (e.g. `<!subteam^S123>`); empty = no ping. |
 | `CYCLER_RUN_MINUTES` | no | `90` | Length of each run's window. |
 | `CYCLER_WARMUP_MINUTES` | no | `15` | Leading portion of the run window excluded from duty/health scoring. |
 | `CYCLER_STARTUP_DEADLINE_MINUTES` | no | `25` | How long to wait for the enclave to become healthy before recording the run `failed`. |

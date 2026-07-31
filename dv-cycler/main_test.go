@@ -1,11 +1,15 @@
 package main
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -491,6 +495,61 @@ func TestLoadConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("logDir default + slack bot token/channel from env", func(t *testing.T) {
+		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "h")
+		t.Setenv("CYCLER_REPO_PATH", "r")
+		t.Setenv("CYCLER_STATE_PATH", "s")
+		t.Setenv("CYCLER_LOG_DIR", "")
+		t.Setenv("CYCLER_SLACK_BOT_TOKEN", "xoxb-abc")
+		t.Setenv("CYCLER_SLACK_CHANNEL_ID", "C123")
+
+		cfg, err := loadConfig()
+		if err != nil {
+			t.Fatalf("loadConfig error: %v", err)
+		}
+		if !strings.HasSuffix(cfg.logDir, "dv-cycler-logs") {
+			t.Errorf("logDir default = %q, want suffix dv-cycler-logs", cfg.logDir)
+		}
+		if cfg.slackBotToken != "xoxb-abc" || cfg.slackChannelID != "C123" {
+			t.Errorf("bot token/channel = %q/%q", cfg.slackBotToken, cfg.slackChannelID)
+		}
+	})
+
+	t.Run("resultsPath default (next to state) + summary mention", func(t *testing.T) {
+		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "h")
+		t.Setenv("CYCLER_REPO_PATH", "r")
+		t.Setenv("CYCLER_STATE_PATH", "/var/lib/cyc/state.json")
+		t.Setenv("CYCLER_RESULTS_PATH", "")
+		t.Setenv("CYCLER_SUMMARY_MENTION", "<!subteam^S9>")
+
+		cfg, err := loadConfig()
+		if err != nil {
+			t.Fatalf("loadConfig error: %v", err)
+		}
+		want := filepath.Join("/var/lib/cyc", "cycler-results.json")
+		if cfg.resultsPath != want {
+			t.Errorf("resultsPath = %q, want %q", cfg.resultsPath, want)
+		}
+		if cfg.summaryMention != "<!subteam^S9>" {
+			t.Errorf("summaryMention = %q", cfg.summaryMention)
+		}
+	})
+
+	t.Run("CYCLER_LOG_DIR override wins over the default", func(t *testing.T) {
+		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "h")
+		t.Setenv("CYCLER_REPO_PATH", "r")
+		t.Setenv("CYCLER_STATE_PATH", "s")
+		t.Setenv("CYCLER_LOG_DIR", "/var/log/dvc")
+
+		cfg, err := loadConfig()
+		if err != nil {
+			t.Fatalf("loadConfig error: %v", err)
+		}
+		if cfg.logDir != "/var/log/dvc" {
+			t.Errorf("logDir = %q, want /var/log/dvc", cfg.logDir)
+		}
+	})
+
 	t.Run("CYCLER_PARAMS_DIR override wins over the derived default", func(t *testing.T) {
 		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "h")
 		t.Setenv("CYCLER_REPO_PATH", "/srv/kurtosis-charon")
@@ -776,7 +835,7 @@ func TestKurtosisRunAndRemove(t *testing.T) {
 	if err := kurtosisRun("c1-teku-prysm", "pkg@ref", "/tmp/args.yaml"); err != nil {
 		t.Fatalf("kurtosisRun error: %v", err)
 	}
-	want := []string{"kurtosis", "run", "--enclave", "c1-teku-prysm", "pkg@ref", "--args-file", "/tmp/args.yaml"}
+	want := []string{"kurtosis", "run", "--enclave", "c1-teku-prysm", "--image-download", "always", "pkg@ref", "--args-file", "/tmp/args.yaml"}
 	if !reflect.DeepEqual(captured, want) {
 		t.Errorf("captured argv = %v, want %v", captured, want)
 	}
@@ -1173,5 +1232,458 @@ func TestDegradedTolerance(t *testing.T) {
 	}
 	if data.status != "degraded" {
 		t.Errorf("status at 95%% pct = %q, want degraded", data.status)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Failure log capture + Slack upload.
+// ---------------------------------------------------------------------------
+
+func readTarGz(t *testing.T, path string) map[string]string {
+	t.Helper()
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open archive: %v", err)
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	defer gz.Close()
+	tr := tar.NewReader(gz)
+	out := map[string]string{}
+	for {
+		h, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("tar next: %v", err)
+		}
+		b, _ := io.ReadAll(tr)
+		out[h.Name] = string(b)
+	}
+	return out
+}
+
+func keysOf(m map[string]string) []string {
+	ks := make([]string, 0, len(m))
+	for k := range m {
+		ks = append(ks, k)
+	}
+	sort.Strings(ks)
+	return ks
+}
+
+func TestSelectLogTargets(t *testing.T) {
+	// Models a lodestar-nimbus enclave: a fixed lighthouse bootstrap (cl-1/cl-2)
+	// plus the DV participant (node index 3) whose CL is lodestar and whose 4
+	// Charon nodes each run a Nimbus VC. The BN must be the DV's cl-3-lodestar,
+	// NOT the lexically-first cl-1-lighthouse bootstrap.
+	containers := []string{
+		"cl-1-lighthouse-geth--a",
+		"cl-2-lighthouse-geth--b",
+		"cl-3-lodestar-geth--c",
+		"el-1-geth-lighthouse--d",
+		"vc-1-geth-lighthouse--e", // bootstrap VC: not a DV VC
+		"vc-3-geth-lodestar-charon-charon-0--f",
+		"vc-3-geth-lodestar-charon-charon-1--g",
+		"vc-3-geth-lodestar-charon-charon-relay-2--h",      // helper: excluded
+		"vc-3-geth-lodestar-charon-charon-split-keys-2--i", // helper: excluded
+		"vc-3-geth-lodestar-charon-vc-0-nimbus--j",
+		"vc-3-geth-lodestar-charon-vc-1-nimbus--k",
+		"prometheus--l",
+	}
+	bn, dv, vcs := selectLogTargets(containers)
+	if bn != "cl-3-lodestar-geth--c" {
+		t.Errorf("bn = %q, want the DV's cl-3-lodestar (not the lighthouse bootstrap)", bn)
+	}
+	if strings.Contains(bn, "lighthouse") {
+		t.Errorf("bn = %q must not be the lighthouse bootstrap node", bn)
+	}
+	if len(dv) != 2 || !strings.Contains(dv[0], "charon-charon-0") || !strings.Contains(dv[1], "charon-charon-1") {
+		t.Errorf("dvNodes = %v, want exactly the 2 numbered charon nodes (relay/split-keys excluded)", dv)
+	}
+	if len(vcs) != 2 || !strings.Contains(vcs[0], "-vc-0-") || !strings.Contains(vcs[1], "-vc-1-") {
+		t.Errorf("vcs = %v, want the two charon-vc clients", vcs)
+	}
+}
+
+func TestCaptureFailureLogs(t *testing.T) {
+	oldRun, oldNow := runCommand, nowFn
+	defer func() { runCommand, nowFn = oldRun, oldNow }()
+	nowFn = func() time.Time { return time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC) }
+
+	psOut := strings.Join([]string{
+		"cl-1-lighthouse-geth--a", // bootstrap CL: must NOT be captured
+		"cl-3-lodestar-geth--b",   // DV CL: the one to capture
+		"el-3-geth-lodestar--c",
+		"vc-3-geth-lodestar-charon-charon-0--d",
+		"vc-3-geth-lodestar-charon-vc-0-nimbus--e",
+		"prometheus--f",
+	}, "\n")
+	runCommand = func(name string, args ...string) (string, error) {
+		if name == "docker" && len(args) > 0 && args[0] == "ps" {
+			return psOut + "\n", nil
+		}
+		if name == "docker" && len(args) > 0 && args[0] == "logs" {
+			c := args[len(args)-1]
+			if strings.Contains(c, "charon-charon-0") {
+				return "INFO all good\nERRO something bad happened\n", nil
+			}
+			return "log for " + c + "\n", nil
+		}
+		return "", nil
+	}
+
+	logDir := t.TempDir()
+	archive, excerpt := captureFailureLogs(config{logDir: logDir}, "c2-lodestar-nimbus", "lodestar-nimbus", 2)
+	if archive == "" {
+		t.Fatal("archive path empty")
+	}
+	if filepath.Dir(archive) != logDir {
+		t.Errorf("archive %q not under logDir %q", archive, logDir)
+	}
+	if base := filepath.Base(archive); base != "cycle2-lodestar-nimbus-20260731-120000.tar.gz" {
+		t.Errorf("archive name = %q", base)
+	}
+
+	got := readTarGz(t, archive)
+	for _, want := range []string{
+		"cl-3-lodestar-geth.log", // the DV's CL, not the bootstrap
+		"vc-3-geth-lodestar-charon-charon-0.log",
+		"vc-3-geth-lodestar-charon-vc-0-nimbus.log",
+	} {
+		if _, ok := got[want]; !ok {
+			t.Errorf("archive missing %s; has %v", want, keysOf(got))
+		}
+	}
+	if _, bad := got["cl-1-lighthouse-geth.log"]; bad {
+		t.Error("bootstrap lighthouse CL must NOT be captured for a lodestar combo")
+	}
+	if _, bad := got["el-3-geth-lodestar.log"]; bad {
+		t.Error("EL log should NOT be captured (only BN/Charon/VC)")
+	}
+	if _, bad := got["prometheus.log"]; bad {
+		t.Error("prometheus log should NOT be captured")
+	}
+	if !strings.Contains(got["vc-3-geth-lodestar-charon-charon-0.log"], "something bad happened") {
+		t.Error("charon-0 log content missing from archive")
+	}
+	if !strings.Contains(excerpt, "something bad happened") {
+		t.Errorf("excerpt missing the error line: %q", excerpt)
+	}
+}
+
+func TestUploadLogsToSlack(t *testing.T) {
+	oldDo := httpDo
+	defer func() { httpDo = oldDo }()
+
+	// Unconfigured (no token/channel) is a silent no-op: (false, nil).
+	if up, err := uploadLogsToSlack(config{}, "/does/not/matter", "c"); err != nil || up {
+		t.Errorf("unconfigured upload should be (false,nil), got up=%v err=%v", up, err)
+	}
+
+	dir := t.TempDir()
+	arch := filepath.Join(dir, "a.tar.gz")
+	if err := os.WriteFile(arch, []byte("PAYLOAD"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var calls []string
+	httpDo = func(method, reqURL string, headers map[string]string, body []byte) ([]byte, int, error) {
+		calls = append(calls, reqURL)
+		switch {
+		case strings.Contains(reqURL, "getUploadURLExternal"):
+			if headers["Authorization"] != "Bearer xoxb-tok" {
+				t.Errorf("step1 missing bearer auth: %v", headers)
+			}
+			if !strings.Contains(string(body), "filename=a.tar.gz") || !strings.Contains(string(body), "length=7") {
+				t.Errorf("step1 body = %q", body)
+			}
+			return []byte(`{"ok":true,"upload_url":"https://files.slack/upload/xyz","file_id":"F1"}`), 200, nil
+		case strings.Contains(reqURL, "files.slack/upload"):
+			if !strings.Contains(string(body), "PAYLOAD") {
+				t.Error("upload POST body missing the file bytes")
+			}
+			return []byte("OK"), 200, nil
+		case strings.Contains(reqURL, "completeUploadExternal"):
+			if !strings.Contains(string(body), `"channel_id":"C42"`) {
+				t.Errorf("complete body missing channel: %q", body)
+			}
+			if !strings.Contains(string(body), `"F1"`) {
+				t.Errorf("complete body missing file id: %q", body)
+			}
+			return []byte(`{"ok":true}`), 200, nil
+		}
+		return []byte(`{"ok":false,"error":"unexpected url"}`), 200, nil
+	}
+
+	cfg := config{slackBotToken: "xoxb-tok", slackChannelID: "C42"}
+	up, err := uploadLogsToSlack(cfg, arch, "logs for x")
+	if err != nil {
+		t.Fatalf("uploadLogsToSlack error: %v", err)
+	}
+	if !up {
+		t.Error("expected uploaded=true on a successful upload")
+	}
+	if len(calls) != 3 {
+		t.Errorf("expected 3 HTTP calls (reserve/upload/complete), got %d: %v", len(calls), calls)
+	}
+}
+
+func TestUploadLogsBestEffortDeletesOnSuccess(t *testing.T) {
+	oldDo := httpDo
+	defer func() { httpDo = oldDo }()
+	httpDo = func(method, reqURL string, headers map[string]string, body []byte) ([]byte, int, error) {
+		switch {
+		case strings.Contains(reqURL, "getUploadURLExternal"):
+			return []byte(`{"ok":true,"upload_url":"https://x/up","file_id":"F1"}`), 200, nil
+		case strings.Contains(reqURL, "/up"):
+			return []byte("OK"), 200, nil
+		case strings.Contains(reqURL, "completeUploadExternal"):
+			return []byte(`{"ok":true}`), 200, nil
+		}
+		return []byte(`{"ok":false}`), 200, nil
+	}
+	dir := t.TempDir()
+	arch := filepath.Join(dir, "a.tar.gz")
+	if err := os.WriteFile(arch, []byte("X"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	uploadLogsBestEffort(config{slackBotToken: "t", slackChannelID: "C"},
+		reportData{name: "x", cycle: 1, status: "failed", logArchivePath: arch})
+	if _, err := os.Stat(arch); !os.IsNotExist(err) {
+		t.Errorf("archive should be deleted after a successful upload; stat err = %v", err)
+	}
+}
+
+func TestUploadLogsBestEffortKeepsWhenNotUploaded(t *testing.T) {
+	oldDo := httpDo
+	defer func() { httpDo = oldDo }()
+	dir := t.TempDir()
+
+	// Upload not configured -> keep the local archive.
+	a1 := filepath.Join(dir, "k1.tar.gz")
+	if err := os.WriteFile(a1, []byte("X"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	uploadLogsBestEffort(config{}, reportData{logArchivePath: a1})
+	if _, err := os.Stat(a1); err != nil {
+		t.Errorf("unconfigured: archive should be kept, got %v", err)
+	}
+
+	// Configured but the upload fails -> keep the local archive.
+	httpDo = func(method, reqURL string, headers map[string]string, body []byte) ([]byte, int, error) {
+		return []byte(`{"ok":false,"error":"boom"}`), 200, nil
+	}
+	a2 := filepath.Join(dir, "k2.tar.gz")
+	if err := os.WriteFile(a2, []byte("X"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	uploadLogsBestEffort(config{slackBotToken: "t", slackChannelID: "C"}, reportData{logArchivePath: a2})
+	if _, err := os.Stat(a2); err != nil {
+		t.Errorf("failed upload: archive should be kept, got %v", err)
+	}
+}
+
+func TestBuildBlocksLogsSection(t *testing.T) {
+	d := reportData{
+		name: "x", cycle: 1, status: "failed", window: "-",
+		logArchivePath: "/home/u/dv-cycler-logs/cycle1-x-ts.tar.gz",
+		logExcerpt:     "charon-0:\nERRO boom",
+	}
+	dump := dumpBlocks(buildBlocks(d))
+	if !strings.Contains(dump, "cycle1-x-ts.tar.gz") {
+		t.Errorf("logs section missing archive path: %s", dump)
+	}
+	if !strings.Contains(dump, "ERRO boom") {
+		t.Errorf("logs section missing excerpt: %s", dump)
+	}
+	if strings.Contains(dumpBlocks(buildBlocks(reportData{name: "x", status: "ok", window: "-"})), "*Logs:*") {
+		t.Error("logs section should be absent when no archive was captured")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// DV results matrix.
+// ---------------------------------------------------------------------------
+
+func TestParsePins(t *testing.T) {
+	yaml := `participants:
+  - el_type: geth
+    cl_type: lighthouse
+    cl_image: sigp/lighthouse:v8.2.1
+    vc_type: lighthouse
+    vc_image: sigp/lighthouse:v8.2.1
+    count: 2
+  - el_type: geth
+    cl_type: lodestar
+    cl_image: "chainsafe/lodestar:v1.43.1"
+    vc_type: charon
+    charon_params:
+      charon_vc: nimbus
+      charon_vc_image: statusim/nimbus-validator-client:multiarch-v26.7.0
+`
+	p := parsePins(yaml)
+	if p.cl != "chainsafe/lodestar:v1.43.1" {
+		t.Errorf("cl = %q, want the DV (last) cl_image, quotes stripped", p.cl)
+	}
+	if p.vc != "statusim/nimbus-validator-client:multiarch-v26.7.0" {
+		t.Errorf("vc = %q, want the charon_vc_image", p.vc)
+	}
+}
+
+func TestPendingCombos(t *testing.T) {
+	files := []string{"/p/grandine-lodestar.yaml", "/p/lodestar-nimbus.yaml", "/p/teku-prysm.yaml"}
+	curPins := map[string]pins{
+		"grandine-lodestar": {cl: "grandine:2.0.5", vc: "lodestar:v1.43.1"},
+		"lodestar-nimbus":   {cl: "lodestar:v1.43.1", vc: "nimbus:v26.7.0"},
+		"teku-prysm":        {cl: "teku:26.7.1", vc: "prysm:v7.1.8"},
+	}
+	m := matrixStore{Results: map[string]comboResult{
+		// VC pin changed (lodestar bumped v1.43.0 -> v1.43.1) => pending
+		"grandine-lodestar": {Status: "ok", CL: "grandine:2.0.5", VC: "lodestar:v1.43.0"},
+		// matches current pins => valid
+		"lodestar-nimbus": {Status: "ok", CL: "lodestar:v1.43.1", VC: "nimbus:v26.7.0"},
+		// teku-prysm: no result at all => pending
+	}}
+	got := pendingCombos(m, files, curPins)
+	want := []string{"grandine-lodestar", "teku-prysm"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("pending = %v, want %v (changed VC + never-run, sorted)", got, want)
+	}
+}
+
+func TestParseCharonCommit(t *testing.T) {
+	cases := map[string]string{
+		"v1.11.0-dev [git_commit_hash=bc5674a,git_commit_time=2026-08-03T11:24:23Z]": "bc5674a",
+		"v1.2.3 [git_commit_hash=abc1234]":                                           "abc1234",
+		"no hash here":                                                               "",
+	}
+	for in, want := range cases {
+		if got := parseCharonCommit(in); got != want {
+			t.Errorf("parseCharonCommit(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestImageTag(t *testing.T) {
+	cases := map[string]string{
+		"chainsafe/lodestar:v1.43.1":                         "v1.43.1",
+		"statusim/nimbus-validator-client:multiarch-v26.7.0": "multiarch-v26.7.0",
+		"":      "N/A",
+		"notag": "notag",
+	}
+	for in, want := range cases {
+		if got := imageTag(in); got != want {
+			t.Errorf("imageTag(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestComboResultFrom(t *testing.T) {
+	mem, cpu := 1.5e9, 1.4
+	d := reportData{
+		status: "degraded",
+		worst: &worstNode{peer: "1", duties: []dutyResult{
+			{duty: "attester", expected: 100, success: 90},
+			{duty: "proposer", expected: 4, success: 4},
+		}},
+		dvMemBytes: &mem, dvCPU: &cpu,
+		host:          &hostStats{cpuPeak: 82, memPeak: 9e9},
+		charonVersion: "bc5674a",
+	}
+	r := comboResultFrom(d)
+	if r.Status != "degraded" {
+		t.Errorf("status = %q", r.Status)
+	}
+	if r.DutyPct == nil || *r.DutyPct < 90.3 || *r.DutyPct > 90.4 { // 94/104 = 90.38%
+		t.Errorf("dutyPct = %v, want ~90.38", r.DutyPct)
+	}
+	if r.CharonMem == nil || *r.CharonMem != mem || r.CharonCPU == nil || *r.CharonCPU != cpu {
+		t.Errorf("charon mem/cpu = %v/%v", r.CharonMem, r.CharonCPU)
+	}
+	if r.HostCPU == nil || *r.HostCPU != 82 || r.HostMem == nil || *r.HostMem != 9e9 {
+		t.Errorf("host cpu/mem = %v/%v", r.HostCPU, r.HostMem)
+	}
+	if r.Charon != "bc5674a" {
+		t.Errorf("charon commit = %q, want bc5674a", r.Charon)
+	}
+
+	f := comboResultFrom(reportData{status: "failed"})
+	if f.Status != "failed" || f.DutyPct != nil || f.CharonMem != nil || f.HostCPU != nil || f.Charon != "" {
+		t.Errorf("failed run should have nil metrics + empty charon: %+v", f)
+	}
+}
+
+func TestBuildMatrixBlocks(t *testing.T) {
+	combos := []string{"grandine-nimbus", "lodestar-nimbus", "teku-teku"}
+	mem, cpu, hp, hm, dp := 1.2e9, 1.1, 55.0, 8e9, 99.9
+	m := matrixStore{Results: map[string]comboResult{
+		"grandine-nimbus": {Status: "ok", DutyPct: &dp, CharonMem: &mem, CharonCPU: &cpu, HostCPU: &hp, HostMem: &hm,
+			CL: "sifrai/grandine:2.0.5", VC: "statusim/nimbus-validator-client:multiarch-v26.7.0", Charon: "bc5674a"},
+		"lodestar-nimbus": {Status: "failed", CL: "chainsafe/lodestar:v1.43.1", VC: "statusim/nimbus:v26.7.0"},
+		// teku-teku absent -> an N/A row
+	}}
+	text, blocks := buildMatrixBlocks(m, combos, "<!subteam^S1|proto>", "2026-08-03 15:40 UTC")
+	if !strings.Contains(text, "3 combos") {
+		t.Errorf("fallback text = %q", text)
+	}
+	dump := dumpBlocks(blocks)
+	// dumpBlocks JSON-encodes, so "<"/">" render as </>; match the
+	// un-bracketed core of the mention.
+	for _, want := range []string{
+		"grandine-nimbus", "lodestar-nimbus", "teku-teku", // every combo present
+		"2.0.5", "multiarch-v26.7.0", "bc5674a", "v1.43.1", // version columns (tags)
+		"99.9%", "1.20GB", // metrics for the filled row
+		"N/A",                          // the unrun teku-teku row
+		"subteam^S1|proto",             // mention prepended
+		"updated 2026-08-03 15:40 UTC", // timestamp
+	} {
+		if !strings.Contains(dump, want) {
+			t.Errorf("matrix dump missing %q\n%s", want, dump)
+		}
+	}
+}
+
+func TestLoadMatrixRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "matrix.json")
+
+	m, err := loadMatrix(path)
+	if err != nil {
+		t.Fatalf("loadMatrix(missing): %v", err)
+	}
+	if m.Results == nil {
+		t.Error("Results map should be initialized for a missing file")
+	}
+
+	dp := 88.0
+	m.Posted = true
+	m.Results["lodestar-nimbus"] = comboResult{
+		Status: "ok", DutyPct: &dp,
+		CL: "chainsafe/lodestar:v1.43.1", VC: "statusim/nimbus:v26.7.0", Charon: "bc5674a",
+	}
+	if err := m.save(path); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	loaded, err := loadMatrix(path)
+	if err != nil {
+		t.Fatalf("loadMatrix: %v", err)
+	}
+	if !loaded.Posted {
+		t.Errorf("loaded.Posted = false, want true")
+	}
+	r, ok := loaded.Results["lodestar-nimbus"]
+	if !ok || r.Status != "ok" || r.CL != "chainsafe/lodestar:v1.43.1" || r.Charon != "bc5674a" || r.DutyPct == nil || *r.DutyPct != 88.0 {
+		t.Errorf("loaded result = %+v", loaded.Results)
+	}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Errorf("leftover tmp file: %s", e.Name())
+		}
 	}
 }

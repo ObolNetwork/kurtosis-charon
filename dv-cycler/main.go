@@ -14,10 +14,13 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -50,6 +53,11 @@ type config struct {
 	sampleIntervalS        int
 	interRunBackoffS       int
 	maxBackoffS            int
+	logDir                 string
+	slackBotToken          string
+	slackChannelID         string
+	resultsPath            string
+	summaryMention         string
 }
 
 // dotEnvPath returns the .env file to load: $CYCLER_ENV_FILE if set, else
@@ -148,6 +156,16 @@ func applyFlags(cfg *config, args []string) {
 			cfg.monitoringToken = val
 		case "package-ref":
 			cfg.packageRef = val
+		case "log-dir":
+			cfg.logDir = val
+		case "slack-bot-token":
+			cfg.slackBotToken = val
+		case "slack-channel-id":
+			cfg.slackChannelID = val
+		case "results-path":
+			cfg.resultsPath = val
+		case "summary-mention":
+			cfg.summaryMention = val
 		case "run-minutes":
 			if n, err := strconv.Atoi(val); err == nil {
 				cfg.runMinutes = n
@@ -193,6 +211,11 @@ func loadConfig() (config, error) {
 	envStr("PARAMS_DIR", &cfg.paramsDir)
 	envStr("MONITORING_TOKEN", &cfg.monitoringToken)
 	envStr("PACKAGE_REF", &cfg.packageRef)
+	envStr("LOG_DIR", &cfg.logDir)
+	envStr("SLACK_BOT_TOKEN", &cfg.slackBotToken)
+	envStr("SLACK_CHANNEL_ID", &cfg.slackChannelID)
+	envStr("RESULTS_PATH", &cfg.resultsPath)
+	envStr("SUMMARY_MENTION", &cfg.summaryMention)
 	envInt("RUN_MINUTES", &cfg.runMinutes)
 	envInt("WARMUP_MINUTES", &cfg.warmupMinutes)
 	envInt("STARTUP_DEADLINE_MINUTES", &cfg.startupDeadlineMinutes)
@@ -212,6 +235,14 @@ func loadConfig() (config, error) {
 		cfg.paramsDir = filepath.Join(cfg.repoPath, "dv-cycler", "network-params")
 	}
 
+	if cfg.logDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil || home == "" {
+			home = "."
+		}
+		cfg.logDir = filepath.Join(home, "dv-cycler-logs")
+	}
+
 	var missing []string
 	if cfg.slackWebhookURL == "" {
 		missing = append(missing, "slack_webhook_url (CYCLER_SLACK_WEBHOOK_URL / --slack-webhook-url)")
@@ -224,6 +255,12 @@ func loadConfig() (config, error) {
 	}
 	if len(missing) > 0 {
 		return config{}, fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))
+	}
+
+	// resultsPath defaults next to the state file (statePath is guaranteed set
+	// by the required-config check above).
+	if cfg.resultsPath == "" {
+		cfg.resultsPath = filepath.Join(filepath.Dir(cfg.statePath), "cycler-results.json")
 	}
 	return cfg, nil
 }
@@ -651,6 +688,10 @@ type reportData struct {
 	host        *hostStats
 	health      []healthCheck
 	errMsg      string
+
+	logArchivePath string // local path to the captured-logs tarball (failing runs)
+	logExcerpt     string // short excerpt (Charon error lines) for the Slack message
+	charonVersion  string // charon git commit hash captured during the run (matrix column)
 }
 
 var statusEmoji = map[string]string{"ok": "✅", "degraded": "⚠️", "failed": "❌"}
@@ -758,6 +799,17 @@ func buildBlocks(d reportData) []map[string]any {
 		})
 	}
 
+	if d.logArchivePath != "" {
+		txt := fmt.Sprintf("*Logs:* `%s`", d.logArchivePath)
+		if d.logExcerpt != "" {
+			txt += "\n```" + d.logExcerpt + "```"
+		}
+		blocks = append(blocks, map[string]any{
+			"type": "section",
+			"text": map[string]any{"type": "mrkdwn", "text": txt},
+		})
+	}
+
 	return blocks
 }
 
@@ -791,6 +843,29 @@ var (
 		}
 		defer resp.Body.Close()
 		return resp.StatusCode, nil
+	}
+
+	// httpDo is a general request seam (method + headers + body -> body +
+	// status), used by the Slack file-upload flow which needs Bearer auth,
+	// varied content types, and the response body.
+	httpDo = func(method, reqURL string, headers map[string]string, body []byte) ([]byte, int, error) {
+		req, err := http.NewRequest(method, reqURL, bytes.NewReader(body))
+		if err != nil {
+			return nil, 0, err
+		}
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer resp.Body.Close()
+		rb, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, resp.StatusCode, err
+		}
+		return rb, resp.StatusCode, nil
 	}
 
 	nowFn      = time.Now
@@ -910,7 +985,11 @@ func slackPost(webhookURL, text string, blocks []map[string]any) error {
 // non-zero exit (runCommand's error already reflects that, as it does for
 // os/exec.Cmd.CombinedOutput).
 func kurtosisRun(enclave, pkg, argsFile string) error {
-	out, err := runCommand("kurtosis", "run", "--enclave", enclave, pkg, "--args-file", argsFile)
+	// --image-download always so moving tags (the param files pin
+	// obolnetwork/charon:next) are re-pulled every run; otherwise Kurtosis's
+	// default ("missing") keeps using a stale locally-cached image and the
+	// cycler silently tests old client/Charon builds.
+	out, err := runCommand("kurtosis", "run", "--enclave", enclave, "--image-download", "always", pkg, "--args-file", argsFile)
 	if err != nil {
 		return fmt.Errorf("kurtosis run failed for %s: %w (output: %s)", enclave, err, strings.TrimSpace(out))
 	}
@@ -1193,6 +1272,332 @@ func postBestEffort(cfg config, d reportData) {
 	_ = slackPost(cfg.slackWebhookURL, buildText(d), buildBlocks(d))
 }
 
+// ---------------------------------------------------------------------------
+// Failure log capture + Slack upload: on a non-ok run, dump the logs of one
+// beacon node, all Charon nodes, and all DV validator clients to a gzipped
+// tarball under cfg.logDir, and (if a bot token is configured) upload it to
+// Slack. Everything here is best-effort: it must never break runOne.
+// ---------------------------------------------------------------------------
+
+// serviceLabel strips kurtosis's "--<hash>" suffix from a container name,
+// leaving the readable service name (used for log file names).
+func serviceLabel(container string) string {
+	if i := strings.LastIndex(container, "--"); i > 0 {
+		return container[:i]
+	}
+	return container
+}
+
+// selectLogTargets picks, from a list of container names, the log targets for
+// a failing run: all Charon nodes ("*-charon-charon-<N>"), all DV validator
+// clients ("*-charon-vc-*"), and the DV participant's beacon node.
+//
+// The beacon node is NOT the lexically-first "cl-*" -- that is the fixed
+// lighthouse bootstrap node (cl-1), a different client than most combos under
+// test. It's the CL sharing the Charon nodes' participant index (Charon
+// "vc-3-..." -> "cl-3-..."), i.e. the beacon node the Charon cluster actually
+// uses. Helper containers (charon relay, split-keys) are excluded from the DV
+// node set.
+func selectLogTargets(containers []string) (bn string, dvNodes, vcs []string) {
+	sorted := append([]string(nil), containers...)
+	sort.Strings(sorted)
+	dvIndex := ""
+	for _, c := range sorted {
+		switch {
+		case isCharonNode(c):
+			dvNodes = append(dvNodes, c)
+			if dvIndex == "" {
+				dvIndex = nodeIndex(c)
+			}
+		case strings.Contains(c, "-charon-vc-"):
+			vcs = append(vcs, c)
+		}
+	}
+	if dvIndex != "" {
+		bn = firstWithPrefix(sorted, "cl-"+dvIndex+"-")
+	}
+	if bn == "" { // fallback if we couldn't tie a CL to the Charon nodes
+		bn = firstWithPrefix(sorted, "cl-")
+	}
+	return bn, dvNodes, vcs
+}
+
+// nodeIndex extracts the participant node index from a kurtosis service name,
+// e.g. "vc-3-geth-lodestar-charon-charon-0" -> "3".
+func nodeIndex(container string) string {
+	if f := strings.Split(serviceLabel(container), "-"); len(f) >= 2 {
+		return f[1]
+	}
+	return ""
+}
+
+// isCharonNode reports whether container is a real Charon node
+// ("...-charon-charon-<N>" with N numeric), excluding helpers like the relay
+// and split-keys containers.
+func isCharonNode(container string) bool {
+	s := serviceLabel(container)
+	const marker = "-charon-charon-"
+	i := strings.LastIndex(s, marker)
+	if i < 0 {
+		return false
+	}
+	suffix := s[i+len(marker):]
+	if suffix == "" {
+		return false
+	}
+	_, err := strconv.Atoi(suffix)
+	return err == nil
+}
+
+// firstWithPrefix returns the first container whose service label starts with
+// prefix, or "".
+func firstWithPrefix(sorted []string, prefix string) string {
+	for _, c := range sorted {
+		if strings.HasPrefix(serviceLabel(c), prefix) {
+			return c
+		}
+	}
+	return ""
+}
+
+// captureFailureLogs dumps the targeted logs for a failing run into a gzipped
+// tarball under cfg.logDir and returns its path plus a short excerpt (error
+// lines from a Charon node) for the Slack message. Best-effort: on any problem
+// it returns whatever it managed (possibly ""), never panicking. Containers are
+// scoped to this enclave via kurtosis's enclave-name label so a leftover
+// container from a prior run can never be captured; -a is kept so a crashed
+// container's logs (e.g. a VC that exited) are still collected.
+func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePath, excerpt string) {
+	defer func() { _ = recover() }()
+
+	out, err := runCommand("docker", "ps", "-a",
+		"--filter", "label=com.kurtosistech.enclave-name="+enclave,
+		"--format", "{{.Names}}")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: log capture: docker ps failed: %v\n", err)
+		return "", ""
+	}
+	var containers []string
+	for _, ln := range strings.Split(out, "\n") {
+		if ln = strings.TrimSpace(ln); ln != "" {
+			containers = append(containers, ln)
+		}
+	}
+	bn, dvNodes, vcs := selectLogTargets(containers)
+
+	var targets []string
+	if bn != "" {
+		targets = append(targets, bn)
+	}
+	targets = append(targets, dvNodes...)
+	targets = append(targets, vcs...)
+	if len(targets) == 0 {
+		fmt.Fprintln(os.Stderr, "dv-cycler: log capture: no BN/Charon/VC containers found")
+		return "", ""
+	}
+
+	staging, err := os.MkdirTemp("", "dv-cycler-logs-*")
+	if err != nil {
+		return "", ""
+	}
+	defer os.RemoveAll(staging)
+
+	for _, c := range targets {
+		logs, _ := runCommand("docker", "logs", c) // capture whatever exists
+		_ = os.WriteFile(filepath.Join(staging, serviceLabel(c)+".log"), []byte(logs), 0o644)
+	}
+
+	if err := os.MkdirAll(cfg.logDir, 0o755); err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: log capture: mkdir %s failed: %v\n", cfg.logDir, err)
+		return "", ""
+	}
+	ts := nowFn().UTC().Format("20060102-150405")
+	archivePath = filepath.Join(cfg.logDir, fmt.Sprintf("cycle%d-%s-%s.tar.gz", cycle, name, ts))
+	if err := makeTarGz(staging, archivePath); err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: log capture: archive failed: %v\n", err)
+		return "", ""
+	}
+
+	return archivePath, extractExcerpt(staging, dvNodes)
+}
+
+// extractExcerpt reads the first Charon node's captured log and returns up to
+// ~25 recent noteworthy lines (error/warn/fatal/panic/doppelganger), capped in
+// length, for inlining into the Slack message.
+func extractExcerpt(staging string, dvNodes []string) string {
+	if len(dvNodes) == 0 {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Join(staging, serviceLabel(dvNodes[0])+".log"))
+	if err != nil {
+		return ""
+	}
+	var hits []string
+	for _, ln := range strings.Split(string(data), "\n") {
+		low := strings.ToLower(ln)
+		if strings.Contains(low, "error") || strings.Contains(low, "erro ") ||
+			strings.Contains(low, "warn") || strings.Contains(low, "fatal") ||
+			strings.Contains(low, "panic") || strings.Contains(low, "doppelganger") {
+			hits = append(hits, ln)
+		}
+	}
+	if len(hits) == 0 {
+		return ""
+	}
+	if len(hits) > 25 {
+		hits = hits[len(hits)-25:]
+	}
+	out := strings.Join(hits, "\n")
+	const maxLen = 1500
+	if len(out) > maxLen {
+		out = out[len(out)-maxLen:]
+	}
+	return serviceLabel(dvNodes[0]) + ":\n" + out
+}
+
+// makeTarGz writes a gzipped tarball of every regular file directly in srcDir
+// to destPath.
+func makeTarGz(srcDir, destPath string) error {
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return err
+	}
+	f, err := os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	gz := gzip.NewWriter(f)
+	defer gz.Close()
+	tw := tar.NewWriter(gz)
+	defer tw.Close()
+
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(srcDir, e.Name()))
+		if err != nil {
+			return err
+		}
+		if err := tw.WriteHeader(&tar.Header{Name: e.Name(), Mode: 0o644, Size: int64(len(data))}); err != nil {
+			return err
+		}
+		if _, err := tw.Write(data); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// uploadLogsBestEffort uploads the failure-log archive to Slack (if a bot
+// token + channel are configured) and, on a successful upload, deletes the
+// local archive so logDir doesn't grow -- Slack becomes the durable store. If
+// upload isn't configured or fails, the local copy is kept (it's the only
+// copy). Best-effort: never breaks runOne.
+func uploadLogsBestEffort(cfg config, d reportData) {
+	defer func() { _ = recover() }()
+	comment := fmt.Sprintf("Logs for %s (cycle %d, %s)", d.name, d.cycle, d.status)
+	uploaded, err := uploadLogsToSlack(cfg, d.logArchivePath, comment)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: slack log upload failed (keeping local %s): %v\n", d.logArchivePath, err)
+		return
+	}
+	if uploaded {
+		if rmErr := os.Remove(d.logArchivePath); rmErr != nil {
+			fmt.Fprintf(os.Stderr, "dv-cycler: could not delete uploaded archive %s: %v\n", d.logArchivePath, rmErr)
+		}
+	}
+	// not uploaded (upload not configured): keep the local archive.
+}
+
+// uploadLogsToSlack uploads archivePath to Slack via the external-upload flow
+// (files.getUploadURLExternal -> POST to the returned upload_url ->
+// files.completeUploadExternal) and shares it into cfg.slackChannelID with an
+// initial comment. It returns (true, nil) only when the file was actually
+// uploaded and shared; (false, nil) when upload isn't configured (bot token or
+// channel unset); and (false, err) on any failure.
+func uploadLogsToSlack(cfg config, archivePath, comment string) (bool, error) {
+	if cfg.slackBotToken == "" || cfg.slackChannelID == "" {
+		return false, nil
+	}
+	data, err := os.ReadFile(archivePath)
+	if err != nil {
+		return false, err
+	}
+	filename := filepath.Base(archivePath)
+	bearer := "Bearer " + cfg.slackBotToken
+
+	// 1. Reserve an upload URL.
+	form := url.Values{"filename": {filename}, "length": {strconv.Itoa(len(data))}}.Encode()
+	body, _, err := httpDo("POST", "https://slack.com/api/files.getUploadURLExternal",
+		map[string]string{"Authorization": bearer, "Content-Type": "application/x-www-form-urlencoded"},
+		[]byte(form))
+	if err != nil {
+		return false, err
+	}
+	var got struct {
+		OK        bool   `json:"ok"`
+		Error     string `json:"error"`
+		UploadURL string `json:"upload_url"`
+		FileID    string `json:"file_id"`
+	}
+	if err := json.Unmarshal(body, &got); err != nil {
+		return false, err
+	}
+	if !got.OK {
+		return false, fmt.Errorf("files.getUploadURLExternal: %s", got.Error)
+	}
+
+	// 2. Upload the bytes to the reserved URL (multipart form field "file").
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	part, err := mw.CreateFormFile("file", filename)
+	if err != nil {
+		return false, err
+	}
+	if _, err := part.Write(data); err != nil {
+		return false, err
+	}
+	if err := mw.Close(); err != nil {
+		return false, err
+	}
+	_, status, err := httpDo("POST", got.UploadURL,
+		map[string]string{"Content-Type": mw.FormDataContentType()}, buf.Bytes())
+	if err != nil {
+		return false, err
+	}
+	if status != 200 {
+		return false, fmt.Errorf("upload POST returned HTTP %d", status)
+	}
+
+	// 3. Complete the upload and share it into the channel.
+	cbody, err := json.Marshal(map[string]any{
+		"files":           []map[string]string{{"id": got.FileID, "title": filename}},
+		"channel_id":      cfg.slackChannelID,
+		"initial_comment": comment,
+	})
+	if err != nil {
+		return false, err
+	}
+	rb, _, err := httpDo("POST", "https://slack.com/api/files.completeUploadExternal",
+		map[string]string{"Authorization": bearer, "Content-Type": "application/json"}, cbody)
+	if err != nil {
+		return false, err
+	}
+	var done struct {
+		OK    bool   `json:"ok"`
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(rb, &done); err != nil {
+		return false, err
+	}
+	if !done.OK {
+		return false, fmt.Errorf("files.completeUploadExternal: %s", done.Error)
+	}
+	return true, nil
+}
+
 // writeTempArgsFile writes yaml to a fresh temp file and returns its path.
 func writeTempArgsFile(yaml string) (path string, err error) {
 	f, err := os.CreateTemp("", "dv-cycler-args-*.yaml")
@@ -1259,6 +1664,7 @@ func runWindow(cfg config, name string, cycle int, enclave string) reportData {
 		return failedReport(name, cycle, err.Error())
 	}
 	data.window = windowLabel
+	data.charonVersion = charonCommit(enclave) // informational matrix column; enclave still up
 	return data
 }
 
@@ -1319,31 +1725,373 @@ func runOne(cfg config, paramFile, name string, cycle int) (result reportData) {
 	defer kurtosisRemove(enclave) // guaranteed teardown after a successful launch
 
 	data := runWindow(cfg, name, cycle, enclave)
+	if data.status != "ok" {
+		// Capture BN/Charon/VC logs while the enclave is still up (teardown is
+		// deferred), for post-mortem of a failing/degraded combo.
+		data.logArchivePath, data.logExcerpt = captureFailureLogs(cfg, enclave, name, cycle)
+	}
 	postBestEffort(cfg, data)
+	if data.logArchivePath != "" {
+		uploadLogsBestEffort(cfg, data)
+	}
 	return data
+}
+
+// ---------------------------------------------------------------------------
+// DV results matrix: one persistent matrix (a row per combo) holding each
+// combo's latest result plus the CL/VC/Charon versions it ran with. A combo is
+// "invalidated" when its CL or VC image pin changes (detected on git pull);
+// mainLoop prioritises re-running invalidated combos, and once every combo is
+// valid again the full matrix is posted to Slack as a fresh message. The Charon
+// commit is informational (a column), not an invalidation trigger.
+// ---------------------------------------------------------------------------
+
+type comboResult struct {
+	Status    string   `json:"status"`
+	DutyPct   *float64 `json:"duty_pct,omitempty"`
+	CharonMem *float64 `json:"charon_mem_bytes,omitempty"`
+	CharonCPU *float64 `json:"charon_cpu,omitempty"`
+	HostCPU   *float64 `json:"host_cpu_peak,omitempty"`
+	HostMem   *float64 `json:"host_mem_peak_bytes,omitempty"`
+	CL        string   `json:"cl,omitempty"`     // DV beacon-node image it ran with
+	VC        string   `json:"vc,omitempty"`     // charon-managed VC image it ran with
+	Charon    string   `json:"charon,omitempty"` // charon git commit hash (informational)
+}
+
+type matrixStore struct {
+	Results map[string]comboResult `json:"results"` // combo -> latest result + versions
+	Posted  bool                   `json:"posted"`  // current fully-valid matrix already posted?
+}
+
+// pins holds a combo's current version pins parsed from its param file.
+type pins struct{ cl, vc string }
+
+func loadMatrix(path string) (matrixStore, error) {
+	data, err := readFileFn(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return matrixStore{Results: map[string]comboResult{}}, nil
+		}
+		return matrixStore{}, err
+	}
+	var s matrixStore
+	if err := json.Unmarshal(data, &s); err != nil {
+		return matrixStore{}, err
+	}
+	if s.Results == nil {
+		s.Results = map[string]comboResult{}
+	}
+	return s, nil
+}
+
+func (s *matrixStore) save(path string) error {
+	data, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+// unquote strips a single pair of surrounding single or double quotes.
+func unquote(s string) string {
+	if len(s) >= 2 && (s[0] == '"' && s[len(s)-1] == '"' || s[0] == '\'' && s[len(s)-1] == '\'') {
+		return s[1 : len(s)-1]
+	}
+	return s
+}
+
+// parsePins extracts a combo's version pins from its param-file YAML: the DV
+// participant's beacon-node image (the last cl_image in the file -- the DV
+// participant comes after the fixed lighthouse bootstrap) and the
+// charon-managed VC image (charon_vc_image).
+func parsePins(yaml string) pins {
+	var p pins
+	for _, line := range strings.Split(yaml, "\n") {
+		t := strings.TrimSpace(line)
+		if v, ok := strings.CutPrefix(t, "cl_image:"); ok {
+			p.cl = unquote(strings.TrimSpace(v))
+		}
+		if v, ok := strings.CutPrefix(t, "charon_vc_image:"); ok {
+			p.vc = unquote(strings.TrimSpace(v))
+		}
+	}
+	return p
+}
+
+// readPins parses the version pins for each combo's param file, keyed by stem.
+func readPins(files []string) map[string]pins {
+	out := make(map[string]pins, len(files))
+	for _, f := range files {
+		raw, err := readFileFn(f)
+		if err != nil {
+			continue
+		}
+		out[paramStem(f)] = parsePins(string(raw))
+	}
+	return out
+}
+
+// pendingCombos returns the combos (sorted) that must run before the matrix is
+// complete: any with no stored result, or whose stored CL/VC pins differ from
+// the current param-file pins (a version change invalidated them).
+func pendingCombos(m matrixStore, files []string, pinsByCombo map[string]pins) []string {
+	var pending []string
+	for _, f := range files {
+		name := paramStem(f)
+		r, ok := m.Results[name]
+		p := pinsByCombo[name]
+		if !ok || r.CL != p.cl || r.VC != p.vc {
+			pending = append(pending, name)
+		}
+	}
+	sort.Strings(pending)
+	return pending
+}
+
+// worstDutyPct is the worst node's overall duty success rate (successes /
+// expected, summed across its duties, which already exclude 0/0 idle duties).
+func worstDutyPct(d reportData) *float64 {
+	if d.worst == nil || len(d.worst.duties) == 0 {
+		return nil
+	}
+	var se, ss float64
+	for _, du := range d.worst.duties {
+		se += du.expected
+		ss += du.success
+	}
+	if se == 0 {
+		return nil
+	}
+	p := 100 * ss / se
+	return &p
+}
+
+// comboResultFrom builds a matrix row's metrics/status/Charon-commit from a
+// run. The CL/VC image pins are set by the caller (from the param file).
+func comboResultFrom(d reportData) comboResult {
+	r := comboResult{Status: d.status, DutyPct: worstDutyPct(d), CharonMem: d.dvMemBytes, CharonCPU: d.dvCPU, Charon: d.charonVersion}
+	if d.host != nil {
+		cp, mp := d.host.cpuPeak, d.host.memPeak
+		r.HostCPU, r.HostMem = &cp, &mp
+	}
+	return r
+}
+
+// comboNames returns the sorted combo stems for the given param file paths.
+func comboNames(files []string) []string {
+	names := make([]string, 0, len(files))
+	for _, f := range files {
+		names = append(names, paramStem(f))
+	}
+	sort.Strings(names)
+	return names
+}
+
+// fileForCombo returns the param file path whose stem is name, or "".
+func fileForCombo(files []string, name string) string {
+	for _, f := range files {
+		if paramStem(f) == name {
+			return f
+		}
+	}
+	return ""
+}
+
+// charonCommit runs `charon version` in the enclave's charon node 0 and returns
+// its short git commit hash (e.g. "bc5674a"), or "" if unavailable. Used for
+// the informational Charon column; best-effort, never fatal.
+func charonCommit(enclave string) string {
+	out, err := runCommand("docker", "ps",
+		"--filter", "label=com.kurtosistech.enclave-name="+enclave,
+		"--format", "{{.Names}}")
+	if err != nil {
+		return ""
+	}
+	var container string
+	for _, ln := range strings.Split(out, "\n") {
+		if ln = strings.TrimSpace(ln); strings.Contains(ln, "-charon-charon-0--") {
+			container = ln
+			break
+		}
+	}
+	if container == "" {
+		return ""
+	}
+	v, err := runCommand("docker", "exec", container, "charon", "version")
+	if err != nil {
+		return ""
+	}
+	return parseCharonCommit(v)
+}
+
+// parseCharonCommit extracts the git commit hash from `charon version` output
+// like "v1.11.0-dev [git_commit_hash=bc5674a,git_commit_time=...]".
+func parseCharonCommit(out string) string {
+	const key = "git_commit_hash="
+	i := strings.Index(out, key)
+	if i < 0 {
+		return ""
+	}
+	rest := out[i+len(key):]
+	end := strings.IndexAny(rest, ",]} \t\r\n")
+	if end < 0 {
+		end = len(rest)
+	}
+	return strings.TrimSpace(rest[:end])
+}
+
+// imageTag returns the tag portion of a docker image ref (after the last ':'),
+// or "N/A" for an empty ref -- for compact matrix version columns.
+func imageTag(image string) string {
+	if image == "" {
+		return "N/A"
+	}
+	if i := strings.LastIndex(image, ":"); i >= 0 && i < len(image)-1 {
+		return image[i+1:]
+	}
+	return image
+}
+
+// fmtF formats an optional metric with the given printf verb, or "N/A" if nil.
+func fmtF(p *float64, format string) string {
+	if p == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf(format, *p)
+}
+
+// fmtGB formats an optional byte count as gigabytes, or "N/A" if nil.
+func fmtGB(p *float64) string {
+	if p == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("%.2fGB", *p/1e9)
+}
+
+// matrixRows renders the fixed-width header line and one row per combo (in the
+// given order), including the CL/VC/Charon version columns. Combos with no
+// stored result render N/A across the board.
+func matrixRows(m matrixStore, combos []string) (header string, rows []string) {
+	cw, clw, vcw, chw := len("combo"), len("cl"), len("vc"), len("charon")
+	for _, c := range combos {
+		if len(c) > cw {
+			cw = len(c)
+		}
+		r := m.Results[c]
+		if t := imageTag(r.CL); len(t) > clw {
+			clw = len(t)
+		}
+		if t := imageTag(r.VC); len(t) > vcw {
+			vcw = len(t)
+		}
+		if len(r.Charon) > chw {
+			chw = len(r.Charon)
+		}
+	}
+	row := func(combo, cl, vc, charon, status, duty, cmem, ccpu, hcpu, hmem string) string {
+		return fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %-8s  %7s  %9s  %8s  %8s  %9s",
+			cw, combo, clw, cl, vcw, vc, chw, charon, status, duty, cmem, ccpu, hcpu, hmem)
+	}
+	header = row("combo", "cl", "vc", "charon", "status", "duty%", "chn-mem", "chn-cpu", "host-cpu", "host-mem")
+	for _, c := range combos {
+		r, ok := m.Results[c]
+		if !ok {
+			rows = append(rows, row(c, "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"))
+			continue
+		}
+		charon := r.Charon
+		if charon == "" {
+			charon = "N/A"
+		}
+		rows = append(rows, row(c, imageTag(r.CL), imageTag(r.VC), charon, r.Status,
+			fmtF(r.DutyPct, "%.1f%%"), fmtGB(r.CharonMem), fmtF(r.CharonCPU, "%.2f"),
+			fmtF(r.HostCPU, "%.0f%%"), fmtGB(r.HostMem)))
+	}
+	return header, rows
+}
+
+// buildMatrixBlocks renders the Slack fallback text and Block Kit blocks for
+// the full matrix: a lead line (optionally prefixed with a mention), an
+// "updated <ts>" context line, and the table split across monospace code
+// blocks to stay under Slack's per-block character limit -- all one message.
+func buildMatrixBlocks(m matrixStore, combos []string, mention, ts string) (string, []map[string]any) {
+	headline := fmt.Sprintf("*DV results matrix* — %d/%d combos", len(combos), len(combos))
+	fallback := fmt.Sprintf("DV results matrix (%d combos, updated %s)", len(combos), ts)
+	lead := headline
+	if mention != "" {
+		lead = mention + " " + headline
+	}
+	blocks := []map[string]any{
+		{"type": "section", "text": map[string]any{"type": "mrkdwn", "text": lead}},
+		{"type": "context", "elements": []map[string]any{
+			{"type": "mrkdwn", "text": "updated " + ts},
+		}},
+	}
+	header, rows := matrixRows(m, combos)
+	const perBlock = 15 // wide rows -> fewer per block to stay under 3000 chars
+	for i := 0; i < len(rows); i += perBlock {
+		j := i + perBlock
+		if j > len(rows) {
+			j = len(rows)
+		}
+		table := header + "\n" + strings.Join(rows[i:j], "\n")
+		blocks = append(blocks, map[string]any{
+			"type": "section",
+			"text": map[string]any{"type": "mrkdwn", "text": "```\n" + table + "\n```"},
+		})
+	}
+	return fallback, blocks
+}
+
+// postMatrixBestEffort posts the full matrix to Slack (a fresh message).
+// Best-effort: never breaks the loop.
+func postMatrixBestEffort(cfg config, m matrixStore, combos []string) {
+	defer func() { _ = recover() }()
+	ts := nowFn().UTC().Format("2006-01-02 15:04 UTC")
+	text, blocks := buildMatrixBlocks(m, combos, cfg.summaryMention, ts)
+	if err := slackPost(cfg.slackWebhookURL, text, blocks); err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: matrix post failed: %v\n", err)
+	}
 }
 
 // ---------------------------------------------------------------------------
 // The 24/7 driver loop: mainLoop, main.
 // ---------------------------------------------------------------------------
 
-// mainLoop drives the 24/7 loop: resume from a possibly-interrupted run,
-// then loop forever re-enumerating network-params/*.yaml, running the next
-// one, and backing off according to consecutive failures. Re-enumerating on
-// every iteration (rather than once at startup) is what makes a newly
-// dropped-in file get picked up without restarting the service.
-// State-save errors are logged and otherwise ignored (best-effort), since
-// this whole task's mandate is that the loop must never die.
+// mainLoop drives the 24/7 loop. Each iteration it git-pulls, re-enumerates
+// network-params/*.yaml (so newly added files are picked up), and schedules the
+// next combo: any combo invalidated by a CL/VC version change is prioritised
+// (run before the normal sequential rotation) so a bump is re-tested fast. It
+// records every run into the persistent results matrix and, once every combo is
+// valid again, posts the full matrix to Slack. State/matrix save errors are
+// logged and ignored (best-effort) -- the loop must never die.
 func mainLoop(cfg config) {
 	st, err := loadState(cfg.statePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "dv-cycler: failed to load state (starting fresh): %v\n", err)
 		st = state{}
 	}
-
 	saveState := func() {
 		if err := st.save(cfg.statePath); err != nil {
 			fmt.Fprintf(os.Stderr, "dv-cycler: failed to save state: %v\n", err)
+		}
+	}
+
+	matrix, err := loadMatrix(cfg.resultsPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: failed to load matrix (starting fresh): %v\n", err)
+		matrix = matrixStore{Results: map[string]comboResult{}}
+	}
+	saveMatrix := func() {
+		if cfg.resultsPath == "" {
+			return
+		}
+		if err := matrix.save(cfg.resultsPath); err != nil {
+			fmt.Fprintf(os.Stderr, "dv-cycler: failed to save matrix: %v\n", err)
 		}
 	}
 
@@ -1355,20 +2103,44 @@ func mainLoop(cfg config) {
 
 	consecutiveFailures := 0
 	for {
+		// Freshen the repo so CL/VC pin changes are seen before scheduling.
+		if err := gitPull(cfg.repoPath); err != nil {
+			fmt.Fprintf(os.Stderr, "dv-cycler: git pull failed (using current checkout): %v\n", err)
+		}
+
 		files, err := paramFiles(cfg.paramsDir)
 		if err != nil || len(files) == 0 {
 			fmt.Fprintf(os.Stderr, "dv-cycler: no param files found in %s (err=%v); backing off\n", cfg.paramsDir, err)
 			sleepFn(time.Duration(computeBackoff(consecutiveFailures, cfg.interRunBackoffS, cfg.maxBackoffS)) * time.Second)
 			continue
 		}
+		combos := comboNames(files)
+		pinsByCombo := readPins(files)
+		pending := pendingCombos(matrix, files, pinsByCombo)
 
-		if st.NextIndex >= len(files) {
-			st.NextIndex = 0
-			st.Cycle++
+		// A fresh invalidation re-arms the post.
+		if len(pending) > 0 && matrix.Posted {
+			matrix.Posted = false
+			saveMatrix()
 		}
 
-		f := files[st.NextIndex]
-		name := paramStem(f)
+		// Prioritise invalidated combos; otherwise take the next in rotation.
+		var name string
+		prioritised := len(pending) > 0
+		if prioritised {
+			name = pending[0]
+		} else {
+			if st.NextIndex >= len(files) {
+				st.NextIndex = 0
+				st.Cycle++
+			}
+			name = paramStem(files[st.NextIndex])
+		}
+		f := fileForCombo(files, name)
+		if f == "" { // shouldn't happen; skip defensively
+			sleepFn(time.Duration(computeBackoff(consecutiveFailures, cfg.interRunBackoffS, cfg.maxBackoffS)) * time.Second)
+			continue
+		}
 
 		st.CurrentEnclave = enclaveName(st.Cycle, name)
 		saveState()
@@ -1376,8 +2148,24 @@ func mainLoop(cfg config) {
 		data := runOne(cfg, f, name, st.Cycle)
 
 		st.CurrentEnclave = ""
-		st.advance()
+		if !prioritised {
+			st.advance() // only the normal rotation advances the pointer
+		}
 		saveState()
+
+		// Record the run into the matrix with the versions it ran with.
+		res := comboResultFrom(data)
+		p := pinsByCombo[name]
+		res.CL, res.VC = p.cl, p.vc
+		matrix.Results[name] = res
+		saveMatrix()
+
+		// Post the full matrix once it's whole again (and not already posted).
+		if !matrix.Posted && len(pendingCombos(matrix, files, pinsByCombo)) == 0 {
+			postMatrixBestEffort(cfg, matrix, combos)
+			matrix.Posted = true
+			saveMatrix()
+		}
 
 		if data.status == "failed" {
 			consecutiveFailures++
