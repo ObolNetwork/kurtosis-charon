@@ -1366,9 +1366,9 @@ func TestUploadLogsToSlack(t *testing.T) {
 	oldDo := httpDo
 	defer func() { httpDo = oldDo }()
 
-	// Unconfigured (no token/channel) is a silent no-op.
-	if err := uploadLogsToSlack(config{}, "/does/not/matter", "c"); err != nil {
-		t.Errorf("unconfigured upload should be a no-op, got %v", err)
+	// Unconfigured (no token/channel) is a silent no-op: (false, nil).
+	if up, err := uploadLogsToSlack(config{}, "/does/not/matter", "c"); err != nil || up {
+		t.Errorf("unconfigured upload should be (false,nil), got up=%v err=%v", up, err)
 	}
 
 	dir := t.TempDir()
@@ -1407,11 +1407,70 @@ func TestUploadLogsToSlack(t *testing.T) {
 	}
 
 	cfg := config{slackBotToken: "xoxb-tok", slackChannelID: "C42"}
-	if err := uploadLogsToSlack(cfg, arch, "logs for x"); err != nil {
+	up, err := uploadLogsToSlack(cfg, arch, "logs for x")
+	if err != nil {
 		t.Fatalf("uploadLogsToSlack error: %v", err)
+	}
+	if !up {
+		t.Error("expected uploaded=true on a successful upload")
 	}
 	if len(calls) != 3 {
 		t.Errorf("expected 3 HTTP calls (reserve/upload/complete), got %d: %v", len(calls), calls)
+	}
+}
+
+func TestUploadLogsBestEffortDeletesOnSuccess(t *testing.T) {
+	oldDo := httpDo
+	defer func() { httpDo = oldDo }()
+	httpDo = func(method, reqURL string, headers map[string]string, body []byte) ([]byte, int, error) {
+		switch {
+		case strings.Contains(reqURL, "getUploadURLExternal"):
+			return []byte(`{"ok":true,"upload_url":"https://x/up","file_id":"F1"}`), 200, nil
+		case strings.Contains(reqURL, "/up"):
+			return []byte("OK"), 200, nil
+		case strings.Contains(reqURL, "completeUploadExternal"):
+			return []byte(`{"ok":true}`), 200, nil
+		}
+		return []byte(`{"ok":false}`), 200, nil
+	}
+	dir := t.TempDir()
+	arch := filepath.Join(dir, "a.tar.gz")
+	if err := os.WriteFile(arch, []byte("X"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	uploadLogsBestEffort(config{slackBotToken: "t", slackChannelID: "C"},
+		reportData{name: "x", cycle: 1, status: "failed", logArchivePath: arch})
+	if _, err := os.Stat(arch); !os.IsNotExist(err) {
+		t.Errorf("archive should be deleted after a successful upload; stat err = %v", err)
+	}
+}
+
+func TestUploadLogsBestEffortKeepsWhenNotUploaded(t *testing.T) {
+	oldDo := httpDo
+	defer func() { httpDo = oldDo }()
+	dir := t.TempDir()
+
+	// Upload not configured -> keep the local archive.
+	a1 := filepath.Join(dir, "k1.tar.gz")
+	if err := os.WriteFile(a1, []byte("X"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	uploadLogsBestEffort(config{}, reportData{logArchivePath: a1})
+	if _, err := os.Stat(a1); err != nil {
+		t.Errorf("unconfigured: archive should be kept, got %v", err)
+	}
+
+	// Configured but the upload fails -> keep the local archive.
+	httpDo = func(method, reqURL string, headers map[string]string, body []byte) ([]byte, int, error) {
+		return []byte(`{"ok":false,"error":"boom"}`), 200, nil
+	}
+	a2 := filepath.Join(dir, "k2.tar.gz")
+	if err := os.WriteFile(a2, []byte("X"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	uploadLogsBestEffort(config{slackBotToken: "t", slackChannelID: "C"}, reportData{logArchivePath: a2})
+	if _, err := os.Stat(a2); err != nil {
+		t.Errorf("failed upload: archive should be kept, got %v", err)
 	}
 }
 

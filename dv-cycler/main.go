@@ -1430,27 +1430,39 @@ func makeTarGz(srcDir, destPath string) error {
 }
 
 // uploadLogsBestEffort uploads the failure-log archive to Slack (if a bot
-// token + channel are configured). Best-effort: never breaks runOne.
+// token + channel are configured) and, on a successful upload, deletes the
+// local archive so logDir doesn't grow -- Slack becomes the durable store. If
+// upload isn't configured or fails, the local copy is kept (it's the only
+// copy). Best-effort: never breaks runOne.
 func uploadLogsBestEffort(cfg config, d reportData) {
 	defer func() { _ = recover() }()
 	comment := fmt.Sprintf("Logs for %s (cycle %d, %s)", d.name, d.cycle, d.status)
-	if err := uploadLogsToSlack(cfg, d.logArchivePath, comment); err != nil {
-		fmt.Fprintf(os.Stderr, "dv-cycler: slack log upload failed: %v\n", err)
+	uploaded, err := uploadLogsToSlack(cfg, d.logArchivePath, comment)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: slack log upload failed (keeping local %s): %v\n", d.logArchivePath, err)
+		return
 	}
+	if uploaded {
+		if rmErr := os.Remove(d.logArchivePath); rmErr != nil {
+			fmt.Fprintf(os.Stderr, "dv-cycler: could not delete uploaded archive %s: %v\n", d.logArchivePath, rmErr)
+		}
+	}
+	// not uploaded (upload not configured): keep the local archive.
 }
 
 // uploadLogsToSlack uploads archivePath to Slack via the external-upload flow
 // (files.getUploadURLExternal -> POST to the returned upload_url ->
 // files.completeUploadExternal) and shares it into cfg.slackChannelID with an
-// initial comment. It is a no-op if the bot token or channel id is unset (the
-// local save has already happened either way).
-func uploadLogsToSlack(cfg config, archivePath, comment string) error {
+// initial comment. It returns (true, nil) only when the file was actually
+// uploaded and shared; (false, nil) when upload isn't configured (bot token or
+// channel unset); and (false, err) on any failure.
+func uploadLogsToSlack(cfg config, archivePath, comment string) (bool, error) {
 	if cfg.slackBotToken == "" || cfg.slackChannelID == "" {
-		return nil
+		return false, nil
 	}
 	data, err := os.ReadFile(archivePath)
 	if err != nil {
-		return err
+		return false, err
 	}
 	filename := filepath.Base(archivePath)
 	bearer := "Bearer " + cfg.slackBotToken
@@ -1461,7 +1473,7 @@ func uploadLogsToSlack(cfg config, archivePath, comment string) error {
 		map[string]string{"Authorization": bearer, "Content-Type": "application/x-www-form-urlencoded"},
 		[]byte(form))
 	if err != nil {
-		return err
+		return false, err
 	}
 	var got struct {
 		OK        bool   `json:"ok"`
@@ -1470,10 +1482,10 @@ func uploadLogsToSlack(cfg config, archivePath, comment string) error {
 		FileID    string `json:"file_id"`
 	}
 	if err := json.Unmarshal(body, &got); err != nil {
-		return err
+		return false, err
 	}
 	if !got.OK {
-		return fmt.Errorf("files.getUploadURLExternal: %s", got.Error)
+		return false, fmt.Errorf("files.getUploadURLExternal: %s", got.Error)
 	}
 
 	// 2. Upload the bytes to the reserved URL (multipart form field "file").
@@ -1481,21 +1493,21 @@ func uploadLogsToSlack(cfg config, archivePath, comment string) error {
 	mw := multipart.NewWriter(&buf)
 	part, err := mw.CreateFormFile("file", filename)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if _, err := part.Write(data); err != nil {
-		return err
+		return false, err
 	}
 	if err := mw.Close(); err != nil {
-		return err
+		return false, err
 	}
 	_, status, err := httpDo("POST", got.UploadURL,
 		map[string]string{"Content-Type": mw.FormDataContentType()}, buf.Bytes())
 	if err != nil {
-		return err
+		return false, err
 	}
 	if status != 200 {
-		return fmt.Errorf("upload POST returned HTTP %d", status)
+		return false, fmt.Errorf("upload POST returned HTTP %d", status)
 	}
 
 	// 3. Complete the upload and share it into the channel.
@@ -1505,24 +1517,24 @@ func uploadLogsToSlack(cfg config, archivePath, comment string) error {
 		"initial_comment": comment,
 	})
 	if err != nil {
-		return err
+		return false, err
 	}
 	rb, _, err := httpDo("POST", "https://slack.com/api/files.completeUploadExternal",
 		map[string]string{"Authorization": bearer, "Content-Type": "application/json"}, cbody)
 	if err != nil {
-		return err
+		return false, err
 	}
 	var done struct {
 		OK    bool   `json:"ok"`
 		Error string `json:"error"`
 	}
 	if err := json.Unmarshal(rb, &done); err != nil {
-		return err
+		return false, err
 	}
 	if !done.OK {
-		return fmt.Errorf("files.completeUploadExternal: %s", done.Error)
+		return false, fmt.Errorf("files.completeUploadExternal: %s", done.Error)
 	}
-	return nil
+	return true, nil
 }
 
 // writeTempArgsFile writes yaml to a fresh temp file and returns its path.

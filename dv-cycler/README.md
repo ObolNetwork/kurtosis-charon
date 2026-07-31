@@ -94,6 +94,13 @@ is also uploaded to that Slack channel via the Web API
 incoming webhook used for the report itself cannot attach files, so without a
 bot token the logs are saved locally only (the report still links the path).
 
+**Local cleanup:** on a *successful* upload the local archive is **deleted** —
+Slack becomes the durable store, so `CYCLER_LOG_DIR` doesn't grow over time. If
+upload isn't configured, or an upload fails, the local archive is **kept** (it's
+then the only copy). So a healthy, upload-configured deployment leaves
+`CYCLER_LOG_DIR` empty between failures; anything lingering there is a run whose
+upload didn't go through.
+
 ## Per-commit results summary
 
 Alongside the per-run reports, the cycler accumulates each combo's headline
