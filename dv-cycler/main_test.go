@@ -515,6 +515,26 @@ func TestLoadConfig(t *testing.T) {
 		}
 	})
 
+	t.Run("resultsPath default (next to state) + summary mention", func(t *testing.T) {
+		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "h")
+		t.Setenv("CYCLER_REPO_PATH", "r")
+		t.Setenv("CYCLER_STATE_PATH", "/var/lib/cyc/state.json")
+		t.Setenv("CYCLER_RESULTS_PATH", "")
+		t.Setenv("CYCLER_SUMMARY_MENTION", "<!subteam^S9>")
+
+		cfg, err := loadConfig()
+		if err != nil {
+			t.Fatalf("loadConfig error: %v", err)
+		}
+		want := filepath.Join("/var/lib/cyc", "cycler-results.json")
+		if cfg.resultsPath != want {
+			t.Errorf("resultsPath = %q, want %q", cfg.resultsPath, want)
+		}
+		if cfg.summaryMention != "<!subteam^S9>" {
+			t.Errorf("summaryMention = %q", cfg.summaryMention)
+		}
+	})
+
 	t.Run("CYCLER_LOG_DIR override wins over the default", func(t *testing.T) {
 		t.Setenv("CYCLER_SLACK_WEBHOOK_URL", "h")
 		t.Setenv("CYCLER_REPO_PATH", "r")
@@ -1410,5 +1430,152 @@ func TestBuildBlocksLogsSection(t *testing.T) {
 	}
 	if strings.Contains(dumpBlocks(buildBlocks(reportData{name: "x", status: "ok", window: "-"})), "*Logs:*") {
 		t.Error("logs section should be absent when no archive was captured")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Per-commit results summary.
+// ---------------------------------------------------------------------------
+
+func TestResultsStoreIngestCompletion(t *testing.T) {
+	all := []string{"a", "b", "c"}
+	res := func(st string) comboResult { return comboResult{Status: st} }
+
+	s := resultsStore{Results: map[string]comboResult{}}
+	if p := s.ingest("A", "a", res("ok"), all); len(p) != 0 {
+		t.Fatalf("a: want 0 posts, got %d", len(p))
+	}
+	if p := s.ingest("A", "b", res("ok"), all); len(p) != 0 {
+		t.Fatalf("b: want 0 posts, got %d", len(p))
+	}
+	p := s.ingest("A", "c", res("degraded"), all)
+	if len(p) != 1 || !p[0].Complete || p[0].Commit != "A" {
+		t.Fatalf("c: want 1 completion post for A, got %+v", p)
+	}
+	if len(p[0].Results) != 3 {
+		t.Errorf("completion results = %d, want 3", len(p[0].Results))
+	}
+	if !s.Posted {
+		t.Error("store should be marked posted after completion")
+	}
+	if p := s.ingest("A", "a", res("ok"), all); len(p) != 0 {
+		t.Errorf("re-run under A after posted: want 0 posts, got %d", len(p))
+	}
+
+	// New commit after A was posted -> no supersede (A already posted), just rotate.
+	if p := s.ingest("B", "a", res("ok"), all); len(p) != 0 {
+		t.Errorf("rotate to B (A already posted): want 0 posts, got %d", len(p))
+	}
+	if s.Commit != "B" || s.Posted || len(s.Results) != 1 {
+		t.Errorf("after rotate: commit=%q posted=%v results=%d, want B/false/1", s.Commit, s.Posted, len(s.Results))
+	}
+}
+
+func TestResultsStoreIngestSupersedePartial(t *testing.T) {
+	all := []string{"a", "b", "c"}
+	res := func(st string) comboResult { return comboResult{Status: st} }
+	s := resultsStore{Results: map[string]comboResult{}}
+	s.ingest("A", "a", res("ok"), all)
+	s.ingest("A", "b", res("failed"), all) // A partial (a,b), not posted
+
+	p := s.ingest("B", "a", res("ok"), all) // new commit supersedes the partial A
+	if len(p) != 1 || !p[0].Superseded || p[0].Commit != "A" {
+		t.Fatalf("want 1 supersede post for A, got %+v", p)
+	}
+	if len(p[0].Results) != 2 {
+		t.Errorf("superseded A results = %d, want 2 (a,b)", len(p[0].Results))
+	}
+	if s.Commit != "B" || len(s.Results) != 1 {
+		t.Errorf("after supersede: commit=%q results=%d, want B/1", s.Commit, len(s.Results))
+	}
+}
+
+func TestComboResultFrom(t *testing.T) {
+	mem, cpu := 1.5e9, 1.4
+	d := reportData{
+		status: "degraded",
+		worst: &worstNode{peer: "1", duties: []dutyResult{
+			{duty: "attester", expected: 100, success: 90},
+			{duty: "proposer", expected: 4, success: 4},
+		}},
+		dvMemBytes: &mem, dvCPU: &cpu,
+		host: &hostStats{cpuPeak: 82, memPeak: 9e9},
+	}
+	r := comboResultFrom(d)
+	if r.Status != "degraded" {
+		t.Errorf("status = %q", r.Status)
+	}
+	if r.DutyPct == nil || *r.DutyPct < 90.3 || *r.DutyPct > 90.4 { // 94/104 = 90.38%
+		t.Errorf("dutyPct = %v, want ~90.38", r.DutyPct)
+	}
+	if r.CharonMem == nil || *r.CharonMem != mem || r.CharonCPU == nil || *r.CharonCPU != cpu {
+		t.Errorf("charon mem/cpu = %v/%v", r.CharonMem, r.CharonCPU)
+	}
+	if r.HostCPU == nil || *r.HostCPU != 82 || r.HostMem == nil || *r.HostMem != 9e9 {
+		t.Errorf("host cpu/mem = %v/%v", r.HostCPU, r.HostMem)
+	}
+
+	f := comboResultFrom(reportData{status: "failed"})
+	if f.Status != "failed" || f.DutyPct != nil || f.CharonMem != nil || f.HostCPU != nil {
+		t.Errorf("failed run should have nil metrics: %+v", f)
+	}
+}
+
+func TestBuildSummaryBlocks(t *testing.T) {
+	all := []string{"grandine-nimbus", "lighthouse-prysm", "teku-teku"}
+	mem, cpu, hp, hm, dp := 1.2e9, 1.1, 55.0, 8e9, 99.9
+	results := map[string]comboResult{
+		"grandine-nimbus": {Status: "ok", DutyPct: &dp, CharonMem: &mem, CharonCPU: &cpu, HostCPU: &hp, HostMem: &hm},
+		"teku-teku":       {Status: "failed"},
+		// lighthouse-prysm intentionally absent -> an N/A row
+	}
+	sum := summaryToPost{Commit: "abc123", Results: results, Superseded: true}
+	text, blocks := buildSummaryBlocks(sum, all, "<!subteam^S1|proto>")
+	if !strings.Contains(text, "abc123") {
+		t.Errorf("fallback text missing commit: %q", text)
+	}
+	dump := dumpBlocks(blocks)
+	// dumpBlocks JSON-encodes, so "<"/">" render as </> (Slack decodes
+	// them back on receipt); match the un-bracketed core of the mention.
+	for _, want := range []string{"subteam^S1|proto", "grandine-nimbus", "lighthouse-prysm", "teku-teku", "99.9%", "1.20GB", "N/A", "superseded", "2/3 combos run"} {
+		if !strings.Contains(dump, want) {
+			t.Errorf("summary dump missing %q\n%s", want, dump)
+		}
+	}
+}
+
+func TestLoadResultsRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "results.json")
+
+	s, err := loadResults(path)
+	if err != nil {
+		t.Fatalf("loadResults(missing): %v", err)
+	}
+	if s.Results == nil {
+		t.Error("Results map should be initialized for a missing file")
+	}
+
+	dp := 88.0
+	s.Commit, s.Posted = "c1", true
+	s.Results["a"] = comboResult{Status: "ok", DutyPct: &dp}
+	if err := s.save(path); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	loaded, err := loadResults(path)
+	if err != nil {
+		t.Fatalf("loadResults: %v", err)
+	}
+	if loaded.Commit != "c1" || !loaded.Posted {
+		t.Errorf("loaded = %+v", loaded)
+	}
+	if r, ok := loaded.Results["a"]; !ok || r.Status != "ok" || r.DutyPct == nil || *r.DutyPct != 88.0 {
+		t.Errorf("loaded result = %+v", loaded.Results)
+	}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Errorf("leftover tmp file: %s", e.Name())
+		}
 	}
 }

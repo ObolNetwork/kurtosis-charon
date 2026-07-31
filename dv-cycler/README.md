@@ -94,6 +94,22 @@ is also uploaded to that Slack channel via the Web API
 incoming webhook used for the report itself cannot attach files, so without a
 bot token the logs are saved locally only (the report still links the path).
 
+## Per-commit results summary
+
+Alongside the per-run reports, the cycler accumulates each combo's headline
+metrics — status, duty success %, Charon peak mem/cpu, host peak cpu/mem —
+keyed by the `CYCLER_REPO_PATH` git commit (the "version set", since the
+`network-params/*.yaml` image pins live in that repo). State is persisted to
+`CYCLER_RESULTS_PATH` so it survives restarts.
+
+When every combo currently in `network-params/` has run under a given commit,
+the cycler posts a Slack **summary table** (`combo | status | duty% | Charon
+mem | Charon cpu | host cpu | host mem`) via the webhook. If a new commit
+appears before the current one finishes, the partial table is posted (with
+`N/A` for combos not yet run under it) as that commit is superseded. Each
+commit posts exactly once. Set `CYCLER_SUMMARY_MENTION` to a Slack mention
+(e.g. `<!subteam^S123>` or `<!here>`) to ping a team on the summary message.
+
 ## Running it
 
 No build step is required — the cycler is run directly with `go run`, from
@@ -157,6 +173,8 @@ the three required variables is unset or empty.
 | `CYCLER_LOG_DIR` | no | `<home>/dv-cycler-logs` | Directory where failing-run log archives (`.tar.gz`) are written. |
 | `CYCLER_SLACK_BOT_TOKEN` | no | `""` | Slack bot token (`files:write` scope) for uploading failing-run log archives. Empty = local save only. |
 | `CYCLER_SLACK_CHANNEL_ID` | no | `""` | Slack channel id to upload failing-run log archives into (needs `CYCLER_SLACK_BOT_TOKEN`). |
+| `CYCLER_RESULTS_PATH` | no | `<state-dir>/cycler-results.json` | Accumulator file for the per-commit results summary table. |
+| `CYCLER_SUMMARY_MENTION` | no | `""` | Slack mention prepended to the summary table (e.g. `<!subteam^S123>`); empty = no ping. |
 | `CYCLER_RUN_MINUTES` | no | `90` | Length of each run's window. |
 | `CYCLER_WARMUP_MINUTES` | no | `15` | Leading portion of the run window excluded from duty/health scoring. |
 | `CYCLER_STARTUP_DEADLINE_MINUTES` | no | `25` | How long to wait for the enclave to become healthy before recording the run `failed`. |

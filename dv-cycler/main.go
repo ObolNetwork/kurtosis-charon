@@ -56,6 +56,8 @@ type config struct {
 	logDir                 string
 	slackBotToken          string
 	slackChannelID         string
+	resultsPath            string
+	summaryMention         string
 }
 
 // dotEnvPath returns the .env file to load: $CYCLER_ENV_FILE if set, else
@@ -160,6 +162,10 @@ func applyFlags(cfg *config, args []string) {
 			cfg.slackBotToken = val
 		case "slack-channel-id":
 			cfg.slackChannelID = val
+		case "results-path":
+			cfg.resultsPath = val
+		case "summary-mention":
+			cfg.summaryMention = val
 		case "run-minutes":
 			if n, err := strconv.Atoi(val); err == nil {
 				cfg.runMinutes = n
@@ -208,6 +214,8 @@ func loadConfig() (config, error) {
 	envStr("LOG_DIR", &cfg.logDir)
 	envStr("SLACK_BOT_TOKEN", &cfg.slackBotToken)
 	envStr("SLACK_CHANNEL_ID", &cfg.slackChannelID)
+	envStr("RESULTS_PATH", &cfg.resultsPath)
+	envStr("SUMMARY_MENTION", &cfg.summaryMention)
 	envInt("RUN_MINUTES", &cfg.runMinutes)
 	envInt("WARMUP_MINUTES", &cfg.warmupMinutes)
 	envInt("STARTUP_DEADLINE_MINUTES", &cfg.startupDeadlineMinutes)
@@ -247,6 +255,12 @@ func loadConfig() (config, error) {
 	}
 	if len(missing) > 0 {
 		return config{}, fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))
+	}
+
+	// resultsPath defaults next to the state file (statePath is guaranteed set
+	// by the required-config check above).
+	if cfg.resultsPath == "" {
+		cfg.resultsPath = filepath.Join(filepath.Dir(cfg.statePath), "cycler-results.json")
 	}
 	return cfg, nil
 }
@@ -1650,6 +1664,289 @@ func runOne(cfg config, paramFile, name string, cycle int) (result reportData) {
 }
 
 // ---------------------------------------------------------------------------
+// Per-commit results summary: accumulate each combo's headline metrics keyed
+// by the repo commit (the version set), and post a Slack table once every
+// combo has run under a commit -- or when a new commit supersedes it (partial,
+// with N/A for combos not yet run under it). Additive to the per-run reports.
+// ---------------------------------------------------------------------------
+
+type comboResult struct {
+	Status    string   `json:"status"`
+	DutyPct   *float64 `json:"duty_pct,omitempty"`
+	CharonMem *float64 `json:"charon_mem_bytes,omitempty"`
+	CharonCPU *float64 `json:"charon_cpu,omitempty"`
+	HostCPU   *float64 `json:"host_cpu_peak,omitempty"`
+	HostMem   *float64 `json:"host_mem_peak_bytes,omitempty"`
+}
+
+type resultsStore struct {
+	Commit  string                 `json:"commit"`  // the commit currently accumulating
+	Posted  bool                   `json:"posted"`  // whether Commit's table has been posted
+	Results map[string]comboResult `json:"results"` // combo name -> latest result for Commit
+}
+
+// summaryToPost is a table the loop should post: the results for one commit,
+// flagged as a completion (all combos ran) or a supersede (partial).
+type summaryToPost struct {
+	Commit     string
+	Results    map[string]comboResult
+	Complete   bool
+	Superseded bool
+}
+
+func loadResults(path string) (resultsStore, error) {
+	data, err := readFileFn(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return resultsStore{Results: map[string]comboResult{}}, nil
+		}
+		return resultsStore{}, err
+	}
+	var s resultsStore
+	if err := json.Unmarshal(data, &s); err != nil {
+		return resultsStore{}, err
+	}
+	if s.Results == nil {
+		s.Results = map[string]comboResult{}
+	}
+	return s, nil
+}
+
+func (s *resultsStore) save(path string) error {
+	data, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+// worstDutyPct is the worst node's overall duty success rate (successes /
+// expected, summed across its duties, which already exclude 0/0 idle duties).
+func worstDutyPct(d reportData) *float64 {
+	if d.worst == nil || len(d.worst.duties) == 0 {
+		return nil
+	}
+	var se, ss float64
+	for _, du := range d.worst.duties {
+		se += du.expected
+		ss += du.success
+	}
+	if se == 0 {
+		return nil
+	}
+	p := 100 * ss / se
+	return &p
+}
+
+func comboResultFrom(d reportData) comboResult {
+	r := comboResult{Status: d.status, DutyPct: worstDutyPct(d), CharonMem: d.dvMemBytes, CharonCPU: d.dvCPU}
+	if d.host != nil {
+		cp, mp := d.host.cpuPeak, d.host.memPeak
+		r.HostCPU, r.HostMem = &cp, &mp
+	}
+	return r
+}
+
+func cloneResults(m map[string]comboResult) map[string]comboResult {
+	out := make(map[string]comboResult, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
+func allCombosPresent(allCombos []string, results map[string]comboResult) bool {
+	if len(allCombos) == 0 {
+		return false
+	}
+	for _, c := range allCombos {
+		if _, ok := results[c]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// ingest records combo's result under commit. If the commit changed it rotates
+// (returning a supersede summary for the previous, unposted commit), and once
+// every combo in allCombos has run under the current commit it returns a
+// completion summary. Each commit is posted at most once.
+func (s *resultsStore) ingest(commit, combo string, res comboResult, allCombos []string) []summaryToPost {
+	if s.Results == nil {
+		s.Results = map[string]comboResult{}
+	}
+	var posts []summaryToPost
+	if s.Commit != commit {
+		if s.Commit != "" && !s.Posted && len(s.Results) > 0 {
+			posts = append(posts, summaryToPost{Commit: s.Commit, Results: cloneResults(s.Results), Superseded: true})
+		}
+		s.Commit = commit
+		s.Results = map[string]comboResult{}
+		s.Posted = false
+	}
+	s.Results[combo] = res
+	if !s.Posted && allCombosPresent(allCombos, s.Results) {
+		posts = append(posts, summaryToPost{Commit: s.Commit, Results: cloneResults(s.Results), Complete: true})
+		s.Posted = true
+	}
+	return posts
+}
+
+// comboNames returns the sorted combo stems for the given param file paths.
+func comboNames(files []string) []string {
+	names := make([]string, 0, len(files))
+	for _, f := range files {
+		names = append(names, paramStem(f))
+	}
+	sort.Strings(names)
+	return names
+}
+
+// repoCommit returns the short HEAD commit of repoPath (the version set), or ""
+// if it can't be resolved.
+func repoCommit(repoPath string) string {
+	out, err := runCommand("git", "-C", repoPath, "rev-parse", "--short", "HEAD")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
+// fmtF formats an optional metric with the given printf verb, or "N/A" if nil.
+func fmtF(p *float64, format string) string {
+	if p == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf(format, *p)
+}
+
+// fmtGB formats an optional byte count as gigabytes, or "N/A" if nil.
+func fmtGB(p *float64) string {
+	if p == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("%.2fGB", *p/1e9)
+}
+
+// summaryRows renders the fixed-width header line and one row per combo in
+// allCombos (N/A across the board for combos with no result), aligned so the
+// table lines up in a Slack monospace block.
+func summaryRows(results map[string]comboResult, allCombos []string) (header string, rows []string) {
+	cw := len("combo")
+	for _, c := range allCombos {
+		if len(c) > cw {
+			cw = len(c)
+		}
+	}
+	row := func(combo, status, duty, cmem, ccpu, hcpu, hmem string) string {
+		return fmt.Sprintf("%-*s  %-9s  %7s  %9s  %8s  %8s  %9s",
+			cw, combo, status, duty, cmem, ccpu, hcpu, hmem)
+	}
+	header = row("combo", "status", "duty%", "chn-mem", "chn-cpu", "host-cpu", "host-mem")
+	for _, c := range allCombos {
+		r, ok := results[c]
+		if !ok {
+			rows = append(rows, row(c, "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"))
+			continue
+		}
+		rows = append(rows, row(c, r.Status,
+			fmtF(r.DutyPct, "%.1f%%"), fmtGB(r.CharonMem), fmtF(r.CharonCPU, "%.2f"),
+			fmtF(r.HostCPU, "%.0f%%"), fmtGB(r.HostMem)))
+	}
+	return header, rows
+}
+
+// buildSummaryBlocks renders the Slack fallback text and Block Kit blocks for a
+// results summary: a lead line (optionally prefixed with a mention to ping),
+// a run-count context line, and the table split across monospace code blocks
+// to stay under Slack's per-block character limit.
+func buildSummaryBlocks(sum summaryToPost, allCombos []string, mention string) (string, []map[string]any) {
+	ran := 0
+	for _, c := range allCombos {
+		if _, ok := sum.Results[c]; ok {
+			ran++
+		}
+	}
+	kind := "in progress"
+	switch {
+	case sum.Complete:
+		kind = "complete"
+	case sum.Superseded:
+		kind = "partial (superseded by a newer commit)"
+	}
+	headline := fmt.Sprintf("*DV matrix results* — commit `%s` — %s", sum.Commit, kind)
+	fallback := fmt.Sprintf("DV matrix results %s (%d/%d combos, %s)", sum.Commit, ran, len(allCombos), kind)
+
+	lead := headline
+	if mention != "" {
+		lead = mention + " " + headline
+	}
+	blocks := []map[string]any{
+		{"type": "section", "text": map[string]any{"type": "mrkdwn", "text": lead}},
+		{"type": "context", "elements": []map[string]any{
+			{"type": "mrkdwn", "text": fmt.Sprintf("%d/%d combos run", ran, len(allCombos))},
+		}},
+	}
+
+	header, rows := summaryRows(sum.Results, allCombos)
+	const perBlock = 18 // keeps each code block well under Slack's 3000-char limit
+	for i := 0; i < len(rows); i += perBlock {
+		j := i + perBlock
+		if j > len(rows) {
+			j = len(rows)
+		}
+		table := header + "\n" + strings.Join(rows[i:j], "\n")
+		blocks = append(blocks, map[string]any{
+			"type": "section",
+			"text": map[string]any{"type": "mrkdwn", "text": "```\n" + table + "\n```"},
+		})
+	}
+	return fallback, blocks
+}
+
+// postSummaryBestEffort posts one results summary via the webhook. Best-effort:
+// never breaks the loop.
+func postSummaryBestEffort(cfg config, sum summaryToPost, allCombos []string) {
+	defer func() { _ = recover() }()
+	text, blocks := buildSummaryBlocks(sum, allCombos, cfg.summaryMention)
+	if err := slackPost(cfg.slackWebhookURL, text, blocks); err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: summary post failed: %v\n", err)
+	}
+}
+
+// recordResultAndMaybePost records this run's headline metrics into the
+// per-commit results store and posts a summary table when a commit completes
+// (or is superseded). Best-effort: never breaks the loop.
+func recordResultAndMaybePost(cfg config, combo string, d reportData, files []string) {
+	defer func() { _ = recover() }()
+	if cfg.resultsPath == "" {
+		return
+	}
+	commit := repoCommit(cfg.repoPath)
+	if commit == "" {
+		fmt.Fprintln(os.Stderr, "dv-cycler: results: could not resolve repo commit; skipping summary")
+		return
+	}
+	store, err := loadResults(cfg.resultsPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: results: load failed (starting fresh): %v\n", err)
+		store = resultsStore{Results: map[string]comboResult{}}
+	}
+	allCombos := comboNames(files)
+	posts := store.ingest(commit, combo, comboResultFrom(d), allCombos)
+	if err := store.save(cfg.resultsPath); err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: results: save failed: %v\n", err)
+	}
+	for _, p := range posts {
+		postSummaryBestEffort(cfg, p, allCombos)
+	}
+}
+
+// ---------------------------------------------------------------------------
 // The 24/7 driver loop: mainLoop, main.
 // ---------------------------------------------------------------------------
 
@@ -1704,6 +2001,8 @@ func mainLoop(cfg config) {
 		st.CurrentEnclave = ""
 		st.advance()
 		saveState()
+
+		recordResultAndMaybePost(cfg, name, data, files)
 
 		if data.status == "failed" {
 			consecutiveFailures++
