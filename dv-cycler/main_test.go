@@ -1529,18 +1529,38 @@ func TestBuildSummaryBlocks(t *testing.T) {
 		"teku-teku":       {Status: "failed"},
 		// lighthouse-prysm intentionally absent -> an N/A row
 	}
+	// Superseded (partial) table: renders every combo (N/A for the unrun one),
+	// but must NOT ping the mention.
 	sum := summaryToPost{Commit: "abc123", Results: results, Superseded: true}
 	text, blocks := buildSummaryBlocks(sum, all, "<!subteam^S1|proto>")
 	if !strings.Contains(text, "abc123") {
 		t.Errorf("fallback text missing commit: %q", text)
 	}
 	dump := dumpBlocks(blocks)
-	// dumpBlocks JSON-encodes, so "<"/">" render as </> (Slack decodes
-	// them back on receipt); match the un-bracketed core of the mention.
-	for _, want := range []string{"subteam^S1|proto", "grandine-nimbus", "lighthouse-prysm", "teku-teku", "99.9%", "1.20GB", "N/A", "superseded", "2/3 combos run"} {
+	// dumpBlocks JSON-encodes, so "<"/">" render as </> (Slack decodes them
+	// back on receipt); match the un-bracketed core of the mention.
+	for _, want := range []string{"grandine-nimbus", "lighthouse-prysm", "teku-teku", "99.9%", "1.20GB", "N/A", "superseded", "2/3 combos run"} {
 		if !strings.Contains(dump, want) {
 			t.Errorf("summary dump missing %q\n%s", want, dump)
 		}
+	}
+	if strings.Contains(dump, "subteam^S1|proto") {
+		t.Errorf("superseded/partial table must NOT ping the mention\n%s", dump)
+	}
+
+	// Complete table pings the mention.
+	full := map[string]comboResult{
+		"grandine-nimbus":  {Status: "ok"},
+		"lighthouse-prysm": {Status: "ok"},
+		"teku-teku":        {Status: "ok"},
+	}
+	_, cblocks := buildSummaryBlocks(summaryToPost{Commit: "abc123", Results: full, Complete: true}, all, "<!subteam^S1|proto>")
+	cdump := dumpBlocks(cblocks)
+	if !strings.Contains(cdump, "subteam^S1|proto") {
+		t.Errorf("complete table should ping the mention\n%s", cdump)
+	}
+	if !strings.Contains(cdump, "complete") {
+		t.Errorf("complete table missing 'complete' label\n%s", cdump)
 	}
 }
 

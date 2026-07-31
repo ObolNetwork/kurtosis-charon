@@ -1881,8 +1881,11 @@ func buildSummaryBlocks(sum summaryToPost, allCombos []string, mention string) (
 	headline := fmt.Sprintf("*DV matrix results* — commit `%s` — %s", sum.Commit, kind)
 	fallback := fmt.Sprintf("DV matrix results %s (%d/%d combos, %s)", sum.Commit, ran, len(allCombos), kind)
 
+	// Only ping the mention on a complete table (all combos ran). Partial /
+	// superseded tables (common during active development, since the repo
+	// commit changes on nearly every run) post without a ping to avoid noise.
 	lead := headline
-	if mention != "" {
+	if mention != "" && sum.Complete {
 		lead = mention + " " + headline
 	}
 	blocks := []map[string]any{
