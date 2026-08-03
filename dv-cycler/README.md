@@ -114,21 +114,35 @@ then the only copy). So a healthy, upload-configured deployment leaves
 `CYCLER_LOG_DIR` empty between failures; anything lingering there is a run whose
 upload didn't go through.
 
-## Per-commit results summary
+## Results matrix
 
-Alongside the per-run reports, the cycler accumulates each combo's headline
-metrics — status, duty success %, Charon peak mem/cpu, host peak cpu/mem —
-keyed by the `CYCLER_REPO_PATH` git commit (the "version set", since the
-`network-params/*.yaml` image pins live in that repo). State is persisted to
-`CYCLER_RESULTS_PATH` so it survives restarts.
+Alongside the per-run reports, the cycler maintains a **single persistent
+matrix** (one row per combo) in `CYCLER_RESULTS_PATH`, so it survives restarts.
+Each row holds the combo's latest result — status, duty success %, Charon peak
+mem/cpu, host peak cpu/mem — plus the **versions it ran with**: the DV
+beacon-node image (`cl`), the Charon-managed VC image (`vc`), and the **Charon
+git commit** (`charon`, captured from `charon version` in the container).
 
-When every combo currently in `network-params/` has run under a given commit,
-the cycler posts a Slack **summary table** (`combo | status | duty% | Charon
-mem | Charon cpu | host cpu | host mem`) via the webhook. If a new commit
-appears before the current one finishes, the partial table is posted (with
-`N/A` for combos not yet run under it) as that commit is superseded. Each
-commit posts exactly once. Set `CYCLER_SUMMARY_MENTION` to a Slack mention
-(e.g. `<!subteam^S123>` or `<!here>`) to ping a team on the summary message.
+**Invalidation & re-test.** On each `git pull` the cycler diffs the current
+param-file pins (each combo's DV `cl_image` and `charon_vc_image`) against what
+each row last ran with. Any combo whose CL or VC version changed is
+**invalidated**, and the scheduler **prioritises** those combos (runs them
+ahead of the normal rotation) so a version bump is re-tested quickly. A combo
+counts as filled once it has run on the current pins, regardless of
+ok/degraded/failed (a persistently-failing combo shows its failure but doesn't
+block completion). Example: bumping Lodestar (CL **and** VC) invalidates the 11
+combos where Lodestar is the beacon node or the VC.
+
+**Posting.** Once every combo is valid again (the matrix is whole), the cycler
+posts the full matrix to Slack as a **fresh message** (via the webhook) —
+columns `combo | cl | vc | charon | status | duty% | chn-mem | chn-cpu |
+host-cpu | host-mem`, one message (the wide table is split across code blocks
+to fit Slack's limits). So you get a new, notified matrix each time a version
+change finishes testing; normal rotation between changes refreshes rows quietly
+without re-posting. A new Charon `:next` build is *not* an invalidation trigger
+— it only updates the `charon` column opportunistically as combos re-run. Set
+`CYCLER_SUMMARY_MENTION` to a Slack mention (e.g. `<!subteam^S123>`) to prepend
+a ping to the matrix message.
 
 ## Running it
 
@@ -193,8 +207,8 @@ the three required variables is unset or empty.
 | `CYCLER_LOG_DIR` | no | `<home>/dv-cycler-logs` | Directory where failing-run log archives (`.tar.gz`) are written. |
 | `CYCLER_SLACK_BOT_TOKEN` | no | `""` | Slack bot token (`files:write` scope) for uploading failing-run log archives. Empty = local save only. |
 | `CYCLER_SLACK_CHANNEL_ID` | no | `""` | Slack channel id to upload failing-run log archives into (needs `CYCLER_SLACK_BOT_TOKEN`). |
-| `CYCLER_RESULTS_PATH` | no | `<state-dir>/cycler-results.json` | Accumulator file for the per-commit results summary table. |
-| `CYCLER_SUMMARY_MENTION` | no | `""` | Slack mention prepended to the summary table (e.g. `<!subteam^S123>`); empty = no ping. |
+| `CYCLER_RESULTS_PATH` | no | `<state-dir>/cycler-results.json` | Persistent results-matrix file (one row per combo + versions). |
+| `CYCLER_SUMMARY_MENTION` | no | `""` | Slack mention prepended to the matrix message (e.g. `<!subteam^S123>`); empty = no ping. |
 | `CYCLER_RUN_MINUTES` | no | `90` | Length of each run's window. |
 | `CYCLER_WARMUP_MINUTES` | no | `15` | Leading portion of the run window excluded from duty/health scoring. |
 | `CYCLER_STARTUP_DEADLINE_MINUTES` | no | `25` | How long to wait for the enclave to become healthy before recording the run `failed`. |

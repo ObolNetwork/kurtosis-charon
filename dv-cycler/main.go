@@ -691,6 +691,7 @@ type reportData struct {
 
 	logArchivePath string // local path to the captured-logs tarball (failing runs)
 	logExcerpt     string // short excerpt (Charon error lines) for the Slack message
+	charonVersion  string // charon git commit hash captured during the run (matrix column)
 }
 
 var statusEmoji = map[string]string{"ok": "✅", "degraded": "⚠️", "failed": "❌"}
@@ -1663,6 +1664,7 @@ func runWindow(cfg config, name string, cycle int, enclave string) reportData {
 		return failedReport(name, cycle, err.Error())
 	}
 	data.window = windowLabel
+	data.charonVersion = charonCommit(enclave) // informational matrix column; enclave still up
 	return data
 }
 
@@ -1736,10 +1738,12 @@ func runOne(cfg config, paramFile, name string, cycle int) (result reportData) {
 }
 
 // ---------------------------------------------------------------------------
-// Per-commit results summary: accumulate each combo's headline metrics keyed
-// by the repo commit (the version set), and post a Slack table once every
-// combo has run under a commit -- or when a new commit supersedes it (partial,
-// with N/A for combos not yet run under it). Additive to the per-run reports.
+// DV results matrix: one persistent matrix (a row per combo) holding each
+// combo's latest result plus the CL/VC/Charon versions it ran with. A combo is
+// "invalidated" when its CL or VC image pin changes (detected on git pull);
+// mainLoop prioritises re-running invalidated combos, and once every combo is
+// valid again the full matrix is posted to Slack as a fresh message. The Charon
+// commit is informational (a column), not an invalidation trigger.
 // ---------------------------------------------------------------------------
 
 type comboResult struct {
@@ -1749,34 +1753,30 @@ type comboResult struct {
 	CharonCPU *float64 `json:"charon_cpu,omitempty"`
 	HostCPU   *float64 `json:"host_cpu_peak,omitempty"`
 	HostMem   *float64 `json:"host_mem_peak_bytes,omitempty"`
+	CL        string   `json:"cl,omitempty"`     // DV beacon-node image it ran with
+	VC        string   `json:"vc,omitempty"`     // charon-managed VC image it ran with
+	Charon    string   `json:"charon,omitempty"` // charon git commit hash (informational)
 }
 
-type resultsStore struct {
-	Commit  string                 `json:"commit"`  // the commit currently accumulating
-	Posted  bool                   `json:"posted"`  // whether Commit's table has been posted
-	Results map[string]comboResult `json:"results"` // combo name -> latest result for Commit
+type matrixStore struct {
+	Results map[string]comboResult `json:"results"` // combo -> latest result + versions
+	Posted  bool                   `json:"posted"`  // current fully-valid matrix already posted?
 }
 
-// summaryToPost is a table the loop should post: the results for one commit,
-// flagged as a completion (all combos ran) or a supersede (partial).
-type summaryToPost struct {
-	Commit     string
-	Results    map[string]comboResult
-	Complete   bool
-	Superseded bool
-}
+// pins holds a combo's current version pins parsed from its param file.
+type pins struct{ cl, vc string }
 
-func loadResults(path string) (resultsStore, error) {
+func loadMatrix(path string) (matrixStore, error) {
 	data, err := readFileFn(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return resultsStore{Results: map[string]comboResult{}}, nil
+			return matrixStore{Results: map[string]comboResult{}}, nil
 		}
-		return resultsStore{}, err
+		return matrixStore{}, err
 	}
-	var s resultsStore
+	var s matrixStore
 	if err := json.Unmarshal(data, &s); err != nil {
-		return resultsStore{}, err
+		return matrixStore{}, err
 	}
 	if s.Results == nil {
 		s.Results = map[string]comboResult{}
@@ -1784,7 +1784,7 @@ func loadResults(path string) (resultsStore, error) {
 	return s, nil
 }
 
-func (s *resultsStore) save(path string) error {
+func (s *matrixStore) save(path string) error {
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
@@ -1794,6 +1794,62 @@ func (s *resultsStore) save(path string) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+// unquote strips a single pair of surrounding single or double quotes.
+func unquote(s string) string {
+	if len(s) >= 2 && (s[0] == '"' && s[len(s)-1] == '"' || s[0] == '\'' && s[len(s)-1] == '\'') {
+		return s[1 : len(s)-1]
+	}
+	return s
+}
+
+// parsePins extracts a combo's version pins from its param-file YAML: the DV
+// participant's beacon-node image (the last cl_image in the file -- the DV
+// participant comes after the fixed lighthouse bootstrap) and the
+// charon-managed VC image (charon_vc_image).
+func parsePins(yaml string) pins {
+	var p pins
+	for _, line := range strings.Split(yaml, "\n") {
+		t := strings.TrimSpace(line)
+		if v, ok := strings.CutPrefix(t, "cl_image:"); ok {
+			p.cl = unquote(strings.TrimSpace(v))
+		}
+		if v, ok := strings.CutPrefix(t, "charon_vc_image:"); ok {
+			p.vc = unquote(strings.TrimSpace(v))
+		}
+	}
+	return p
+}
+
+// readPins parses the version pins for each combo's param file, keyed by stem.
+func readPins(files []string) map[string]pins {
+	out := make(map[string]pins, len(files))
+	for _, f := range files {
+		raw, err := readFileFn(f)
+		if err != nil {
+			continue
+		}
+		out[paramStem(f)] = parsePins(string(raw))
+	}
+	return out
+}
+
+// pendingCombos returns the combos (sorted) that must run before the matrix is
+// complete: any with no stored result, or whose stored CL/VC pins differ from
+// the current param-file pins (a version change invalidated them).
+func pendingCombos(m matrixStore, files []string, pinsByCombo map[string]pins) []string {
+	var pending []string
+	for _, f := range files {
+		name := paramStem(f)
+		r, ok := m.Results[name]
+		p := pinsByCombo[name]
+		if !ok || r.CL != p.cl || r.VC != p.vc {
+			pending = append(pending, name)
+		}
+	}
+	sort.Strings(pending)
+	return pending
 }
 
 // worstDutyPct is the worst node's overall duty success rate (successes /
@@ -1814,58 +1870,15 @@ func worstDutyPct(d reportData) *float64 {
 	return &p
 }
 
+// comboResultFrom builds a matrix row's metrics/status/Charon-commit from a
+// run. The CL/VC image pins are set by the caller (from the param file).
 func comboResultFrom(d reportData) comboResult {
-	r := comboResult{Status: d.status, DutyPct: worstDutyPct(d), CharonMem: d.dvMemBytes, CharonCPU: d.dvCPU}
+	r := comboResult{Status: d.status, DutyPct: worstDutyPct(d), CharonMem: d.dvMemBytes, CharonCPU: d.dvCPU, Charon: d.charonVersion}
 	if d.host != nil {
 		cp, mp := d.host.cpuPeak, d.host.memPeak
 		r.HostCPU, r.HostMem = &cp, &mp
 	}
 	return r
-}
-
-func cloneResults(m map[string]comboResult) map[string]comboResult {
-	out := make(map[string]comboResult, len(m))
-	for k, v := range m {
-		out[k] = v
-	}
-	return out
-}
-
-func allCombosPresent(allCombos []string, results map[string]comboResult) bool {
-	if len(allCombos) == 0 {
-		return false
-	}
-	for _, c := range allCombos {
-		if _, ok := results[c]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
-// ingest records combo's result under commit. If the commit changed it rotates
-// (returning a supersede summary for the previous, unposted commit), and once
-// every combo in allCombos has run under the current commit it returns a
-// completion summary. Each commit is posted at most once.
-func (s *resultsStore) ingest(commit, combo string, res comboResult, allCombos []string) []summaryToPost {
-	if s.Results == nil {
-		s.Results = map[string]comboResult{}
-	}
-	var posts []summaryToPost
-	if s.Commit != commit {
-		if s.Commit != "" && !s.Posted && len(s.Results) > 0 {
-			posts = append(posts, summaryToPost{Commit: s.Commit, Results: cloneResults(s.Results), Superseded: true})
-		}
-		s.Commit = commit
-		s.Results = map[string]comboResult{}
-		s.Posted = false
-	}
-	s.Results[combo] = res
-	if !s.Posted && allCombosPresent(allCombos, s.Results) {
-		posts = append(posts, summaryToPost{Commit: s.Commit, Results: cloneResults(s.Results), Complete: true})
-		s.Posted = true
-	}
-	return posts
 }
 
 // comboNames returns the sorted combo stems for the given param file paths.
@@ -1878,14 +1891,69 @@ func comboNames(files []string) []string {
 	return names
 }
 
-// repoCommit returns the short HEAD commit of repoPath (the version set), or ""
-// if it can't be resolved.
-func repoCommit(repoPath string) string {
-	out, err := runCommand("git", "-C", repoPath, "rev-parse", "--short", "HEAD")
+// fileForCombo returns the param file path whose stem is name, or "".
+func fileForCombo(files []string, name string) string {
+	for _, f := range files {
+		if paramStem(f) == name {
+			return f
+		}
+	}
+	return ""
+}
+
+// charonCommit runs `charon version` in the enclave's charon node 0 and returns
+// its short git commit hash (e.g. "bc5674a"), or "" if unavailable. Used for
+// the informational Charon column; best-effort, never fatal.
+func charonCommit(enclave string) string {
+	out, err := runCommand("docker", "ps",
+		"--filter", "label=com.kurtosistech.enclave-name="+enclave,
+		"--format", "{{.Names}}")
 	if err != nil {
 		return ""
 	}
-	return strings.TrimSpace(out)
+	var container string
+	for _, ln := range strings.Split(out, "\n") {
+		if ln = strings.TrimSpace(ln); strings.Contains(ln, "-charon-charon-0--") {
+			container = ln
+			break
+		}
+	}
+	if container == "" {
+		return ""
+	}
+	v, err := runCommand("docker", "exec", container, "charon", "version")
+	if err != nil {
+		return ""
+	}
+	return parseCharonCommit(v)
+}
+
+// parseCharonCommit extracts the git commit hash from `charon version` output
+// like "v1.11.0-dev [git_commit_hash=bc5674a,git_commit_time=...]".
+func parseCharonCommit(out string) string {
+	const key = "git_commit_hash="
+	i := strings.Index(out, key)
+	if i < 0 {
+		return ""
+	}
+	rest := out[i+len(key):]
+	end := strings.IndexAny(rest, ",]} \t\r\n")
+	if end < 0 {
+		end = len(rest)
+	}
+	return strings.TrimSpace(rest[:end])
+}
+
+// imageTag returns the tag portion of a docker image ref (after the last ':'),
+// or "N/A" for an empty ref -- for compact matrix version columns.
+func imageTag(image string) string {
+	if image == "" {
+		return "N/A"
+	}
+	if i := strings.LastIndex(image, ":"); i >= 0 && i < len(image)-1 {
+		return image[i+1:]
+	}
+	return image
 }
 
 // fmtF formats an optional metric with the given printf verb, or "N/A" if nil.
@@ -1904,71 +1972,67 @@ func fmtGB(p *float64) string {
 	return fmt.Sprintf("%.2fGB", *p/1e9)
 }
 
-// summaryRows renders the fixed-width header line and one row per combo in
-// allCombos (N/A across the board for combos with no result), aligned so the
-// table lines up in a Slack monospace block.
-func summaryRows(results map[string]comboResult, allCombos []string) (header string, rows []string) {
-	cw := len("combo")
-	for _, c := range allCombos {
+// matrixRows renders the fixed-width header line and one row per combo (in the
+// given order), including the CL/VC/Charon version columns. Combos with no
+// stored result render N/A across the board.
+func matrixRows(m matrixStore, combos []string) (header string, rows []string) {
+	cw, clw, vcw, chw := len("combo"), len("cl"), len("vc"), len("charon")
+	for _, c := range combos {
 		if len(c) > cw {
 			cw = len(c)
 		}
+		r := m.Results[c]
+		if t := imageTag(r.CL); len(t) > clw {
+			clw = len(t)
+		}
+		if t := imageTag(r.VC); len(t) > vcw {
+			vcw = len(t)
+		}
+		if len(r.Charon) > chw {
+			chw = len(r.Charon)
+		}
 	}
-	row := func(combo, status, duty, cmem, ccpu, hcpu, hmem string) string {
-		return fmt.Sprintf("%-*s  %-9s  %7s  %9s  %8s  %8s  %9s",
-			cw, combo, status, duty, cmem, ccpu, hcpu, hmem)
+	row := func(combo, cl, vc, charon, status, duty, cmem, ccpu, hcpu, hmem string) string {
+		return fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %-8s  %7s  %9s  %8s  %8s  %9s",
+			cw, combo, clw, cl, vcw, vc, chw, charon, status, duty, cmem, ccpu, hcpu, hmem)
 	}
-	header = row("combo", "status", "duty%", "chn-mem", "chn-cpu", "host-cpu", "host-mem")
-	for _, c := range allCombos {
-		r, ok := results[c]
+	header = row("combo", "cl", "vc", "charon", "status", "duty%", "chn-mem", "chn-cpu", "host-cpu", "host-mem")
+	for _, c := range combos {
+		r, ok := m.Results[c]
 		if !ok {
-			rows = append(rows, row(c, "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"))
+			rows = append(rows, row(c, "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A"))
 			continue
 		}
-		rows = append(rows, row(c, r.Status,
+		charon := r.Charon
+		if charon == "" {
+			charon = "N/A"
+		}
+		rows = append(rows, row(c, imageTag(r.CL), imageTag(r.VC), charon, r.Status,
 			fmtF(r.DutyPct, "%.1f%%"), fmtGB(r.CharonMem), fmtF(r.CharonCPU, "%.2f"),
 			fmtF(r.HostCPU, "%.0f%%"), fmtGB(r.HostMem)))
 	}
 	return header, rows
 }
 
-// buildSummaryBlocks renders the Slack fallback text and Block Kit blocks for a
-// results summary: a lead line (optionally prefixed with a mention to ping),
-// a run-count context line, and the table split across monospace code blocks
-// to stay under Slack's per-block character limit.
-func buildSummaryBlocks(sum summaryToPost, allCombos []string, mention string) (string, []map[string]any) {
-	ran := 0
-	for _, c := range allCombos {
-		if _, ok := sum.Results[c]; ok {
-			ran++
-		}
-	}
-	kind := "in progress"
-	switch {
-	case sum.Complete:
-		kind = "complete"
-	case sum.Superseded:
-		kind = "partial (superseded by a newer commit)"
-	}
-	headline := fmt.Sprintf("*DV matrix results* — commit `%s` — %s", sum.Commit, kind)
-	fallback := fmt.Sprintf("DV matrix results %s (%d/%d combos, %s)", sum.Commit, ran, len(allCombos), kind)
-
-	// Only ping the mention on a complete table (all combos ran). Partial /
-	// superseded tables (common during active development, since the repo
-	// commit changes on nearly every run) post without a ping to avoid noise.
+// buildMatrixBlocks renders the Slack fallback text and Block Kit blocks for
+// the full matrix: a lead line (optionally prefixed with a mention), an
+// "updated <ts>" context line, and the table split across monospace code
+// blocks to stay under Slack's per-block character limit -- all one message.
+func buildMatrixBlocks(m matrixStore, combos []string, mention, ts string) (string, []map[string]any) {
+	headline := fmt.Sprintf("*DV results matrix* — %d/%d combos", len(combos), len(combos))
+	fallback := fmt.Sprintf("DV results matrix (%d combos, updated %s)", len(combos), ts)
 	lead := headline
-	if mention != "" && sum.Complete {
+	if mention != "" {
 		lead = mention + " " + headline
 	}
 	blocks := []map[string]any{
 		{"type": "section", "text": map[string]any{"type": "mrkdwn", "text": lead}},
 		{"type": "context", "elements": []map[string]any{
-			{"type": "mrkdwn", "text": fmt.Sprintf("%d/%d combos run", ran, len(allCombos))},
+			{"type": "mrkdwn", "text": "updated " + ts},
 		}},
 	}
-
-	header, rows := summaryRows(sum.Results, allCombos)
-	const perBlock = 18 // keeps each code block well under Slack's 3000-char limit
+	header, rows := matrixRows(m, combos)
+	const perBlock = 15 // wide rows -> fewer per block to stay under 3000 chars
 	for i := 0; i < len(rows); i += perBlock {
 		j := i + perBlock
 		if j > len(rows) {
@@ -1983,41 +2047,14 @@ func buildSummaryBlocks(sum summaryToPost, allCombos []string, mention string) (
 	return fallback, blocks
 }
 
-// postSummaryBestEffort posts one results summary via the webhook. Best-effort:
-// never breaks the loop.
-func postSummaryBestEffort(cfg config, sum summaryToPost, allCombos []string) {
+// postMatrixBestEffort posts the full matrix to Slack (a fresh message).
+// Best-effort: never breaks the loop.
+func postMatrixBestEffort(cfg config, m matrixStore, combos []string) {
 	defer func() { _ = recover() }()
-	text, blocks := buildSummaryBlocks(sum, allCombos, cfg.summaryMention)
+	ts := nowFn().UTC().Format("2006-01-02 15:04 UTC")
+	text, blocks := buildMatrixBlocks(m, combos, cfg.summaryMention, ts)
 	if err := slackPost(cfg.slackWebhookURL, text, blocks); err != nil {
-		fmt.Fprintf(os.Stderr, "dv-cycler: summary post failed: %v\n", err)
-	}
-}
-
-// recordResultAndMaybePost records this run's headline metrics into the
-// per-commit results store and posts a summary table when a commit completes
-// (or is superseded). Best-effort: never breaks the loop.
-func recordResultAndMaybePost(cfg config, combo string, d reportData, files []string) {
-	defer func() { _ = recover() }()
-	if cfg.resultsPath == "" {
-		return
-	}
-	commit := repoCommit(cfg.repoPath)
-	if commit == "" {
-		fmt.Fprintln(os.Stderr, "dv-cycler: results: could not resolve repo commit; skipping summary")
-		return
-	}
-	store, err := loadResults(cfg.resultsPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "dv-cycler: results: load failed (starting fresh): %v\n", err)
-		store = resultsStore{Results: map[string]comboResult{}}
-	}
-	allCombos := comboNames(files)
-	posts := store.ingest(commit, combo, comboResultFrom(d), allCombos)
-	if err := store.save(cfg.resultsPath); err != nil {
-		fmt.Fprintf(os.Stderr, "dv-cycler: results: save failed: %v\n", err)
-	}
-	for _, p := range posts {
-		postSummaryBestEffort(cfg, p, allCombos)
+		fmt.Fprintf(os.Stderr, "dv-cycler: matrix post failed: %v\n", err)
 	}
 }
 
@@ -2025,23 +2062,36 @@ func recordResultAndMaybePost(cfg config, combo string, d reportData, files []st
 // The 24/7 driver loop: mainLoop, main.
 // ---------------------------------------------------------------------------
 
-// mainLoop drives the 24/7 loop: resume from a possibly-interrupted run,
-// then loop forever re-enumerating network-params/*.yaml, running the next
-// one, and backing off according to consecutive failures. Re-enumerating on
-// every iteration (rather than once at startup) is what makes a newly
-// dropped-in file get picked up without restarting the service.
-// State-save errors are logged and otherwise ignored (best-effort), since
-// this whole task's mandate is that the loop must never die.
+// mainLoop drives the 24/7 loop. Each iteration it git-pulls, re-enumerates
+// network-params/*.yaml (so newly added files are picked up), and schedules the
+// next combo: any combo invalidated by a CL/VC version change is prioritised
+// (run before the normal sequential rotation) so a bump is re-tested fast. It
+// records every run into the persistent results matrix and, once every combo is
+// valid again, posts the full matrix to Slack. State/matrix save errors are
+// logged and ignored (best-effort) -- the loop must never die.
 func mainLoop(cfg config) {
 	st, err := loadState(cfg.statePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "dv-cycler: failed to load state (starting fresh): %v\n", err)
 		st = state{}
 	}
-
 	saveState := func() {
 		if err := st.save(cfg.statePath); err != nil {
 			fmt.Fprintf(os.Stderr, "dv-cycler: failed to save state: %v\n", err)
+		}
+	}
+
+	matrix, err := loadMatrix(cfg.resultsPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "dv-cycler: failed to load matrix (starting fresh): %v\n", err)
+		matrix = matrixStore{Results: map[string]comboResult{}}
+	}
+	saveMatrix := func() {
+		if cfg.resultsPath == "" {
+			return
+		}
+		if err := matrix.save(cfg.resultsPath); err != nil {
+			fmt.Fprintf(os.Stderr, "dv-cycler: failed to save matrix: %v\n", err)
 		}
 	}
 
@@ -2053,20 +2103,44 @@ func mainLoop(cfg config) {
 
 	consecutiveFailures := 0
 	for {
+		// Freshen the repo so CL/VC pin changes are seen before scheduling.
+		if err := gitPull(cfg.repoPath); err != nil {
+			fmt.Fprintf(os.Stderr, "dv-cycler: git pull failed (using current checkout): %v\n", err)
+		}
+
 		files, err := paramFiles(cfg.paramsDir)
 		if err != nil || len(files) == 0 {
 			fmt.Fprintf(os.Stderr, "dv-cycler: no param files found in %s (err=%v); backing off\n", cfg.paramsDir, err)
 			sleepFn(time.Duration(computeBackoff(consecutiveFailures, cfg.interRunBackoffS, cfg.maxBackoffS)) * time.Second)
 			continue
 		}
+		combos := comboNames(files)
+		pinsByCombo := readPins(files)
+		pending := pendingCombos(matrix, files, pinsByCombo)
 
-		if st.NextIndex >= len(files) {
-			st.NextIndex = 0
-			st.Cycle++
+		// A fresh invalidation re-arms the post.
+		if len(pending) > 0 && matrix.Posted {
+			matrix.Posted = false
+			saveMatrix()
 		}
 
-		f := files[st.NextIndex]
-		name := paramStem(f)
+		// Prioritise invalidated combos; otherwise take the next in rotation.
+		var name string
+		prioritised := len(pending) > 0
+		if prioritised {
+			name = pending[0]
+		} else {
+			if st.NextIndex >= len(files) {
+				st.NextIndex = 0
+				st.Cycle++
+			}
+			name = paramStem(files[st.NextIndex])
+		}
+		f := fileForCombo(files, name)
+		if f == "" { // shouldn't happen; skip defensively
+			sleepFn(time.Duration(computeBackoff(consecutiveFailures, cfg.interRunBackoffS, cfg.maxBackoffS)) * time.Second)
+			continue
+		}
 
 		st.CurrentEnclave = enclaveName(st.Cycle, name)
 		saveState()
@@ -2074,10 +2148,24 @@ func mainLoop(cfg config) {
 		data := runOne(cfg, f, name, st.Cycle)
 
 		st.CurrentEnclave = ""
-		st.advance()
+		if !prioritised {
+			st.advance() // only the normal rotation advances the pointer
+		}
 		saveState()
 
-		recordResultAndMaybePost(cfg, name, data, files)
+		// Record the run into the matrix with the versions it ran with.
+		res := comboResultFrom(data)
+		p := pinsByCombo[name]
+		res.CL, res.VC = p.cl, p.vc
+		matrix.Results[name] = res
+		saveMatrix()
+
+		// Post the full matrix once it's whole again (and not already posted).
+		if !matrix.Posted && len(pendingCombos(matrix, files, pinsByCombo)) == 0 {
+			postMatrixBestEffort(cfg, matrix, combos)
+			matrix.Posted = true
+			saveMatrix()
+		}
 
 		if data.status == "failed" {
 			consecutiveFailures++

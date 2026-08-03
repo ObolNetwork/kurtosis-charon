@@ -1507,59 +1507,79 @@ func TestBuildBlocksLogsSection(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Per-commit results summary.
+// DV results matrix.
 // ---------------------------------------------------------------------------
 
-func TestResultsStoreIngestCompletion(t *testing.T) {
-	all := []string{"a", "b", "c"}
-	res := func(st string) comboResult { return comboResult{Status: st} }
-
-	s := resultsStore{Results: map[string]comboResult{}}
-	if p := s.ingest("A", "a", res("ok"), all); len(p) != 0 {
-		t.Fatalf("a: want 0 posts, got %d", len(p))
+func TestParsePins(t *testing.T) {
+	yaml := `participants:
+  - el_type: geth
+    cl_type: lighthouse
+    cl_image: sigp/lighthouse:v8.2.1
+    vc_type: lighthouse
+    vc_image: sigp/lighthouse:v8.2.1
+    count: 2
+  - el_type: geth
+    cl_type: lodestar
+    cl_image: "chainsafe/lodestar:v1.43.1"
+    vc_type: charon
+    charon_params:
+      charon_vc: nimbus
+      charon_vc_image: statusim/nimbus-validator-client:multiarch-v26.7.0
+`
+	p := parsePins(yaml)
+	if p.cl != "chainsafe/lodestar:v1.43.1" {
+		t.Errorf("cl = %q, want the DV (last) cl_image, quotes stripped", p.cl)
 	}
-	if p := s.ingest("A", "b", res("ok"), all); len(p) != 0 {
-		t.Fatalf("b: want 0 posts, got %d", len(p))
-	}
-	p := s.ingest("A", "c", res("degraded"), all)
-	if len(p) != 1 || !p[0].Complete || p[0].Commit != "A" {
-		t.Fatalf("c: want 1 completion post for A, got %+v", p)
-	}
-	if len(p[0].Results) != 3 {
-		t.Errorf("completion results = %d, want 3", len(p[0].Results))
-	}
-	if !s.Posted {
-		t.Error("store should be marked posted after completion")
-	}
-	if p := s.ingest("A", "a", res("ok"), all); len(p) != 0 {
-		t.Errorf("re-run under A after posted: want 0 posts, got %d", len(p))
-	}
-
-	// New commit after A was posted -> no supersede (A already posted), just rotate.
-	if p := s.ingest("B", "a", res("ok"), all); len(p) != 0 {
-		t.Errorf("rotate to B (A already posted): want 0 posts, got %d", len(p))
-	}
-	if s.Commit != "B" || s.Posted || len(s.Results) != 1 {
-		t.Errorf("after rotate: commit=%q posted=%v results=%d, want B/false/1", s.Commit, s.Posted, len(s.Results))
+	if p.vc != "statusim/nimbus-validator-client:multiarch-v26.7.0" {
+		t.Errorf("vc = %q, want the charon_vc_image", p.vc)
 	}
 }
 
-func TestResultsStoreIngestSupersedePartial(t *testing.T) {
-	all := []string{"a", "b", "c"}
-	res := func(st string) comboResult { return comboResult{Status: st} }
-	s := resultsStore{Results: map[string]comboResult{}}
-	s.ingest("A", "a", res("ok"), all)
-	s.ingest("A", "b", res("failed"), all) // A partial (a,b), not posted
+func TestPendingCombos(t *testing.T) {
+	files := []string{"/p/grandine-lodestar.yaml", "/p/lodestar-nimbus.yaml", "/p/teku-prysm.yaml"}
+	curPins := map[string]pins{
+		"grandine-lodestar": {cl: "grandine:2.0.5", vc: "lodestar:v1.43.1"},
+		"lodestar-nimbus":   {cl: "lodestar:v1.43.1", vc: "nimbus:v26.7.0"},
+		"teku-prysm":        {cl: "teku:26.7.1", vc: "prysm:v7.1.8"},
+	}
+	m := matrixStore{Results: map[string]comboResult{
+		// VC pin changed (lodestar bumped v1.43.0 -> v1.43.1) => pending
+		"grandine-lodestar": {Status: "ok", CL: "grandine:2.0.5", VC: "lodestar:v1.43.0"},
+		// matches current pins => valid
+		"lodestar-nimbus": {Status: "ok", CL: "lodestar:v1.43.1", VC: "nimbus:v26.7.0"},
+		// teku-prysm: no result at all => pending
+	}}
+	got := pendingCombos(m, files, curPins)
+	want := []string{"grandine-lodestar", "teku-prysm"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("pending = %v, want %v (changed VC + never-run, sorted)", got, want)
+	}
+}
 
-	p := s.ingest("B", "a", res("ok"), all) // new commit supersedes the partial A
-	if len(p) != 1 || !p[0].Superseded || p[0].Commit != "A" {
-		t.Fatalf("want 1 supersede post for A, got %+v", p)
+func TestParseCharonCommit(t *testing.T) {
+	cases := map[string]string{
+		"v1.11.0-dev [git_commit_hash=bc5674a,git_commit_time=2026-08-03T11:24:23Z]": "bc5674a",
+		"v1.2.3 [git_commit_hash=abc1234]":                                           "abc1234",
+		"no hash here":                                                               "",
 	}
-	if len(p[0].Results) != 2 {
-		t.Errorf("superseded A results = %d, want 2 (a,b)", len(p[0].Results))
+	for in, want := range cases {
+		if got := parseCharonCommit(in); got != want {
+			t.Errorf("parseCharonCommit(%q) = %q, want %q", in, got, want)
+		}
 	}
-	if s.Commit != "B" || len(s.Results) != 1 {
-		t.Errorf("after supersede: commit=%q results=%d, want B/1", s.Commit, len(s.Results))
+}
+
+func TestImageTag(t *testing.T) {
+	cases := map[string]string{
+		"chainsafe/lodestar:v1.43.1":                         "v1.43.1",
+		"statusim/nimbus-validator-client:multiarch-v26.7.0": "multiarch-v26.7.0",
+		"":      "N/A",
+		"notag": "notag",
+	}
+	for in, want := range cases {
+		if got := imageTag(in); got != want {
+			t.Errorf("imageTag(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 
@@ -1572,7 +1592,8 @@ func TestComboResultFrom(t *testing.T) {
 			{duty: "proposer", expected: 4, success: 4},
 		}},
 		dvMemBytes: &mem, dvCPU: &cpu,
-		host: &hostStats{cpuPeak: 82, memPeak: 9e9},
+		host:          &hostStats{cpuPeak: 82, memPeak: 9e9},
+		charonVersion: "bc5674a",
 	}
 	r := comboResultFrom(d)
 	if r.Status != "degraded" {
@@ -1587,82 +1608,76 @@ func TestComboResultFrom(t *testing.T) {
 	if r.HostCPU == nil || *r.HostCPU != 82 || r.HostMem == nil || *r.HostMem != 9e9 {
 		t.Errorf("host cpu/mem = %v/%v", r.HostCPU, r.HostMem)
 	}
+	if r.Charon != "bc5674a" {
+		t.Errorf("charon commit = %q, want bc5674a", r.Charon)
+	}
 
 	f := comboResultFrom(reportData{status: "failed"})
-	if f.Status != "failed" || f.DutyPct != nil || f.CharonMem != nil || f.HostCPU != nil {
-		t.Errorf("failed run should have nil metrics: %+v", f)
+	if f.Status != "failed" || f.DutyPct != nil || f.CharonMem != nil || f.HostCPU != nil || f.Charon != "" {
+		t.Errorf("failed run should have nil metrics + empty charon: %+v", f)
 	}
 }
 
-func TestBuildSummaryBlocks(t *testing.T) {
-	all := []string{"grandine-nimbus", "lighthouse-prysm", "teku-teku"}
+func TestBuildMatrixBlocks(t *testing.T) {
+	combos := []string{"grandine-nimbus", "lodestar-nimbus", "teku-teku"}
 	mem, cpu, hp, hm, dp := 1.2e9, 1.1, 55.0, 8e9, 99.9
-	results := map[string]comboResult{
-		"grandine-nimbus": {Status: "ok", DutyPct: &dp, CharonMem: &mem, CharonCPU: &cpu, HostCPU: &hp, HostMem: &hm},
-		"teku-teku":       {Status: "failed"},
-		// lighthouse-prysm intentionally absent -> an N/A row
-	}
-	// Superseded (partial) table: renders every combo (N/A for the unrun one),
-	// but must NOT ping the mention.
-	sum := summaryToPost{Commit: "abc123", Results: results, Superseded: true}
-	text, blocks := buildSummaryBlocks(sum, all, "<!subteam^S1|proto>")
-	if !strings.Contains(text, "abc123") {
-		t.Errorf("fallback text missing commit: %q", text)
+	m := matrixStore{Results: map[string]comboResult{
+		"grandine-nimbus": {Status: "ok", DutyPct: &dp, CharonMem: &mem, CharonCPU: &cpu, HostCPU: &hp, HostMem: &hm,
+			CL: "sifrai/grandine:2.0.5", VC: "statusim/nimbus-validator-client:multiarch-v26.7.0", Charon: "bc5674a"},
+		"lodestar-nimbus": {Status: "failed", CL: "chainsafe/lodestar:v1.43.1", VC: "statusim/nimbus:v26.7.0"},
+		// teku-teku absent -> an N/A row
+	}}
+	text, blocks := buildMatrixBlocks(m, combos, "<!subteam^S1|proto>", "2026-08-03 15:40 UTC")
+	if !strings.Contains(text, "3 combos") {
+		t.Errorf("fallback text = %q", text)
 	}
 	dump := dumpBlocks(blocks)
-	// dumpBlocks JSON-encodes, so "<"/">" render as </> (Slack decodes them
-	// back on receipt); match the un-bracketed core of the mention.
-	for _, want := range []string{"grandine-nimbus", "lighthouse-prysm", "teku-teku", "99.9%", "1.20GB", "N/A", "superseded", "2/3 combos run"} {
+	// dumpBlocks JSON-encodes, so "<"/">" render as </>; match the
+	// un-bracketed core of the mention.
+	for _, want := range []string{
+		"grandine-nimbus", "lodestar-nimbus", "teku-teku", // every combo present
+		"2.0.5", "multiarch-v26.7.0", "bc5674a", "v1.43.1", // version columns (tags)
+		"99.9%", "1.20GB", // metrics for the filled row
+		"N/A",                          // the unrun teku-teku row
+		"subteam^S1|proto",             // mention prepended
+		"updated 2026-08-03 15:40 UTC", // timestamp
+	} {
 		if !strings.Contains(dump, want) {
-			t.Errorf("summary dump missing %q\n%s", want, dump)
+			t.Errorf("matrix dump missing %q\n%s", want, dump)
 		}
-	}
-	if strings.Contains(dump, "subteam^S1|proto") {
-		t.Errorf("superseded/partial table must NOT ping the mention\n%s", dump)
-	}
-
-	// Complete table pings the mention.
-	full := map[string]comboResult{
-		"grandine-nimbus":  {Status: "ok"},
-		"lighthouse-prysm": {Status: "ok"},
-		"teku-teku":        {Status: "ok"},
-	}
-	_, cblocks := buildSummaryBlocks(summaryToPost{Commit: "abc123", Results: full, Complete: true}, all, "<!subteam^S1|proto>")
-	cdump := dumpBlocks(cblocks)
-	if !strings.Contains(cdump, "subteam^S1|proto") {
-		t.Errorf("complete table should ping the mention\n%s", cdump)
-	}
-	if !strings.Contains(cdump, "complete") {
-		t.Errorf("complete table missing 'complete' label\n%s", cdump)
 	}
 }
 
-func TestLoadResultsRoundTrip(t *testing.T) {
+func TestLoadMatrixRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "results.json")
+	path := filepath.Join(dir, "matrix.json")
 
-	s, err := loadResults(path)
+	m, err := loadMatrix(path)
 	if err != nil {
-		t.Fatalf("loadResults(missing): %v", err)
+		t.Fatalf("loadMatrix(missing): %v", err)
 	}
-	if s.Results == nil {
+	if m.Results == nil {
 		t.Error("Results map should be initialized for a missing file")
 	}
 
 	dp := 88.0
-	s.Commit, s.Posted = "c1", true
-	s.Results["a"] = comboResult{Status: "ok", DutyPct: &dp}
-	if err := s.save(path); err != nil {
+	m.Posted = true
+	m.Results["lodestar-nimbus"] = comboResult{
+		Status: "ok", DutyPct: &dp,
+		CL: "chainsafe/lodestar:v1.43.1", VC: "statusim/nimbus:v26.7.0", Charon: "bc5674a",
+	}
+	if err := m.save(path); err != nil {
 		t.Fatalf("save: %v", err)
 	}
-	loaded, err := loadResults(path)
+	loaded, err := loadMatrix(path)
 	if err != nil {
-		t.Fatalf("loadResults: %v", err)
+		t.Fatalf("loadMatrix: %v", err)
 	}
-	if loaded.Commit != "c1" || !loaded.Posted {
-		t.Errorf("loaded = %+v", loaded)
+	if !loaded.Posted {
+		t.Errorf("loaded.Posted = false, want true")
 	}
-	if r, ok := loaded.Results["a"]; !ok || r.Status != "ok" || r.DutyPct == nil || *r.DutyPct != 88.0 {
+	r, ok := loaded.Results["lodestar-nimbus"]
+	if !ok || r.Status != "ok" || r.CL != "chainsafe/lodestar:v1.43.1" || r.Charon != "bc5674a" || r.DutyPct == nil || *r.DutyPct != 88.0 {
 		t.Errorf("loaded result = %+v", loaded.Results)
 	}
 	entries, _ := os.ReadDir(dir)
