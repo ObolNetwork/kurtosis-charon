@@ -82,12 +82,19 @@ must never block teardown.
 ## Failure log capture
 
 When a run ends **non-`ok`** (`failed` or `degraded`), the cycler captures the
-logs of the relevant services *before tearing the enclave down* — one beacon
-node (`cl-*`), all Charon nodes (`*-charon-charon-*`), and all DV validator
-clients (`*-charon-vc-*`) — and writes them to a gzipped tarball under
-`CYCLER_LOG_DIR` named `cycle<N>-<combo>-<UTC-timestamp>.tar.gz`. The Slack
+logs of the relevant services *before tearing the enclave down* — the DV
+participant's own beacon node, all Charon nodes (`*-charon-charon-<N>`), and all
+DV validator clients (`*-charon-vc-*`) — and writes them to a gzipped tarball
+under `CYCLER_LOG_DIR` named `cycle<N>-<combo>-<UTC-timestamp>.tar.gz`. The Slack
 report for that run includes the archive path and a short excerpt (recent
 error/warn/fatal lines from a Charon node).
+
+The beacon node captured is the one the Charon cluster actually uses — the CL
+sharing the Charon nodes' participant index (`vc-3-…` → `cl-3-…`), *not* the
+fixed lighthouse bootstrap node (`cl-1`), which is a different client than most
+combos. Containers are scoped to the current enclave via kurtosis's
+`enclave-name` label, so a leftover container from a prior run is never
+captured.
 
 Capture is best-effort — a problem gathering logs never breaks the run or the
 loop. It relies on `docker` being available to the service user and assumes a

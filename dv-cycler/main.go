@@ -1288,34 +1288,90 @@ func serviceLabel(container string) string {
 }
 
 // selectLogTargets picks, from a list of container names, the log targets for
-// a failing run: one beacon node (the lexically-first "cl-*"), all Charon
-// nodes ("*-charon-charon-*"), and all DV validator clients ("*-charon-vc-*").
+// a failing run: all Charon nodes ("*-charon-charon-<N>"), all DV validator
+// clients ("*-charon-vc-*"), and the DV participant's beacon node.
+//
+// The beacon node is NOT the lexically-first "cl-*" -- that is the fixed
+// lighthouse bootstrap node (cl-1), a different client than most combos under
+// test. It's the CL sharing the Charon nodes' participant index (Charon
+// "vc-3-..." -> "cl-3-..."), i.e. the beacon node the Charon cluster actually
+// uses. Helper containers (charon relay, split-keys) are excluded from the DV
+// node set.
 func selectLogTargets(containers []string) (bn string, dvNodes, vcs []string) {
 	sorted := append([]string(nil), containers...)
 	sort.Strings(sorted)
+	dvIndex := ""
 	for _, c := range sorted {
 		switch {
-		case strings.Contains(c, "-charon-charon-"):
+		case isCharonNode(c):
 			dvNodes = append(dvNodes, c)
+			if dvIndex == "" {
+				dvIndex = nodeIndex(c)
+			}
 		case strings.Contains(c, "-charon-vc-"):
 			vcs = append(vcs, c)
-		case bn == "" && strings.HasPrefix(serviceLabel(c), "cl-"):
-			bn = c
 		}
 	}
+	if dvIndex != "" {
+		bn = firstWithPrefix(sorted, "cl-"+dvIndex+"-")
+	}
+	if bn == "" { // fallback if we couldn't tie a CL to the Charon nodes
+		bn = firstWithPrefix(sorted, "cl-")
+	}
 	return bn, dvNodes, vcs
+}
+
+// nodeIndex extracts the participant node index from a kurtosis service name,
+// e.g. "vc-3-geth-lodestar-charon-charon-0" -> "3".
+func nodeIndex(container string) string {
+	if f := strings.Split(serviceLabel(container), "-"); len(f) >= 2 {
+		return f[1]
+	}
+	return ""
+}
+
+// isCharonNode reports whether container is a real Charon node
+// ("...-charon-charon-<N>" with N numeric), excluding helpers like the relay
+// and split-keys containers.
+func isCharonNode(container string) bool {
+	s := serviceLabel(container)
+	const marker = "-charon-charon-"
+	i := strings.LastIndex(s, marker)
+	if i < 0 {
+		return false
+	}
+	suffix := s[i+len(marker):]
+	if suffix == "" {
+		return false
+	}
+	_, err := strconv.Atoi(suffix)
+	return err == nil
+}
+
+// firstWithPrefix returns the first container whose service label starts with
+// prefix, or "".
+func firstWithPrefix(sorted []string, prefix string) string {
+	for _, c := range sorted {
+		if strings.HasPrefix(serviceLabel(c), prefix) {
+			return c
+		}
+	}
+	return ""
 }
 
 // captureFailureLogs dumps the targeted logs for a failing run into a gzipped
 // tarball under cfg.logDir and returns its path plus a short excerpt (error
 // lines from a Charon node) for the Slack message. Best-effort: on any problem
-// it returns whatever it managed (possibly ""), never panicking. Assumes a
-// single enclave is running (the cycler tears down between runs), so it scopes
-// targets by service-name pattern rather than by enclave label.
-func captureFailureLogs(cfg config, name string, cycle int) (archivePath, excerpt string) {
+// it returns whatever it managed (possibly ""), never panicking. Containers are
+// scoped to this enclave via kurtosis's enclave-name label so a leftover
+// container from a prior run can never be captured; -a is kept so a crashed
+// container's logs (e.g. a VC that exited) are still collected.
+func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePath, excerpt string) {
 	defer func() { _ = recover() }()
 
-	out, err := runCommand("docker", "ps", "-a", "--format", "{{.Names}}")
+	out, err := runCommand("docker", "ps", "-a",
+		"--filter", "label=com.kurtosistech.enclave-name="+enclave,
+		"--format", "{{.Names}}")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "dv-cycler: log capture: docker ps failed: %v\n", err)
 		return "", ""
@@ -1670,7 +1726,7 @@ func runOne(cfg config, paramFile, name string, cycle int) (result reportData) {
 	if data.status != "ok" {
 		// Capture BN/Charon/VC logs while the enclave is still up (teardown is
 		// deferred), for post-mortem of a failing/degraded combo.
-		data.logArchivePath, data.logExcerpt = captureFailureLogs(cfg, name, cycle)
+		data.logArchivePath, data.logExcerpt = captureFailureLogs(cfg, enclave, name, cycle)
 	}
 	postBestEffort(cfg, data)
 	if data.logArchivePath != "" {

@@ -1277,26 +1277,36 @@ func keysOf(m map[string]string) []string {
 }
 
 func TestSelectLogTargets(t *testing.T) {
+	// Models a lodestar-nimbus enclave: a fixed lighthouse bootstrap (cl-1/cl-2)
+	// plus the DV participant (node index 3) whose CL is lodestar and whose 4
+	// Charon nodes each run a Nimbus VC. The BN must be the DV's cl-3-lodestar,
+	// NOT the lexically-first cl-1-lighthouse bootstrap.
 	containers := []string{
-		"vc-3-geth-lighthouse-charon-vc-2-nimbus--hh2",
-		"cl-2-lighthouse-geth--x",
-		"vc-3-geth-lighthouse-charon-charon-1--h1",
-		"cl-1-lighthouse-geth--y",
-		"el-1-geth-lighthouse--z",
-		"vc-3-geth-lighthouse-charon-vc-0-nimbus--hh0",
-		"vc-3-geth-lighthouse-charon-charon-0--h0",
-		"prometheus--p",
-		"vc-1-geth-lighthouse--boot", // bootstrap (non-DV) VC: must NOT be picked
+		"cl-1-lighthouse-geth--a",
+		"cl-2-lighthouse-geth--b",
+		"cl-3-lodestar-geth--c",
+		"el-1-geth-lighthouse--d",
+		"vc-1-geth-lighthouse--e", // bootstrap VC: not a DV VC
+		"vc-3-geth-lodestar-charon-charon-0--f",
+		"vc-3-geth-lodestar-charon-charon-1--g",
+		"vc-3-geth-lodestar-charon-charon-relay-2--h",      // helper: excluded
+		"vc-3-geth-lodestar-charon-charon-split-keys-2--i", // helper: excluded
+		"vc-3-geth-lodestar-charon-vc-0-nimbus--j",
+		"vc-3-geth-lodestar-charon-vc-1-nimbus--k",
+		"prometheus--l",
 	}
 	bn, dv, vcs := selectLogTargets(containers)
-	if bn != "cl-1-lighthouse-geth--y" {
-		t.Errorf("bn = %q, want the lexically-first cl-* (cl-1)", bn)
+	if bn != "cl-3-lodestar-geth--c" {
+		t.Errorf("bn = %q, want the DV's cl-3-lodestar (not the lighthouse bootstrap)", bn)
+	}
+	if strings.Contains(bn, "lighthouse") {
+		t.Errorf("bn = %q must not be the lighthouse bootstrap node", bn)
 	}
 	if len(dv) != 2 || !strings.Contains(dv[0], "charon-charon-0") || !strings.Contains(dv[1], "charon-charon-1") {
-		t.Errorf("dvNodes = %v, want the two charon-charon nodes sorted", dv)
+		t.Errorf("dvNodes = %v, want exactly the 2 numbered charon nodes (relay/split-keys excluded)", dv)
 	}
-	if len(vcs) != 2 || !strings.Contains(vcs[0], "-vc-0-") || !strings.Contains(vcs[1], "-vc-2-") {
-		t.Errorf("vcs = %v, want the two charon-vc clients sorted", vcs)
+	if len(vcs) != 2 || !strings.Contains(vcs[0], "-vc-0-") || !strings.Contains(vcs[1], "-vc-1-") {
+		t.Errorf("vcs = %v, want the two charon-vc clients", vcs)
 	}
 }
 
@@ -1306,11 +1316,12 @@ func TestCaptureFailureLogs(t *testing.T) {
 	nowFn = func() time.Time { return time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC) }
 
 	psOut := strings.Join([]string{
-		"cl-1-lighthouse-geth--a",
-		"el-1-geth-lighthouse--b",
-		"vc-3-geth-lighthouse-charon-charon-0--c",
-		"vc-3-geth-lighthouse-charon-vc-0-nimbus--d",
-		"prometheus--e",
+		"cl-1-lighthouse-geth--a", // bootstrap CL: must NOT be captured
+		"cl-3-lodestar-geth--b",   // DV CL: the one to capture
+		"el-3-geth-lodestar--c",
+		"vc-3-geth-lodestar-charon-charon-0--d",
+		"vc-3-geth-lodestar-charon-vc-0-nimbus--e",
+		"prometheus--f",
 	}, "\n")
 	runCommand = func(name string, args ...string) (string, error) {
 		if name == "docker" && len(args) > 0 && args[0] == "ps" {
@@ -1327,34 +1338,37 @@ func TestCaptureFailureLogs(t *testing.T) {
 	}
 
 	logDir := t.TempDir()
-	archive, excerpt := captureFailureLogs(config{logDir: logDir}, "lighthouse-nimbus", 2)
+	archive, excerpt := captureFailureLogs(config{logDir: logDir}, "c2-lodestar-nimbus", "lodestar-nimbus", 2)
 	if archive == "" {
 		t.Fatal("archive path empty")
 	}
 	if filepath.Dir(archive) != logDir {
 		t.Errorf("archive %q not under logDir %q", archive, logDir)
 	}
-	if base := filepath.Base(archive); base != "cycle2-lighthouse-nimbus-20260731-120000.tar.gz" {
+	if base := filepath.Base(archive); base != "cycle2-lodestar-nimbus-20260731-120000.tar.gz" {
 		t.Errorf("archive name = %q", base)
 	}
 
 	got := readTarGz(t, archive)
 	for _, want := range []string{
-		"cl-1-lighthouse-geth.log",
-		"vc-3-geth-lighthouse-charon-charon-0.log",
-		"vc-3-geth-lighthouse-charon-vc-0-nimbus.log",
+		"cl-3-lodestar-geth.log", // the DV's CL, not the bootstrap
+		"vc-3-geth-lodestar-charon-charon-0.log",
+		"vc-3-geth-lodestar-charon-vc-0-nimbus.log",
 	} {
 		if _, ok := got[want]; !ok {
 			t.Errorf("archive missing %s; has %v", want, keysOf(got))
 		}
 	}
-	if _, bad := got["el-1-geth-lighthouse.log"]; bad {
+	if _, bad := got["cl-1-lighthouse-geth.log"]; bad {
+		t.Error("bootstrap lighthouse CL must NOT be captured for a lodestar combo")
+	}
+	if _, bad := got["el-3-geth-lodestar.log"]; bad {
 		t.Error("EL log should NOT be captured (only BN/Charon/VC)")
 	}
 	if _, bad := got["prometheus.log"]; bad {
 		t.Error("prometheus log should NOT be captured")
 	}
-	if !strings.Contains(got["vc-3-geth-lighthouse-charon-charon-0.log"], "something bad happened") {
+	if !strings.Contains(got["vc-3-geth-lodestar-charon-charon-0.log"], "something bad happened") {
 		t.Error("charon-0 log content missing from archive")
 	}
 	if !strings.Contains(excerpt, "something bad happened") {
