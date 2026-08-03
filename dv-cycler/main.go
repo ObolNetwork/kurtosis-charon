@@ -984,7 +984,11 @@ func slackPost(webhookURL, text string, blocks []map[string]any) error {
 // non-zero exit (runCommand's error already reflects that, as it does for
 // os/exec.Cmd.CombinedOutput).
 func kurtosisRun(enclave, pkg, argsFile string) error {
-	out, err := runCommand("kurtosis", "run", "--enclave", enclave, pkg, "--args-file", argsFile)
+	// --image-download always so moving tags (the param files pin
+	// obolnetwork/charon:next) are re-pulled every run; otherwise Kurtosis's
+	// default ("missing") keeps using a stale locally-cached image and the
+	// cycler silently tests old client/Charon builds.
+	out, err := runCommand("kurtosis", "run", "--enclave", enclave, "--image-download", "always", pkg, "--args-file", argsFile)
 	if err != nil {
 		return fmt.Errorf("kurtosis run failed for %s: %w (output: %s)", enclave, err, strings.TrimSpace(out))
 	}

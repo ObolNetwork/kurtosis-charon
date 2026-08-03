@@ -835,7 +835,7 @@ func TestKurtosisRunAndRemove(t *testing.T) {
 	if err := kurtosisRun("c1-teku-prysm", "pkg@ref", "/tmp/args.yaml"); err != nil {
 		t.Fatalf("kurtosisRun error: %v", err)
 	}
-	want := []string{"kurtosis", "run", "--enclave", "c1-teku-prysm", "pkg@ref", "--args-file", "/tmp/args.yaml"}
+	want := []string{"kurtosis", "run", "--enclave", "c1-teku-prysm", "--image-download", "always", "pkg@ref", "--args-file", "/tmp/args.yaml"}
 	if !reflect.DeepEqual(captured, want) {
 		t.Errorf("captured argv = %v, want %v", captured, want)
 	}

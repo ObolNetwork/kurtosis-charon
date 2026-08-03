@@ -26,6 +26,12 @@ The directory is re-scanned (sorted lexically) on every loop iteration, so:
   pins. Edit the file, commit, push to `CYCLER_REPO_PATH`; the next time
   that file comes up in rotation (after the cycler's per-run `git pull`) it
   launches with the new pin.
+- **Moving tags are always re-pulled.** The cycler runs `kurtosis run` with
+  `--image-download always`, so a moving tag like `obolnetwork/charon:next`
+  picks up a freshly-built image on the next run rather than reusing a stale
+  locally-cached one (Kurtosis's default `missing` policy would never re-pull
+  it). A rebuilt `:next` therefore lands on the next combo launch — no param
+  file edit needed.
 - **Removing a file removes it from rotation** the same way, on the next
   full pass.
 
