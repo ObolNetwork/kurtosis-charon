@@ -16,7 +16,7 @@ participants:
     supernode: true
     use_separate_vc: true
     vc_type: charon
-    vc_image: obolnetwork/charon:next
+    vc_image: obolnetwork/charon:v1.11.0-rc2
     charon_node_count: 4
     charon_params:
       charon_vc: prysm
@@ -32,7 +32,7 @@ network_params:
   shard_committee_period: 1
   prefunded_accounts: '{"0xb9e79D19f651a941757b35830232E7EFC77E1c79": {"balance": "100000ETH"}}'
 wait_for_finalization: false
-global_log_level: info
+global_log_level: debug
 parallel_keystore_generation: false
 mev_type: flashbots
 mev_params:

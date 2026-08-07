@@ -458,7 +458,6 @@ func TestLoadConfig(t *testing.T) {
 		t.Setenv("CYCLER_MONITORING_TOKEN", "")
 		t.Setenv("CYCLER_PACKAGE_REF", "")
 		t.Setenv("CYCLER_RUN_MINUTES", "")
-		t.Setenv("CYCLER_WARMUP_MINUTES", "")
 		t.Setenv("CYCLER_STARTUP_DEADLINE_MINUTES", "")
 		t.Setenv("CYCLER_SAMPLE_INTERVAL_S", "")
 		t.Setenv("CYCLER_INTER_RUN_BACKOFF_S", "")
@@ -481,8 +480,8 @@ func TestLoadConfig(t *testing.T) {
 		if cfg.paramsDir != wantParamsDir {
 			t.Errorf("paramsDir = %q, want %q", cfg.paramsDir, wantParamsDir)
 		}
-		if cfg.runMinutes != 90 || cfg.warmupMinutes != 15 {
-			t.Errorf("runMinutes/warmupMinutes = %d/%d, want 90/15", cfg.runMinutes, cfg.warmupMinutes)
+		if cfg.runMinutes != 90 {
+			t.Errorf("runMinutes = %d, want 90", cfg.runMinutes)
 		}
 		if !strings.HasSuffix(cfg.packageRef, "ethereum-package@charon") {
 			t.Errorf("packageRef = %q", cfg.packageRef)
@@ -926,7 +925,7 @@ func TestRunOnePreLaunchFailurePostsFailed(t *testing.T) {
 
 	cfg := config{
 		slackWebhookURL: "http://hook", repoPath: "/nonexistent", packageRef: "pkg",
-		runMinutes: 1, warmupMinutes: 0, startupDeadlineMinutes: 1, sampleIntervalS: 1,
+		runMinutes: 1, startupDeadlineMinutes: 1, sampleIntervalS: 1,
 	}
 	data := runOne(cfg, paramFile, "teku-prysm", 1)
 	if data.status != "failed" {
@@ -964,7 +963,7 @@ func TestRunOneLaunchFailureTearsDown(t *testing.T) {
 
 	cfg := config{
 		slackWebhookURL: "http://hook", repoPath: dir, packageRef: "pkg",
-		runMinutes: 1, warmupMinutes: 0, startupDeadlineMinutes: 1, sampleIntervalS: 1,
+		runMinutes: 1, startupDeadlineMinutes: 1, sampleIntervalS: 1,
 	}
 	data := runOne(cfg, paramFile, "teku-prysm", 1)
 	if data.status != "failed" {
@@ -1015,7 +1014,7 @@ func TestRunOneMidRunFailureTearsDownAndPosts(t *testing.T) {
 
 	cfg := config{
 		slackWebhookURL: "http://hook", repoPath: dir, packageRef: "pkg",
-		runMinutes: 1, warmupMinutes: 0, startupDeadlineMinutes: 1, sampleIntervalS: 1,
+		runMinutes: 1, startupDeadlineMinutes: 1, sampleIntervalS: 1,
 	}
 	data := runOne(cfg, paramFile, "teku-prysm", 1)
 	if data.status != "failed" {
@@ -1078,7 +1077,7 @@ func TestRunOneRecoversFromPanicAfterLaunch(t *testing.T) {
 
 	cfg := config{
 		slackWebhookURL: "http://hook", repoPath: dir, packageRef: "pkg",
-		runMinutes: 1, warmupMinutes: 0, startupDeadlineMinutes: 1, sampleIntervalS: 1,
+		runMinutes: 1, startupDeadlineMinutes: 1, sampleIntervalS: 1,
 	}
 
 	data := runOne(cfg, paramFile, "teku-prysm", 1) // must not panic out of this call
@@ -1141,7 +1140,7 @@ func TestRunOneHappyPathOK(t *testing.T) {
 
 	cfg := config{
 		slackWebhookURL: "http://hook", repoPath: dir, packageRef: "pkg",
-		runMinutes: 2, warmupMinutes: 1, startupDeadlineMinutes: 1, sampleIntervalS: 1,
+		runMinutes: 2, startupDeadlineMinutes: 1, sampleIntervalS: 1,
 	}
 	data := runOne(cfg, paramFile, "teku-prysm", 1)
 	if data.status != "ok" {
@@ -1150,7 +1149,7 @@ func TestRunOneHappyPathOK(t *testing.T) {
 	if data.clusterName != "kurtosis-teku-prysm" {
 		t.Errorf("clusterName = %q, want kurtosis-teku-prysm", data.clusterName)
 	}
-	windowS := cfg.runMinutes*60 - cfg.warmupMinutes*60
+	windowS := cfg.runMinutes * 60
 	wantWindow := fmtWindow(fixedNow.Add(-time.Duration(windowS)*time.Second), fixedNow)
 	if data.window != wantWindow {
 		t.Errorf("window = %q, want %q", data.window, wantWindow)
@@ -1176,7 +1175,7 @@ func TestHealthCheckStatusGatedByToggle(t *testing.T) {
 
 	// Default (disabled): a firing health check must NOT downgrade an otherwise
 	// healthy run.
-	data, err := collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, hostStats{})
+	data, err := collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, nil, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
@@ -1188,7 +1187,7 @@ func TestHealthCheckStatusGatedByToggle(t *testing.T) {
 	oldFlag := reportHealthChecks
 	reportHealthChecks = true
 	defer func() { reportHealthChecks = oldFlag }()
-	data, err = collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, hostStats{})
+	data, err = collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, nil, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
@@ -1217,7 +1216,7 @@ func TestDegradedTolerance(t *testing.T) {
 	}
 
 	httpGet = mkResp(99.9)
-	data, err := collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, hostStats{})
+	data, err := collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, nil, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
@@ -1226,7 +1225,7 @@ func TestDegradedTolerance(t *testing.T) {
 	}
 
 	httpGet = mkResp(95)
-	data, err = collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, hostStats{})
+	data, err = collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, nil, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
@@ -1323,16 +1322,29 @@ func TestCaptureFailureLogs(t *testing.T) {
 		"vc-3-geth-lodestar-charon-vc-0-nimbus--e",
 		"prometheus--f",
 	}, "\n")
+	dockerLogsCalled := false
 	runCommand = func(name string, args ...string) (string, error) {
 		if name == "docker" && len(args) > 0 && args[0] == "ps" {
 			return psOut + "\n", nil
 		}
-		if name == "docker" && len(args) > 0 && args[0] == "logs" {
-			c := args[len(args)-1]
-			if strings.Contains(c, "charon-charon-0") {
+		// Logs must come from the kurtosis log aggregator (complete history),
+		// not docker's local ring buffer.
+		if name == "kurtosis" && len(args) >= 5 && args[0] == "service" && args[1] == "logs" && args[2] == "-a" {
+			if args[3] != "c2-lodestar-nimbus" {
+				return "", fmt.Errorf("unexpected enclave %q", args[3])
+			}
+			svc := args[len(args)-1]
+			if strings.Contains(svc, "--") {
+				return "", fmt.Errorf("service name %q must not contain the docker container hash suffix", svc)
+			}
+			if strings.Contains(svc, "charon-charon-0") {
 				return "INFO all good\nERRO something bad happened\n", nil
 			}
-			return "log for " + c + "\n", nil
+			return "log for " + svc + "\n", nil
+		}
+		if name == "docker" && len(args) > 0 && args[0] == "logs" {
+			dockerLogsCalled = true
+			return "docker ring buffer content\n", nil
 		}
 		return "", nil
 	}
@@ -1373,6 +1385,39 @@ func TestCaptureFailureLogs(t *testing.T) {
 	}
 	if !strings.Contains(excerpt, "something bad happened") {
 		t.Errorf("excerpt missing the error line: %q", excerpt)
+	}
+	if dockerLogsCalled {
+		t.Error("docker logs must not be used when kurtosis service logs succeeds")
+	}
+}
+
+func TestFetchServiceLogsFallback(t *testing.T) {
+	oldRun := runCommand
+	defer func() { runCommand = oldRun }()
+
+	// Kurtosis aggregator unavailable -> fall back to docker logs.
+	runCommand = func(name string, args ...string) (string, error) {
+		if name == "kurtosis" {
+			return "", fmt.Errorf("engine unreachable")
+		}
+		if name == "docker" && args[0] == "logs" && args[1] == "vc-3-x-charon-charon-0--abc" {
+			return "ring buffer logs\n", nil
+		}
+		return "", nil
+	}
+	if got := fetchServiceLogs("c1-x", "vc-3-x-charon-charon-0--abc"); got != "ring buffer logs\n" {
+		t.Errorf("fallback logs = %q, want docker ring buffer content", got)
+	}
+
+	// Kurtosis succeeding but empty also falls back (a service kurtosis lost).
+	runCommand = func(name string, args ...string) (string, error) {
+		if name == "kurtosis" {
+			return "  \n", nil
+		}
+		return "docker content\n", nil
+	}
+	if got := fetchServiceLogs("c1-x", "svc--abc"); got != "docker content\n" {
+		t.Errorf("empty-kurtosis fallback = %q, want docker content", got)
 	}
 }
 
@@ -1685,5 +1730,66 @@ func TestLoadMatrixRoundTrip(t *testing.T) {
 		if strings.HasSuffix(e.Name(), ".tmp") {
 			t.Errorf("leftover tmp file: %s", e.Name())
 		}
+	}
+}
+
+func TestSubtractEpoch0(t *testing.T) {
+	expected := []sample{
+		{labels: map[string]string{"cluster_peer": "0", "duty": "attester"}, value: 100},
+		{labels: map[string]string{"cluster_peer": "0", "duty": "aggregator"}, value: 50},
+		{labels: map[string]string{"cluster_peer": "1", "duty": "attester"}, value: 100},
+	}
+
+	epoch0 := map[string]float64{"attester": 10, "aggregator": 5}
+	got := subtractEpoch0(expected, epoch0)
+
+	if got[0].value != 90 {
+		t.Errorf("attester peer-0: got %v, want 90", got[0].value)
+	}
+	if got[1].value != 45 {
+		t.Errorf("aggregator peer-0: got %v, want 45", got[1].value)
+	}
+	if got[2].value != 90 {
+		t.Errorf("attester peer-1: got %v, want 90", got[2].value)
+	}
+
+	// nil map should be a no-op.
+	unchanged := subtractEpoch0(expected, nil)
+	for i, s := range unchanged {
+		if s.value != expected[i].value {
+			t.Errorf("nil map: sample %d changed from %v to %v", i, expected[i].value, s.value)
+		}
+	}
+}
+
+func TestCountEpoch0FailuresLogParsing(t *testing.T) {
+	oldRun := runCommand
+	defer func() { runCommand = oldRun }()
+
+	charonLogs := strings.Join([]string{
+		`14:05:32.123 WARN tracker Duty failed {"duty": "3/aggregator", "step": "fetcher", "reason": "insufficient_peer_signatures"}`,
+		`14:05:32.200 WARN tracker Duty failed {"duty": "15/attester", "step": "consensus", "reason": "no_consensus"}`,
+		`14:05:33.000 WARN tracker Duty failed {"duty": "31/aggregator", "step": "fetcher", "reason": "insufficient_peer_signatures"}`,
+		`14:06:00.000 WARN tracker Duty failed {"duty": "32/aggregator", "step": "fetcher", "reason": "insufficient_peer_signatures"}`,
+		`14:06:10.000 WARN tracker Duty failed {"duty": "100/attester", "step": "consensus", "reason": "no_consensus"}`,
+		`14:06:20.000 INFO tracker All peers participated in duty {"duty": "10/attester"}`,
+	}, "\n")
+
+	runCommand = func(name string, args ...string) (string, error) {
+		if name == "docker" && len(args) > 0 && args[0] == "ps" {
+			return "vc-3-teku-prysm-charon-charon-0--abc123\n", nil
+		}
+		if name == "kurtosis" && len(args) > 0 && args[0] == "service" {
+			return charonLogs, nil
+		}
+		return "", nil
+	}
+
+	got := countEpoch0Failures("test-enclave")
+	if got["aggregator"] != 2 {
+		t.Errorf("aggregator = %v, want 2", got["aggregator"])
+	}
+	if got["attester"] != 1 {
+		t.Errorf("attester = %v, want 1", got["attester"])
 	}
 }

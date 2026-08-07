@@ -26,6 +26,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -48,7 +49,6 @@ type config struct {
 	monitoringToken        string
 	packageRef             string
 	runMinutes             int
-	warmupMinutes          int
 	startupDeadlineMinutes int
 	sampleIntervalS        int
 	interRunBackoffS       int
@@ -170,10 +170,6 @@ func applyFlags(cfg *config, args []string) {
 			if n, err := strconv.Atoi(val); err == nil {
 				cfg.runMinutes = n
 			}
-		case "warmup-minutes":
-			if n, err := strconv.Atoi(val); err == nil {
-				cfg.warmupMinutes = n
-			}
 		case "startup-deadline-minutes":
 			if n, err := strconv.Atoi(val); err == nil {
 				cfg.startupDeadlineMinutes = n
@@ -198,7 +194,6 @@ func loadConfig() (config, error) {
 	cfg := config{
 		packageRef:             "github.com/ObolNetwork/ethereum-package@charon",
 		runMinutes:             90,
-		warmupMinutes:          15,
 		startupDeadlineMinutes: 25,
 		sampleIntervalS:        15,
 		interRunBackoffS:       30,
@@ -217,7 +212,6 @@ func loadConfig() (config, error) {
 	envStr("RESULTS_PATH", &cfg.resultsPath)
 	envStr("SUMMARY_MENTION", &cfg.summaryMention)
 	envInt("RUN_MINUTES", &cfg.runMinutes)
-	envInt("WARMUP_MINUTES", &cfg.warmupMinutes)
 	envInt("STARTUP_DEADLINE_MINUTES", &cfg.startupDeadlineMinutes)
 	envInt("SAMPLE_INTERVAL_S", &cfg.sampleIntervalS)
 	envInt("INTER_RUN_BACKOFF_S", &cfg.interRunBackoffS)
@@ -1151,6 +1145,73 @@ func waitHealthy(baseURL string, deadlineS int) bool {
 // collectReport: assemble the post-run report.
 // ---------------------------------------------------------------------------
 
+const slotsPerEpoch = 32
+
+var dutyFailedRe = regexp.MustCompile(`"duty"\s*:\s*"(\d+)/([^"]+)"`)
+
+// countEpoch0Failures fetches charon logs from the enclave and counts
+// "Duty failed" lines whose slot falls in epoch 0 (slot < 32). Returns a
+// map from duty type (e.g. "aggregator") to the number of epoch-0 failures.
+// Best-effort: returns an empty map on any error so scoring falls back to
+// the unfiltered Prometheus totals.
+func countEpoch0Failures(enclave string) map[string]float64 {
+	counts := map[string]float64{}
+
+	out, err := runCommand("docker", "ps", "-a",
+		"--filter", "label=com.kurtosistech.enclave-name="+enclave,
+		"--format", "{{.Names}}")
+	if err != nil {
+		return counts
+	}
+	var containers []string
+	for _, ln := range strings.Split(out, "\n") {
+		if ln = strings.TrimSpace(ln); ln != "" {
+			containers = append(containers, ln)
+		}
+	}
+	_, dvNodes, _ := selectLogTargets(containers)
+	if len(dvNodes) == 0 {
+		return counts
+	}
+
+	logs := fetchServiceLogs(enclave, dvNodes[0])
+	for _, line := range strings.Split(logs, "\n") {
+		if !strings.Contains(line, "Duty failed") {
+			continue
+		}
+		m := dutyFailedRe.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		slot, err := strconv.Atoi(m[1])
+		if err != nil || slot >= slotsPerEpoch {
+			continue
+		}
+		counts[m[2]]++
+	}
+	return counts
+}
+
+// subtractEpoch0 reduces the expected-duty Prometheus samples by the
+// per-type epoch-0 failure counts. The reduction is applied equally to
+// every cluster_peer because epoch-0 failures are cluster-wide (all nodes
+// see the same duties fail).
+func subtractEpoch0(expected []sample, epoch0 map[string]float64) []sample {
+	if len(epoch0) == 0 {
+		return expected
+	}
+	out := make([]sample, len(expected))
+	for i, s := range expected {
+		d := s.labels["duty"]
+		adj := s.value - epoch0[d]
+		if adj < 0 {
+			adj = 0
+		}
+		out[i] = sample{labels: s.labels, value: adj}
+	}
+	return out
+}
+
 // degradedPctThreshold: below this per-duty success pct on the worst node,
 // or with any health check firing now, a run's status is downgraded from
 // "ok" to "degraded".
@@ -1162,7 +1223,11 @@ const degradedPctThreshold = 99.5
 // caller, which builds the failed report). window is always filled in by
 // the caller afterwards, since it's derived from wall-clock time, not from
 // anything collectReport queries.
-func collectReport(baseURL, name, clusterName string, cycle, windowS int, host hostStats) (reportData, error) {
+//
+// epoch0Failures contains per-duty-type failure counts from epoch 0
+// (parsed from charon logs). These are subtracted from the expected
+// duty counts so that genesis-epoch warmup failures do not affect scoring.
+func collectReport(baseURL, name, clusterName string, cycle, windowS int, epoch0Failures map[string]float64, host hostStats) (reportData, error) {
 	expected, err := promQuery(baseURL, promDutyExpected(clusterName, windowS))
 	if err != nil {
 		return reportData{}, err
@@ -1171,6 +1236,7 @@ func collectReport(baseURL, name, clusterName string, cycle, windowS int, host h
 	if err != nil {
 		return reportData{}, err
 	}
+	expected = subtractEpoch0(expected, epoch0Failures)
 	worst, ok := selectWorstNode(expected, success)
 	var worstPtr *worstNode
 	if ok {
@@ -1360,13 +1426,28 @@ func firstWithPrefix(sorted []string, prefix string) string {
 	return ""
 }
 
+// fetchServiceLogs returns a service's log history for the archive. The
+// preferred source is kurtosis's log aggregator ("kurtosis service logs -a"),
+// which retains the complete run: the containers log via the fluentd driver,
+// so "docker logs" only serves a local ring buffer that a chatty (debug-level)
+// container can wrap in ~20 minutes, silently dropping the start of the run.
+// Falls back to "docker logs" when kurtosis yields nothing (aggregator down).
+func fetchServiceLogs(enclave, container string) string {
+	logs, err := runCommand("kurtosis", "service", "logs", "-a", enclave, serviceLabel(container))
+	if err == nil && strings.TrimSpace(logs) != "" {
+		return logs
+	}
+	fallback, _ := runCommand("docker", "logs", container)
+	return fallback
+}
+
 // captureFailureLogs dumps the targeted logs for a failing run into a gzipped
 // tarball under cfg.logDir and returns its path plus a short excerpt (error
 // lines from a Charon node) for the Slack message. Best-effort: on any problem
 // it returns whatever it managed (possibly ""), never panicking. Containers are
 // scoped to this enclave via kurtosis's enclave-name label so a leftover
-// container from a prior run can never be captured; -a is kept so a crashed
-// container's logs (e.g. a VC that exited) are still collected.
+// container from a prior run can never be captured; docker ps -a is kept so a
+// crashed container (e.g. a VC that exited) is still discovered and captured.
 func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePath, excerpt string) {
 	defer func() { _ = recover() }()
 
@@ -1403,7 +1484,7 @@ func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePat
 	defer os.RemoveAll(staging)
 
 	for _, c := range targets {
-		logs, _ := runCommand("docker", "logs", c) // capture whatever exists
+		logs := fetchServiceLogs(enclave, c) // capture whatever exists
 		_ = os.WriteFile(filepath.Join(staging, serviceLabel(c)+".log"), []byte(logs), 0o644)
 	}
 
@@ -1650,7 +1731,7 @@ func runWindow(cfg config, name string, cycle int, enclave string) reportData {
 	}
 
 	end := nowFn()
-	windowS := cfg.runMinutes*60 - cfg.warmupMinutes*60
+	windowS := cfg.runMinutes * 60
 	if windowS < 1 {
 		windowS = 1
 	}
@@ -1659,7 +1740,8 @@ func runWindow(cfg config, name string, cycle int, enclave string) reportData {
 	close(stopCh)
 	host := <-sampleDone
 
-	data, err := collectReport(baseURL, name, clusterName, cycle, windowS, host)
+	epoch0Failures := countEpoch0Failures(enclave)
+	data, err := collectReport(baseURL, name, clusterName, cycle, windowS, epoch0Failures, host)
 	if err != nil {
 		return failedReport(name, cycle, err.Error())
 	}
