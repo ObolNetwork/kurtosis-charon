@@ -1323,16 +1323,29 @@ func TestCaptureFailureLogs(t *testing.T) {
 		"vc-3-geth-lodestar-charon-vc-0-nimbus--e",
 		"prometheus--f",
 	}, "\n")
+	dockerLogsCalled := false
 	runCommand = func(name string, args ...string) (string, error) {
 		if name == "docker" && len(args) > 0 && args[0] == "ps" {
 			return psOut + "\n", nil
 		}
-		if name == "docker" && len(args) > 0 && args[0] == "logs" {
-			c := args[len(args)-1]
-			if strings.Contains(c, "charon-charon-0") {
+		// Logs must come from the kurtosis log aggregator (complete history),
+		// not docker's local ring buffer.
+		if name == "kurtosis" && len(args) >= 5 && args[0] == "service" && args[1] == "logs" && args[2] == "-a" {
+			if args[3] != "c2-lodestar-nimbus" {
+				return "", fmt.Errorf("unexpected enclave %q", args[3])
+			}
+			svc := args[len(args)-1]
+			if strings.Contains(svc, "--") {
+				return "", fmt.Errorf("service name %q must not contain the docker container hash suffix", svc)
+			}
+			if strings.Contains(svc, "charon-charon-0") {
 				return "INFO all good\nERRO something bad happened\n", nil
 			}
-			return "log for " + c + "\n", nil
+			return "log for " + svc + "\n", nil
+		}
+		if name == "docker" && len(args) > 0 && args[0] == "logs" {
+			dockerLogsCalled = true
+			return "docker ring buffer content\n", nil
 		}
 		return "", nil
 	}
@@ -1373,6 +1386,39 @@ func TestCaptureFailureLogs(t *testing.T) {
 	}
 	if !strings.Contains(excerpt, "something bad happened") {
 		t.Errorf("excerpt missing the error line: %q", excerpt)
+	}
+	if dockerLogsCalled {
+		t.Error("docker logs must not be used when kurtosis service logs succeeds")
+	}
+}
+
+func TestFetchServiceLogsFallback(t *testing.T) {
+	oldRun := runCommand
+	defer func() { runCommand = oldRun }()
+
+	// Kurtosis aggregator unavailable -> fall back to docker logs.
+	runCommand = func(name string, args ...string) (string, error) {
+		if name == "kurtosis" {
+			return "", fmt.Errorf("engine unreachable")
+		}
+		if name == "docker" && args[0] == "logs" && args[1] == "vc-3-x-charon-charon-0--abc" {
+			return "ring buffer logs\n", nil
+		}
+		return "", nil
+	}
+	if got := fetchServiceLogs("c1-x", "vc-3-x-charon-charon-0--abc"); got != "ring buffer logs\n" {
+		t.Errorf("fallback logs = %q, want docker ring buffer content", got)
+	}
+
+	// Kurtosis succeeding but empty also falls back (a service kurtosis lost).
+	runCommand = func(name string, args ...string) (string, error) {
+		if name == "kurtosis" {
+			return "  \n", nil
+		}
+		return "docker content\n", nil
+	}
+	if got := fetchServiceLogs("c1-x", "svc--abc"); got != "docker content\n" {
+		t.Errorf("empty-kurtosis fallback = %q, want docker content", got)
 	}
 }
 

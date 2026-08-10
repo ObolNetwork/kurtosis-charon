@@ -1360,13 +1360,28 @@ func firstWithPrefix(sorted []string, prefix string) string {
 	return ""
 }
 
+// fetchServiceLogs returns a service's log history for the archive. The
+// preferred source is kurtosis's log aggregator ("kurtosis service logs -a"),
+// which retains the complete run: the containers log via the fluentd driver,
+// so "docker logs" only serves a local ring buffer that a chatty (debug-level)
+// container can wrap in ~20 minutes, silently dropping the start of the run.
+// Falls back to "docker logs" when kurtosis yields nothing (aggregator down).
+func fetchServiceLogs(enclave, container string) string {
+	logs, err := runCommand("kurtosis", "service", "logs", "-a", enclave, serviceLabel(container))
+	if err == nil && strings.TrimSpace(logs) != "" {
+		return logs
+	}
+	fallback, _ := runCommand("docker", "logs", container)
+	return fallback
+}
+
 // captureFailureLogs dumps the targeted logs for a failing run into a gzipped
 // tarball under cfg.logDir and returns its path plus a short excerpt (error
 // lines from a Charon node) for the Slack message. Best-effort: on any problem
 // it returns whatever it managed (possibly ""), never panicking. Containers are
 // scoped to this enclave via kurtosis's enclave-name label so a leftover
-// container from a prior run can never be captured; -a is kept so a crashed
-// container's logs (e.g. a VC that exited) are still collected.
+// container from a prior run can never be captured; docker ps -a is kept so a
+// crashed container (e.g. a VC that exited) is still discovered and captured.
 func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePath, excerpt string) {
 	defer func() { _ = recover() }()
 
@@ -1403,7 +1418,7 @@ func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePat
 	defer os.RemoveAll(staging)
 
 	for _, c := range targets {
-		logs, _ := runCommand("docker", "logs", c) // capture whatever exists
+		logs := fetchServiceLogs(enclave, c) // capture whatever exists
 		_ = os.WriteFile(filepath.Join(staging, serviceLabel(c)+".log"), []byte(logs), 0o644)
 	}
 
