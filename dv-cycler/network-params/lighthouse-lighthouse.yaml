@@ -16,7 +16,7 @@ participants:
     supernode: true
     use_separate_vc: true
     vc_type: charon
-    vc_image: obolnetwork/charon:next
+    vc_image: obolnetwork/charon:56d1f22
     charon_node_count: 4
     charon_params:
       charon_vc: lighthouse
