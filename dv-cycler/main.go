@@ -1321,6 +1321,9 @@ func fmtWindow(start, end time.Time) string {
 // pins file the cycler no longer reads -- pins are now inline in each
 // static network-params file), so this is now a plain constructor.
 func failedReport(name string, cycle int, errMsg string) reportData {
+	// Mirror the failure to stderr so the local log carries the diagnosis;
+	// otherwise the only copy of the kurtosis error output lives in Slack.
+	fmt.Fprintf(os.Stderr, "dv-cycler: %s cycle %d failed: %s\n", name, cycle, errMsg)
 	return reportData{
 		name:   name,
 		cycle:  cycle,
