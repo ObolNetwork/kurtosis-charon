@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -566,6 +567,12 @@ func selectWorstNode(expected, success []sample) (worstNode, bool) {
 	}
 
 	return worstNode{peer: worst, duties: results}, true
+}
+
+func roundSamples(samples []sample) {
+	for i := range samples {
+		samples[i].value = math.Round(samples[i].value)
+	}
 }
 
 func maxValue(samples []sample) (float64, bool) {
@@ -1145,17 +1152,24 @@ func waitHealthy(baseURL string, deadlineS int) bool {
 // collectReport: assemble the post-run report.
 // ---------------------------------------------------------------------------
 
-const slotsPerEpoch = 32
+const warmupSlots = 64 // exclude epochs 0 and 1 (2 × 32 slots)
 
-var dutyFailedRe = regexp.MustCompile(`"duty"\s*:\s*"(\d+)/([^"]+)"`)
+var (
+	dutyFailedRe = regexp.MustCompile(`"duty"\s*:\s*"(\d+)/([^"]+)"`)
+	peerNameRe   = regexp.MustCompile(`"peer_name"\s*:\s*"([^"]+)"`)
+)
 
-// countEpoch0Failures fetches charon logs from the enclave and counts
-// "Duty failed" lines whose slot falls in epoch 0 (slot < 32). Returns a
-// map from duty type (e.g. "aggregator") to the number of epoch-0 failures.
-// Best-effort: returns an empty map on any error so scoring falls back to
-// the unfiltered Prometheus totals.
-func countEpoch0Failures(enclave string) map[string]float64 {
-	counts := map[string]float64{}
+// epoch0Key is a (peer, duty-type) pair used to key per-node epoch-0
+// failure counts.
+type epoch0Key struct{ peer, duty string }
+
+// countEpoch0Failures fetches charon logs from every DV node in the
+// enclave and counts "Duty failed" lines whose slot falls in epoch 0
+// (slot < 32). Returns a map keyed by (cluster_peer, duty_type) so
+// the subtraction matches the per-peer Prometheus samples exactly.
+// Best-effort: returns an empty map on any error.
+func countEpoch0Failures(enclave string) map[epoch0Key]float64 {
+	counts := map[epoch0Key]float64{}
 
 	out, err := runCommand("docker", "ps", "-a",
 		"--filter", "label=com.kurtosistech.enclave-name="+enclave,
@@ -1170,40 +1184,57 @@ func countEpoch0Failures(enclave string) map[string]float64 {
 		}
 	}
 	_, dvNodes, _ := selectLogTargets(containers)
-	if len(dvNodes) == 0 {
-		return counts
-	}
 
-	logs := fetchServiceLogs(enclave, dvNodes[0])
-	for _, line := range strings.Split(logs, "\n") {
-		if !strings.Contains(line, "Duty failed") {
+	for _, node := range dvNodes {
+		logs := fetchServiceLogs(enclave, node)
+		peerName := extractPeerName(logs)
+		if peerName == "" {
 			continue
 		}
-		m := dutyFailedRe.FindStringSubmatch(line)
-		if m == nil {
-			continue
+		for _, line := range strings.Split(logs, "\n") {
+			if !strings.Contains(line, "Duty failed") {
+				continue
+			}
+			m := dutyFailedRe.FindStringSubmatch(line)
+			if m == nil {
+				continue
+			}
+			slot, err := strconv.Atoi(m[1])
+			if err != nil || slot >= warmupSlots {
+				continue
+			}
+			counts[epoch0Key{peer: peerName, duty: m[2]}]++
 		}
-		slot, err := strconv.Atoi(m[1])
-		if err != nil || slot >= slotsPerEpoch {
-			continue
-		}
-		counts[m[2]]++
 	}
 	return counts
 }
 
+// extractPeerName returns the cluster_peer name from a charon node's log
+// output by finding the "Lock file loaded" line which contains peer_name.
+func extractPeerName(logs string) string {
+	for _, line := range strings.Split(logs, "\n") {
+		if !strings.Contains(line, "Lock file loaded") {
+			continue
+		}
+		m := peerNameRe.FindStringSubmatch(line)
+		if m != nil {
+			return m[1]
+		}
+	}
+	return ""
+}
+
 // subtractEpoch0 reduces the expected-duty Prometheus samples by the
-// per-type epoch-0 failure counts. The reduction is applied equally to
-// every cluster_peer because epoch-0 failures are cluster-wide (all nodes
-// see the same duties fail).
-func subtractEpoch0(expected []sample, epoch0 map[string]float64) []sample {
+// per-(peer, duty-type) epoch-0 failure counts so that genesis-epoch
+// warmup failures do not affect scoring.
+func subtractEpoch0(expected []sample, epoch0 map[epoch0Key]float64) []sample {
 	if len(epoch0) == 0 {
 		return expected
 	}
 	out := make([]sample, len(expected))
 	for i, s := range expected {
-		d := s.labels["duty"]
-		adj := s.value - epoch0[d]
+		k := epoch0Key{peer: s.labels["cluster_peer"], duty: s.labels["duty"]}
+		adj := s.value - epoch0[k]
 		if adj < 0 {
 			adj = 0
 		}
@@ -1215,7 +1246,7 @@ func subtractEpoch0(expected []sample, epoch0 map[string]float64) []sample {
 // degradedPctThreshold: below this per-duty success pct on the worst node,
 // or with any health check firing now, a run's status is downgraded from
 // "ok" to "degraded".
-const degradedPctThreshold = 99.5
+const degradedPctThreshold = 100.0
 
 // collectReport queries Prometheus for duty/mem/cpu/health data over the
 // scored window and assembles a reportData, applying the ok/degraded
@@ -1224,10 +1255,11 @@ const degradedPctThreshold = 99.5
 // the caller afterwards, since it's derived from wall-clock time, not from
 // anything collectReport queries.
 //
-// epoch0Failures contains per-duty-type failure counts from epoch 0
-// (parsed from charon logs). These are subtracted from the expected
-// duty counts so that genesis-epoch warmup failures do not affect scoring.
-func collectReport(baseURL, name, clusterName string, cycle, windowS int, epoch0Failures map[string]float64, host hostStats) (reportData, error) {
+// epoch0Failures contains per-(peer, duty-type) failure counts from
+// epoch 0 (parsed from charon logs). These are subtracted from the
+// expected duty counts so that genesis-epoch warmup failures do not
+// affect scoring.
+func collectReport(baseURL, name, clusterName string, cycle, windowS int, epoch0Failures map[epoch0Key]float64, host hostStats) (reportData, error) {
 	expected, err := promQuery(baseURL, promDutyExpected(clusterName, windowS))
 	if err != nil {
 		return reportData{}, err
@@ -1236,6 +1268,12 @@ func collectReport(baseURL, name, clusterName string, cycle, windowS int, epoch0
 	if err != nil {
 		return reportData{}, err
 	}
+	// Prometheus increase() extrapolates at window boundaries, producing
+	// non-integer values for integer counters. Round to avoid display
+	// artifacts like "361/361 - 99.99%".
+	roundSamples(expected)
+	roundSamples(success)
+
 	expected = subtractEpoch0(expected, epoch0Failures)
 	worst, ok := selectWorstNode(expected, success)
 	var worstPtr *worstNode
@@ -1321,6 +1359,9 @@ func fmtWindow(start, end time.Time) string {
 // pins file the cycler no longer reads -- pins are now inline in each
 // static network-params file), so this is now a plain constructor.
 func failedReport(name string, cycle int, errMsg string) reportData {
+	// Mirror the failure to stderr so the local log carries the diagnosis;
+	// otherwise the only copy of the kurtosis error output lives in Slack.
+	fmt.Fprintf(os.Stderr, "dv-cycler: %s cycle %d failed: %s\n", name, cycle, errMsg)
 	return reportData{
 		name:   name,
 		cycle:  cycle,

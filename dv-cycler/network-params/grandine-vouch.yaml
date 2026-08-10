@@ -1,6 +1,6 @@
 participants:
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.4
+    el_image: ethereum/client-go:v1.17.5
     cl_type: lighthouse
     cl_image: sigp/lighthouse:v8.2.1
     use_separate_vc: true
@@ -10,7 +10,7 @@ participants:
     supernode: true
 
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.4
+    el_image: ethereum/client-go:v1.17.5
     cl_type: grandine
     cl_image: sifrai/grandine:2.0.5
     supernode: true
@@ -34,9 +34,7 @@ network_params:
 wait_for_finalization: false
 global_log_level: debug
 parallel_keystore_generation: false
-mev_type: flashbots
-mev_params:
-  mev_builder_subsidy: 1
+mev_type: mock
 prometheus_params:
   storage_tsdb_retention_time: 3h
   remote_write_url: "https://vm.monitoring.gcp.obol.tech/write"

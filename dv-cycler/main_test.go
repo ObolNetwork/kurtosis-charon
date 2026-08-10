@@ -1196,6 +1196,24 @@ func TestHealthCheckStatusGatedByToggle(t *testing.T) {
 	}
 }
 
+func TestRoundSamples(t *testing.T) {
+	samples := []sample{
+		{labels: map[string]string{"duty": "attester"}, value: 361.02},
+		{labels: map[string]string{"duty": "proposer"}, value: 119.98},
+		{labels: map[string]string{"duty": "sync_message"}, value: 420.0},
+	}
+	roundSamples(samples)
+	if samples[0].value != 361 {
+		t.Errorf("got %v, want 361", samples[0].value)
+	}
+	if samples[1].value != 120 {
+		t.Errorf("got %v, want 120", samples[1].value)
+	}
+	if samples[2].value != 420 {
+		t.Errorf("got %v, want 420", samples[2].value)
+	}
+}
+
 func TestDegradedTolerance(t *testing.T) {
 	old := httpGet
 	defer func() { httpGet = old }()
@@ -1215,22 +1233,22 @@ func TestDegradedTolerance(t *testing.T) {
 		}
 	}
 
-	httpGet = mkResp(99.9)
+	httpGet = mkResp(100)
 	data, err := collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, nil, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
 	if data.status != "ok" {
-		t.Errorf("status at 99.9%% pct = %q, want ok", data.status)
+		t.Errorf("status at 100%% pct = %q, want ok", data.status)
 	}
 
-	httpGet = mkResp(95)
+	httpGet = mkResp(99.9)
 	data, err = collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, nil, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
 	if data.status != "degraded" {
-		t.Errorf("status at 95%% pct = %q, want degraded", data.status)
+		t.Errorf("status at 99.9%% pct = %q, want degraded", data.status)
 	}
 }
 
@@ -1735,22 +1753,31 @@ func TestLoadMatrixRoundTrip(t *testing.T) {
 
 func TestSubtractEpoch0(t *testing.T) {
 	expected := []sample{
-		{labels: map[string]string{"cluster_peer": "0", "duty": "attester"}, value: 100},
-		{labels: map[string]string{"cluster_peer": "0", "duty": "aggregator"}, value: 50},
-		{labels: map[string]string{"cluster_peer": "1", "duty": "attester"}, value: 100},
+		{labels: map[string]string{"cluster_peer": "cute-child", "duty": "attester"}, value: 100},
+		{labels: map[string]string{"cluster_peer": "cute-child", "duty": "aggregator"}, value: 50},
+		{labels: map[string]string{"cluster_peer": "bold-storm", "duty": "attester"}, value: 100},
+		{labels: map[string]string{"cluster_peer": "bold-storm", "duty": "aggregator"}, value: 50},
 	}
 
-	epoch0 := map[string]float64{"attester": 10, "aggregator": 5}
+	epoch0 := map[epoch0Key]float64{
+		{peer: "cute-child", duty: "attester"}:   10,
+		{peer: "cute-child", duty: "aggregator"}: 5,
+		{peer: "bold-storm", duty: "attester"}:   7,
+		{peer: "bold-storm", duty: "aggregator"}: 3,
+	}
 	got := subtractEpoch0(expected, epoch0)
 
 	if got[0].value != 90 {
-		t.Errorf("attester peer-0: got %v, want 90", got[0].value)
+		t.Errorf("attester cute-child: got %v, want 90", got[0].value)
 	}
 	if got[1].value != 45 {
-		t.Errorf("aggregator peer-0: got %v, want 45", got[1].value)
+		t.Errorf("aggregator cute-child: got %v, want 45", got[1].value)
 	}
-	if got[2].value != 90 {
-		t.Errorf("attester peer-1: got %v, want 90", got[2].value)
+	if got[2].value != 93 {
+		t.Errorf("attester bold-storm: got %v, want 93", got[2].value)
+	}
+	if got[3].value != 47 {
+		t.Errorf("aggregator bold-storm: got %v, want 47", got[3].value)
 	}
 
 	// nil map should be a no-op.
@@ -1767,11 +1794,14 @@ func TestCountEpoch0FailuresLogParsing(t *testing.T) {
 	defer func() { runCommand = oldRun }()
 
 	charonLogs := strings.Join([]string{
+		`14:05:00.000 INFO app-start Lock file loaded {"peer_name": "cute-child", "peer_index": 0, "cluster_name": "kurtosis-test"}`,
 		`14:05:32.123 WARN tracker Duty failed {"duty": "3/aggregator", "step": "fetcher", "reason": "insufficient_peer_signatures"}`,
 		`14:05:32.200 WARN tracker Duty failed {"duty": "15/attester", "step": "consensus", "reason": "no_consensus"}`,
 		`14:05:33.000 WARN tracker Duty failed {"duty": "31/aggregator", "step": "fetcher", "reason": "insufficient_peer_signatures"}`,
-		`14:06:00.000 WARN tracker Duty failed {"duty": "32/aggregator", "step": "fetcher", "reason": "insufficient_peer_signatures"}`,
-		`14:06:10.000 WARN tracker Duty failed {"duty": "100/attester", "step": "consensus", "reason": "no_consensus"}`,
+		`14:06:00.000 WARN tracker Duty failed {"duty": "33/proposer", "step": "fetcher", "reason": "not_included_onchain"}`,
+		`14:06:05.000 WARN tracker Duty failed {"duty": "63/aggregator", "step": "fetcher", "reason": "insufficient_peer_signatures"}`,
+		`14:06:10.000 WARN tracker Duty failed {"duty": "64/aggregator", "step": "fetcher", "reason": "insufficient_peer_signatures"}`,
+		`14:06:15.000 WARN tracker Duty failed {"duty": "100/attester", "step": "consensus", "reason": "no_consensus"}`,
 		`14:06:20.000 INFO tracker All peers participated in duty {"duty": "10/attester"}`,
 	}, "\n")
 
@@ -1786,10 +1816,16 @@ func TestCountEpoch0FailuresLogParsing(t *testing.T) {
 	}
 
 	got := countEpoch0Failures("test-enclave")
-	if got["aggregator"] != 2 {
-		t.Errorf("aggregator = %v, want 2", got["aggregator"])
+	if got[epoch0Key{peer: "cute-child", duty: "aggregator"}] != 3 {
+		t.Errorf("aggregator = %v, want 3 (slots 3, 31, 63)", got[epoch0Key{peer: "cute-child", duty: "aggregator"}])
 	}
-	if got["attester"] != 1 {
-		t.Errorf("attester = %v, want 1", got["attester"])
+	if got[epoch0Key{peer: "cute-child", duty: "attester"}] != 1 {
+		t.Errorf("attester = %v, want 1 (slot 15)", got[epoch0Key{peer: "cute-child", duty: "attester"}])
+	}
+	if got[epoch0Key{peer: "cute-child", duty: "proposer"}] != 1 {
+		t.Errorf("proposer = %v, want 1 (slot 33)", got[epoch0Key{peer: "cute-child", duty: "proposer"}])
+	}
+	if len(got) != 3 {
+		t.Errorf("got %d keys, want 3 (slots 64+ excluded)", len(got))
 	}
 }
