@@ -20,7 +20,7 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: nimbus
-      charon_vc_image: statusim/nimbus-validator-client:multiarch-v26.7.0
+      charon_vc_image: kaloyantanev/nimbus-validator-client:dvt-agg-fix
     vc_extra_env_vars:
       CHARON_FEATURE_SET_ENABLE: json_requests
     count: 1
