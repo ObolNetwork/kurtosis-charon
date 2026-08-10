@@ -1,6 +1,7 @@
 charon.yml
 charon
 .charon/cluster/
+.charon/fetched_exits/
 manifest.json
 cluster_definition.json
 cluster_lock.json
