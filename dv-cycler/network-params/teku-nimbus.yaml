@@ -36,9 +36,7 @@ network_params:
 wait_for_finalization: false
 global_log_level: debug
 parallel_keystore_generation: false
-mev_type: flashbots
-mev_params:
-  mev_builder_subsidy: 1
+mev_type: mock
 prometheus_params:
   storage_tsdb_retention_time: 3h
   remote_write_url: "https://vm.monitoring.gcp.obol.tech/write"
