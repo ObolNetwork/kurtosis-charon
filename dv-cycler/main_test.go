@@ -1780,8 +1780,10 @@ func TestCountEpoch0FailuresLogParsing(t *testing.T) {
 		`14:05:32.123 WARN tracker Duty failed {"duty": "3/aggregator", "step": "fetcher", "reason": "insufficient_peer_signatures"}`,
 		`14:05:32.200 WARN tracker Duty failed {"duty": "15/attester", "step": "consensus", "reason": "no_consensus"}`,
 		`14:05:33.000 WARN tracker Duty failed {"duty": "31/aggregator", "step": "fetcher", "reason": "insufficient_peer_signatures"}`,
-		`14:06:00.000 WARN tracker Duty failed {"duty": "32/aggregator", "step": "fetcher", "reason": "insufficient_peer_signatures"}`,
-		`14:06:10.000 WARN tracker Duty failed {"duty": "100/attester", "step": "consensus", "reason": "no_consensus"}`,
+		`14:06:00.000 WARN tracker Duty failed {"duty": "33/proposer", "step": "fetcher", "reason": "not_included_onchain"}`,
+		`14:06:05.000 WARN tracker Duty failed {"duty": "63/aggregator", "step": "fetcher", "reason": "insufficient_peer_signatures"}`,
+		`14:06:10.000 WARN tracker Duty failed {"duty": "64/aggregator", "step": "fetcher", "reason": "insufficient_peer_signatures"}`,
+		`14:06:15.000 WARN tracker Duty failed {"duty": "100/attester", "step": "consensus", "reason": "no_consensus"}`,
 		`14:06:20.000 INFO tracker All peers participated in duty {"duty": "10/attester"}`,
 	}, "\n")
 
@@ -1796,13 +1798,16 @@ func TestCountEpoch0FailuresLogParsing(t *testing.T) {
 	}
 
 	got := countEpoch0Failures("test-enclave")
-	if got[epoch0Key{peer: "cute-child", duty: "aggregator"}] != 2 {
-		t.Errorf("aggregator = %v, want 2", got[epoch0Key{peer: "cute-child", duty: "aggregator"}])
+	if got[epoch0Key{peer: "cute-child", duty: "aggregator"}] != 3 {
+		t.Errorf("aggregator = %v, want 3 (slots 3, 31, 63)", got[epoch0Key{peer: "cute-child", duty: "aggregator"}])
 	}
 	if got[epoch0Key{peer: "cute-child", duty: "attester"}] != 1 {
-		t.Errorf("attester = %v, want 1", got[epoch0Key{peer: "cute-child", duty: "attester"}])
+		t.Errorf("attester = %v, want 1 (slot 15)", got[epoch0Key{peer: "cute-child", duty: "attester"}])
 	}
-	if len(got) != 2 {
-		t.Errorf("got %d keys, want 2 (only epoch-0 duties)", len(got))
+	if got[epoch0Key{peer: "cute-child", duty: "proposer"}] != 1 {
+		t.Errorf("proposer = %v, want 1 (slot 33)", got[epoch0Key{peer: "cute-child", duty: "proposer"}])
+	}
+	if len(got) != 3 {
+		t.Errorf("got %d keys, want 3 (slots 64+ excluded)", len(got))
 	}
 }

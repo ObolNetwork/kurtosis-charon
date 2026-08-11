@@ -1145,7 +1145,7 @@ func waitHealthy(baseURL string, deadlineS int) bool {
 // collectReport: assemble the post-run report.
 // ---------------------------------------------------------------------------
 
-const slotsPerEpoch = 32
+const warmupSlots = 64 // exclude epochs 0 and 1 (2 × 32 slots)
 
 var (
 	dutyFailedRe = regexp.MustCompile(`"duty"\s*:\s*"(\d+)/([^"]+)"`)
@@ -1193,7 +1193,7 @@ func countEpoch0Failures(enclave string) map[epoch0Key]float64 {
 				continue
 			}
 			slot, err := strconv.Atoi(m[1])
-			if err != nil || slot >= slotsPerEpoch {
+			if err != nil || slot >= warmupSlots {
 				continue
 			}
 			counts[epoch0Key{peer: peerName, duty: m[2]}]++
