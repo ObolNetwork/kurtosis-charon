@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -566,6 +567,12 @@ func selectWorstNode(expected, success []sample) (worstNode, bool) {
 	}
 
 	return worstNode{peer: worst, duties: results}, true
+}
+
+func roundSamples(samples []sample) {
+	for i := range samples {
+		samples[i].value = math.Round(samples[i].value)
+	}
 }
 
 func maxValue(samples []sample) (float64, bool) {
@@ -1239,7 +1246,7 @@ func subtractEpoch0(expected []sample, epoch0 map[epoch0Key]float64) []sample {
 // degradedPctThreshold: below this per-duty success pct on the worst node,
 // or with any health check firing now, a run's status is downgraded from
 // "ok" to "degraded".
-const degradedPctThreshold = 99.5
+const degradedPctThreshold = 100.0
 
 // collectReport queries Prometheus for duty/mem/cpu/health data over the
 // scored window and assembles a reportData, applying the ok/degraded
@@ -1261,6 +1268,12 @@ func collectReport(baseURL, name, clusterName string, cycle, windowS int, epoch0
 	if err != nil {
 		return reportData{}, err
 	}
+	// Prometheus increase() extrapolates at window boundaries, producing
+	// non-integer values for integer counters. Round to avoid display
+	// artifacts like "361/361 - 99.99%".
+	roundSamples(expected)
+	roundSamples(success)
+
 	expected = subtractEpoch0(expected, epoch0Failures)
 	worst, ok := selectWorstNode(expected, success)
 	var worstPtr *worstNode

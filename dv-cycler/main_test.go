@@ -1196,6 +1196,24 @@ func TestHealthCheckStatusGatedByToggle(t *testing.T) {
 	}
 }
 
+func TestRoundSamples(t *testing.T) {
+	samples := []sample{
+		{labels: map[string]string{"duty": "attester"}, value: 361.02},
+		{labels: map[string]string{"duty": "proposer"}, value: 119.98},
+		{labels: map[string]string{"duty": "sync_message"}, value: 420.0},
+	}
+	roundSamples(samples)
+	if samples[0].value != 361 {
+		t.Errorf("got %v, want 361", samples[0].value)
+	}
+	if samples[1].value != 120 {
+		t.Errorf("got %v, want 120", samples[1].value)
+	}
+	if samples[2].value != 420 {
+		t.Errorf("got %v, want 420", samples[2].value)
+	}
+}
+
 func TestDegradedTolerance(t *testing.T) {
 	old := httpGet
 	defer func() { httpGet = old }()
@@ -1215,22 +1233,22 @@ func TestDegradedTolerance(t *testing.T) {
 		}
 	}
 
-	httpGet = mkResp(99.9)
+	httpGet = mkResp(100)
 	data, err := collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, nil, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
 	if data.status != "ok" {
-		t.Errorf("status at 99.9%% pct = %q, want ok", data.status)
+		t.Errorf("status at 100%% pct = %q, want ok", data.status)
 	}
 
-	httpGet = mkResp(95)
+	httpGet = mkResp(99.9)
 	data, err = collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, nil, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
 	if data.status != "degraded" {
-		t.Errorf("status at 95%% pct = %q, want degraded", data.status)
+		t.Errorf("status at 99.9%% pct = %q, want degraded", data.status)
 	}
 }
 
