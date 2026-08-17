@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start the dv-cycler as a detached background process that survives logout.
+# Start the cycler as a detached background process that survives logout.
 # Idempotent: refuses to start a second instance. Config is read from .env in
 # this directory (see .env.example). Override the log path with CYCLER_LOG.
 set -euo pipefail
@@ -21,13 +21,13 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
-LOG="${CYCLER_LOG:-$HOME/dv-cycler.log}"
-PAT='go-build.*/dv-cycler|go run \.'
+LOG="${CYCLER_LOG:-$HOME/cycler.log}"
+PAT='go-build.*/cycler|go run \.'
 
 if pgrep -f "$PAT" >/dev/null 2>&1; then
-  echo "dv-cycler already running (pids: $(pgrep -f "$PAT" | tr '\n' ' '))"
+  echo "cycler already running (pids: $(pgrep -f "$PAT" | tr '\n' ' '))"
   exit 0
 fi
 
 setsid nohup go run . > "$LOG" 2>&1 < /dev/null &
-echo "started dv-cycler (pid $!); logging to $LOG"
+echo "started cycler (pid $!); logging to $LOG"

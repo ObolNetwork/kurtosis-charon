@@ -15,11 +15,11 @@ VOLUME_IOPS = 6000  # optimized for Charon test runs
 VOLUME_THROUGHPUT = 250  # MB/s
 BASE_TAG = "kurtosis-fleet"
 GIT_REPO = "https://github.com/ObolNetwork/kurtosis-charon.git"
-NETWORK_PARAMS_DIR = "network-params"
+NETWORK_PARAMS_DIR = "deployments"
 ETHEREUM_PACKAGE = "github.com/ObolNetwork/ethereum-package@charon"
 KURTOSIS_DEB_URL = "https://github.com/kurtosis-tech/kurtosis-cli-release-artifacts/releases/download/1.20.0/kurtosis-cli_1.20.0_linux_amd64.deb"
 
-# All 36 CL x VC combos. Shares args-files with the DV cycler (network-params/).
+# All 36 CL x VC combos. Shares args-files with the local cycler (deployments/).
 _BNS = ["lighthouse", "lodestar", "nimbus", "teku", "prysm", "grandine"]
 _VCS = ["lighthouse", "lodestar", "nimbus", "teku", "prysm", "vouch"]
 COMBOS = [

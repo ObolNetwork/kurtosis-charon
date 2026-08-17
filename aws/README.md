@@ -10,7 +10,7 @@ Launches a fleet of EC2 instances, each running a different CL x VC combo with C
 ## Setup
 
 ```bash
-cd kurtosis-charon/kurtosis-aws-runner
+cd kurtosis-charon/aws
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt

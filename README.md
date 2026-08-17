@@ -2,7 +2,7 @@
 
 Test harness for running Ethereum networks with [Charon](https://github.com/ObolNetwork/charon) Distributed Validator clusters, powered by [Kurtosis](https://docs.kurtosis.com) and ObolNetwork's [ethereum-package](https://github.com/ObolNetwork/ethereum-package/tree/charon) fork.
 
-A single `kurtosis run` command spins up the full stack: EL + CL + Charon DV middleware + VC. All 36 CL x VC combinations (6 CLs x 6 VCs) are defined as self-contained args-files in `network-params/`.
+A single `kurtosis run` command spins up the full stack: EL + CL + Charon DV middleware + VC. All 36 CL x VC combinations (6 CLs x 6 VCs) are defined as self-contained args-files in `deployments/`.
 
 ## Quick Start
 
@@ -56,15 +56,15 @@ Terminate the fleet:
 make stop-aws
 ```
 
-See `kurtosis-aws-runner/README.md` for full details.
+See `aws/README.md` for full details.
 
 ## DV Cycler
 
-The DV cycler (`dv-cycler/`) runs 24/7 on dappnode, cycling all 36 combos and reporting results to Slack. It uses `charon:next` by default for bleeding-edge testing. See `dv-cycler/README.md` for configuration.
+The DV cycler (`local/cycler/`) runs 24/7, cycling all 36 combos and reporting results to Slack. It uses `charon:next` by default for bleeding-edge testing. See `local/cycler/README.md` for configuration.
 
 ## Network Params
 
-Args-files live in `network-params/<cl>-<vc>.yaml`. They use `$CHARON_VERSION` as a placeholder, substituted at runtime by the cycler and AWS runner. Client versions are pinned directly in each YAML file.
+Args-files live in `deployments/<cl>-<vc>.yaml`. They use `$CHARON_VERSION` as a placeholder, substituted at runtime by the cycler and AWS runner. Client versions are pinned directly in each YAML file.
 
 ## Notes
 

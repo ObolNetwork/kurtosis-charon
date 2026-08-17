@@ -476,7 +476,7 @@ func TestLoadConfig(t *testing.T) {
 		if cfg.statePath != "/var/lib/cycler/state.json" {
 			t.Errorf("statePath = %q", cfg.statePath)
 		}
-		wantParamsDir := filepath.Join("/srv/kurtosis-charon", "network-params")
+		wantParamsDir := filepath.Join("/srv/kurtosis-charon", "deployments")
 		if cfg.paramsDir != wantParamsDir {
 			t.Errorf("paramsDir = %q, want %q", cfg.paramsDir, wantParamsDir)
 		}
@@ -506,8 +506,8 @@ func TestLoadConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("loadConfig error: %v", err)
 		}
-		if !strings.HasSuffix(cfg.logDir, "dv-cycler-logs") {
-			t.Errorf("logDir default = %q, want suffix dv-cycler-logs", cfg.logDir)
+		if !strings.HasSuffix(cfg.logDir, "cycler-logs") {
+			t.Errorf("logDir default = %q, want suffix cycler-logs", cfg.logDir)
 		}
 		if cfg.slackBotToken != "xoxb-abc" || cfg.slackChannelID != "C123" {
 			t.Errorf("bot token/channel = %q/%q", cfg.slackBotToken, cfg.slackChannelID)
@@ -876,7 +876,7 @@ func TestPrometheusBaseURLParse(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // writeParamFile writes a minimal static args-file (with the token
-// placeholder, mirroring the real network-params/*.yaml files) into dir and
+// placeholder, mirroring the real deployments/*.yaml files) into dir and
 // returns its path.
 func writeParamFile(t *testing.T, dir, name string) string {
 	t.Helper()
@@ -1554,7 +1554,7 @@ func TestUploadLogsBestEffortKeepsWhenNotUploaded(t *testing.T) {
 func TestBuildBlocksLogsSection(t *testing.T) {
 	d := reportData{
 		name: "x", cycle: 1, status: "failed", window: "-",
-		logArchivePath: "/home/u/dv-cycler-logs/cycle1-x-ts.tar.gz",
+		logArchivePath: "/home/u/cycler-logs/cycle1-x-ts.tar.gz",
 		logExcerpt:     "charon-0:\nERRO boom",
 	}
 	dump := dumpBlocks(buildBlocks(d))

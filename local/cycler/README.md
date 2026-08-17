@@ -1,15 +1,15 @@
 # DV matrix cycler
 
-A small Go program (`package main`, `dv-cycler/main.go`) that runs every
-static args-file in `network-params/` (one per CL/VC pairing behind the DV
+A small Go program (`package main`, `local/cycler/main.go`) that runs every
+static args-file in `deployments/` (one per CL/VC pairing behind the DV
 client) 24/7 on a host machine, using the local Kurtosis `ethereum-package`
 harness.
 
-## Static param files (`network-params/`)
+## Static param files (`deployments/`)
 
 Unlike an earlier design that generated each run's args-file from code, the
-cycler now just runs whatever `*.yaml` files exist in `network-params/`
-(default: `<CYCLER_REPO_PATH>/dv-cycler/network-params`, overridable via
+cycler now just runs whatever `*.yaml` files exist in `deployments/`
+(default: `<CYCLER_REPO_PATH>/deployments`, overridable via
 `CYCLER_PARAMS_DIR`). Each file is a complete, self-contained
 ethereum-package args-file (participants, network params, MEV, monitoring,
 etc.) with client/DV image pins inlined and a literal
@@ -19,10 +19,10 @@ runtime with `CYCLER_MONITORING_TOKEN`.
 The directory is re-scanned (sorted lexically) on every loop iteration, so:
 
 - **Adding a file picks it up automatically.** Drop a 37th file into
-  `network-params/` (e.g. `newclient-teku.yaml`) and it runs in its turn on
+  `deployments/` (e.g. `newclient-teku.yaml`) and it runs in its turn on
   the very next pass through the directory — no cycler restart needed.
 - **Bumping a pin means editing that file.** There's no shared `images.json`
-  for the cycler anymore — each `network-params/*.yaml` carries its own
+  for the cycler anymore — each `deployments/*.yaml` carries its own
   pins. Edit the file, commit, push to `CYCLER_REPO_PATH`; the next time
   that file comes up in rotation (after the cycler's per-run `git pull`) it
   launches with the new pin.
@@ -74,7 +74,7 @@ For each param file in the directory, in sorted order, forever:
 A failure at any stage (launch, health wait, cluster discovery, sampling,
 metrics query, report assembly) produces a `failed` Slack report instead of
 crashing the loop — the cycler always continues to the next file. An empty
-or unreadable `network-params/` directory is treated the same way: a
+or unreadable `deployments/` directory is treated the same way: a
 warning is logged, the loop backs off, and it retries (re-scanning the
 directory) rather than exiting. Slack-post failures are swallowed too; they
 must never block teardown.
@@ -150,7 +150,7 @@ No build step is required — the cycler is run directly with `go run`, from
 the module directory. Put config in a `.env` file:
 
 ```bash
-cd dv-cycler
+cd local/cycler
 cp .env.example .env      # then edit .env (webhook, paths, token)
 go run .
 ```
@@ -158,10 +158,10 @@ go run .
 Or set the `CYCLER_*` variables in the environment (these override `.env`):
 
 ```bash
-cd dv-cycler
+cd local/cycler
 CYCLER_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/... \
 CYCLER_REPO_PATH=/opt/kurtosis-charon \
-CYCLER_STATE_PATH=/var/lib/dv-cycler/state.json \
+CYCLER_STATE_PATH=/var/lib/cycler/state.json \
 go run .
 ```
 
@@ -180,7 +180,7 @@ For a host without a supervisor, three helper scripts wrap the manual launch:
 ```
 
 `start.sh` reads `.env` from this directory, logs to `$CYCLER_LOG` (default
-`~/dv-cycler.log`), and adds `$HOME/sdk/go/bin` or `/usr/local/go/bin` to `PATH`
+`~/cycler.log`), and adds `$HOME/sdk/go/bin` or `/usr/local/go/bin` to `PATH`
 if `go` isn't already resolvable. `stop.sh` stops the loop process and tears
 down the in-flight enclave; the state file is preserved, so a later `start.sh`
 resumes at the same rotation position. These are a convenience for
@@ -201,10 +201,10 @@ the three required variables is unset or empty.
 | `CYCLER_SLACK_WEBHOOK_URL` | yes | — | Slack Incoming Webhook URL for run reports. |
 | `CYCLER_REPO_PATH` | yes | — | Absolute path to this repo checkout on the host (the cycler `git pull`s this path before each run). |
 | `CYCLER_STATE_PATH` | yes | — | Absolute path to the state file (see below); the containing directory must exist and be writable by the service user. |
-| `CYCLER_PARAMS_DIR` | no | `<CYCLER_REPO_PATH>/dv-cycler/network-params` | Directory scanned for `*.yaml` param files every loop iteration. |
+| `CYCLER_PARAMS_DIR` | no | `<CYCLER_REPO_PATH>/deployments` | Directory scanned for `*.yaml` param files every loop iteration. |
 | `CYCLER_MONITORING_TOKEN` | no | `""` | Prometheus remote-write auth token (substituted for `$PROMETHEUS_REMOTE_WRITE_TOKEN` in each param file); empty disables remote-write auth. |
 | `CYCLER_PACKAGE_REF` | no | `github.com/ObolNetwork/ethereum-package@charon` | Kurtosis package reference to run. |
-| `CYCLER_LOG_DIR` | no | `<home>/dv-cycler-logs` | Directory where failing-run log archives (`.tar.gz`) are written. |
+| `CYCLER_LOG_DIR` | no | `<home>/cycler-logs` | Directory where failing-run log archives (`.tar.gz`) are written. |
 | `CYCLER_SLACK_BOT_TOKEN` | no | `""` | Slack bot token (`files:write` scope) for uploading failing-run log archives. Empty = local save only. |
 | `CYCLER_SLACK_CHANNEL_ID` | no | `""` | Slack channel id to upload failing-run log archives into (needs `CYCLER_SLACK_BOT_TOKEN`). |
 | `CYCLER_RESULTS_PATH` | no | `<state-dir>/cycler-results.json` | Persistent results-matrix file (one row per combo + versions). |
@@ -231,8 +231,8 @@ Wants=docker.service network-online.target
 [Service]
 Type=simple
 User=dv
-WorkingDirectory=/opt/kurtosis-charon/dv-cycler
-Environment=GOCACHE=/var/cache/dv-cycler/go-build
+WorkingDirectory=/opt/kurtosis-charon/local/cycler
+Environment=GOCACHE=/var/cache/cycler/go-build
 Environment=HOME=/opt/kurtosis-charon
 ExecStart=/usr/local/go/bin/go run .
 Restart=always
@@ -244,8 +244,9 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-Save it as `/etc/systemd/system/dv-cycler.service`, then
-`sudo systemctl daemon-reload && sudo systemctl enable --now dv-cycler`.
+Save it as `/etc/systemd/system/cycler.service`, then
+`sudo systemctl daemon-reload && sudo systemctl enable --now cycler`. The
+`WorkingDirectory` is the Go module root (`local/cycler/`), not the repo root.
 
 Notes:
 
@@ -269,7 +270,7 @@ the `cycler` unit.
 
 ## State file and resume behavior
 
-The cycler persists its position in the `network-params/` rotation to
+The cycler persists its position in the `deployments/` rotation to
 `CYCLER_STATE_PATH` after every run (`cycle`, `next_index`, and — while a run
 is in flight — `current_enclave`). On startup, `mainLoop`:
 
@@ -290,6 +291,6 @@ rotation.
 ## Running tests
 
 ```bash
-cd dv-cycler
+cd local/cycler
 go test ./...
 ```

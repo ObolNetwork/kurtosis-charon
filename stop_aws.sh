@@ -4,9 +4,9 @@
 
 set -euo pipefail
 
-python3 -m venv ./kurtosis-aws-runner
-source ./kurtosis-aws-runner/bin/activate
+python3 -m venv ./aws
+source ./aws/bin/activate
 trap deactivate EXIT
-pip3 install -r kurtosis-aws-runner/requirements.txt -q
+pip3 install -r aws/requirements.txt -q
 
-python3 kurtosis-aws-runner/kurtosis_aws_runner.py --terminate
+python3 aws/kurtosis_aws_runner.py --terminate
