@@ -12,8 +12,9 @@ All 36 CL x VC combos (6 CLs: lighthouse, lodestar, nimbus, teku, prysm, grandin
 
 ### Running a local cluster
 ```bash
-make run-local/lighthouse-lodestar
+make start-local/lighthouse-lodestar
 make stop-local/lighthouse-lodestar
+make status-local
 make clean
 ```
 
@@ -21,12 +22,13 @@ make clean
 ```bash
 export CHARON_VERSION=v1.11.0
 export PROMETHEUS_REMOTE_WRITE_TOKEN=<token>
-make run-aws                           # all 36 combos
-make stop-aws                          # terminate fleet
+make start-aws                           # all 36 combos
+make stop-aws
+make status-aws                          # terminate fleet
 
 # Filter combos:
-ONLY=cl:lighthouse make run-aws        # 6 combos with lighthouse CL
-ONLY=lighthouse-vouch make run-aws     # single combo
+ONLY=cl:lighthouse make start-aws        # 6 combos with lighthouse CL
+ONLY=lighthouse-vouch make start-aws     # single combo
 ```
 
 ## Architecture

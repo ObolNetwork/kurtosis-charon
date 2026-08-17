@@ -80,7 +80,7 @@ def get_latest_ubuntu_ami():
 
 def generate_user_data(combo, branch, shutdown_minutes, monitoring_token, charon_version):
     """Cloud-init that installs Docker + Kurtosis, clones kurtosis-charon, then runs
-    the Charon kurtosis command (mirrors `make run-local/<combo>`) against this
+    the Charon kurtosis command (mirrors `make start-local/<combo>`) against this
     combo's split args-file. $PROMETHEUS_REMOTE_WRITE_TOKEN and $CHARON_VERSION
     placeholders in the args-file are substituted with envsubst before the run.
     """
@@ -250,6 +250,7 @@ def main():
     parser.add_argument("--monitoring-token", help="PROMETHEUS_REMOTE_WRITE_TOKEN for Prometheus remote_write")
     parser.add_argument("--charon-version", required=False, help="Charon image tag to substitute into args-files (e.g. v1.11.0)")
     parser.add_argument("--terminate", action="store_true", help="Terminate matching EC2 instances")
+    parser.add_argument("--status", action="store_true", help="Show status of running fleet instances")
     parser.add_argument("--on-demand", action="store_true", help="Use On-Demand EC2 instances (default is Spot)")
     parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help=f"EC2 instance type for all combos (default: {DEFAULT_INSTANCE_TYPE})")
     parser.add_argument("--only", help="Comma-separated filter: combo names (lighthouse-prysm), cl:<client> for all combos with that CL, vc:<client> for all combos with that VC")
@@ -281,6 +282,14 @@ def main():
         combos = [c for c in matched if c["name"] not in seen and not seen.add(c["name"])]
 
     tag_values = [instance_tag(c) for c in combos]
+
+    if args.status:
+        rows = fetch_instance_table(tag_values)
+        if not rows:
+            print("No running fleet instances.")
+        else:
+            print(tabulate(rows, headers=["Name", "IP", "State"]))
+        return
 
     if args.terminate:
         terminate_instances(tag_values)

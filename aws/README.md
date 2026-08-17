@@ -23,7 +23,7 @@ The simplest way to launch is via the Makefile wrapper:
 ```bash
 export CHARON_VERSION=v1.11.0
 export PROMETHEUS_REMOTE_WRITE_TOKEN=<token>
-make run-aws
+make start-aws
 ```
 
 Or call the runner directly:
@@ -58,6 +58,9 @@ Use `--only` to run a subset of combos:
 
 ```bash
 make stop-aws
+
+# Check fleet status:
+make status-aws
 # or directly:
 python3 kurtosis_aws_runner.py --terminate
 ```

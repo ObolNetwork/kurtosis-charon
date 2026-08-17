@@ -14,7 +14,7 @@ A single `kurtosis run` command spins up the full stack: EL + CL + Charon DV mid
 ### Run a local cluster
 
 ```bash
-make run-local/lighthouse-lodestar
+make start-local/lighthouse-lodestar
 ```
 
 Watch the Kurtosis enclave come up, then inspect with `kurtosis enclave inspect lighthouse-lodestar`.
@@ -23,6 +23,8 @@ Watch the Kurtosis enclave come up, then inspect with `kurtosis enclave inspect 
 
 ```bash
 make stop-local/lighthouse-lodestar
+# or check running enclaves:
+make status-local
 # or clean everything:
 make clean
 ```
@@ -34,26 +36,29 @@ Launch all 36 combos on EC2 (one instance per combo):
 ```bash
 export CHARON_VERSION=v1.11.0
 export PROMETHEUS_REMOTE_WRITE_TOKEN=<your-token>
-make run-aws
+make start-aws
 ```
 
 Filter with `--only`:
 
 ```bash
 # All combos with lighthouse CL (6 combos)
-ONLY=cl:lighthouse make run-aws
+ONLY=cl:lighthouse make start-aws
 
 # Specific combo
-ONLY=lighthouse-vouch make run-aws
+ONLY=lighthouse-vouch make start-aws
 
 # Multiple filters (union)
-ONLY=cl:lighthouse,vc:vouch make run-aws
+ONLY=cl:lighthouse,vc:vouch make start-aws
 ```
 
 Terminate the fleet:
 
 ```bash
 make stop-aws
+
+# or check fleet status:
+make status-aws
 ```
 
 See `aws/README.md` for full details.
