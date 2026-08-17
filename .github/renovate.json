@@ -1,0 +1,58 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "enabledManagers": [
+    "custom.regex"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": [
+        "^deployments/.*\\.yaml$"
+      ],
+      "matchStrings": [
+        "(?:el|cl|vc|charon_vc)_image:\\s*(?<depName>[^:]+):(?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "packageRules": []
+    }
+  ],
+  "packageRules": [
+    {
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchFileNames": [
+        "deployments/**"
+      ],
+      "labels": [
+        "renovate/docker-deps"
+      ],
+      "groupName": "Docker image updates",
+      "schedule": [
+        "every weekend"
+      ]
+    },
+    {
+      "matchPackageNames": [
+        "obolnetwork/charon"
+      ],
+      "enabled": false
+    },
+    {
+      "matchPackageNames": [
+        "kaloyantanev/lighthouse"
+      ],
+      "enabled": false
+    },
+    {
+      "matchPackageNames": [
+        "statusim/nimbus-eth2",
+        "statusim/nimbus-validator-client"
+      ],
+      "versioning": "regex:^multiarch-v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
+    }
+  ]
+}
