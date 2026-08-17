@@ -87,7 +87,7 @@ def generate_user_data(combo, branch, shutdown_minutes, monitoring_token, charon
     args_file = f"{NETWORK_PARAMS_DIR}/{combo['file']}"
     enclave = enclave_name(combo)
     return f"""#!/bin/bash
-set -euxo pipefail
+set -euo pipefail
 sleep 20
 
 # Schedule shutdown early so the instance always self-terminates.

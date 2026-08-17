@@ -248,7 +248,7 @@ stop-aws-native:
 
 # Run/stop the native Charon cluster from the Obol ethereum-package charon branch.
 run-native:
-	kurtosis run --enclave lighthouse-charon-lighthouse github.com/ObolNetwork/ethereum-package@charon --args-file ./deployments/network_params/network_params_charon_1_lighthouse.yaml
+	kurtosis run --enclave lighthouse-charon-lighthouse github.com/ObolNetwork/ethereum-package@charon --args-file ./network-params/lighthouse-lighthouse.yaml
 
 stop-native:
 	kurtosis enclave rm -f lighthouse-charon-lighthouse
