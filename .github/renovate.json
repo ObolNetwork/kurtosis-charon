@@ -4,65 +4,48 @@
     "config:recommended"
   ],
   "enabledManagers": [
-    "github-actions",
     "custom.regex"
   ],
   "customManagers": [
     {
       "customType": "regex",
       "fileMatch": [
-        "^deployments/env/.*\\.env$"
+        "^deployments/.*\\.yaml$"
       ],
       "matchStrings": [
-        "(?:CL|VC|EL|CHARON)_IMAGE=(?<depName>[^\\n]+)\\n(?:CL|VC|EL|CHARON)_VERSION=(?<currentValue>[^\\n]+)"
+        "(?:el|cl|vc|charon_vc)_image:\\s*(?<depName>[^:]+):(?<currentValue>[^\\s]+)"
       ],
-      "datasourceTemplate": "docker"
-    },
-    {
-      "customType": "regex",
-      "fileMatch": [
-        ".*"
-      ],
-      "matchStrings": [
-        "github\\.com/ethpandaops/ethereum-package@(?<currentValue>[^\\s]+)"
-      ],
-      "depNameTemplate": "ethpandaops/ethereum-package",
-      "datasourceTemplate": "github-tags"
+      "datasourceTemplate": "docker",
+      "packageRules": []
     }
   ],
   "packageRules": [
     {
       "matchManagers": [
-        "github-actions"
-      ],
-      "matchDepTypes": [
-        "github-actions"
-      ],
-      "matchFileNames": [
-        ".github/workflows/**"
-      ],
-      "schedule": [
-        "every weekend"
-      ],
-      "labels": [
-        "renovate/github-actions"
-      ],
-      "groupName": "GitHub Actions updates"
-    },
-    {
-      "matchManagers": [
         "custom.regex"
       ],
       "matchFileNames": [
-        "deployments/env/**"
+        "deployments/**"
       ],
       "labels": [
         "renovate/docker-deps"
       ],
       "groupName": "Docker image updates",
       "schedule": [
-        "at any time"
+        "every weekend"
       ]
+    },
+    {
+      "matchPackageNames": [
+        "obolnetwork/charon"
+      ],
+      "enabled": false
+    },
+    {
+      "matchPackageNames": [
+        "kaloyantanev/lighthouse"
+      ],
+      "enabled": false
     },
     {
       "matchPackageNames": [
