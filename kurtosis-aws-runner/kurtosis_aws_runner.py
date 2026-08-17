@@ -1,26 +1,42 @@
 import boto3
-import os
 import re
 import sys
 import time
 import argparse
-from botocore.exceptions import ClientError, BotoCoreError
 from tabulate import tabulate
 
-# --- Configuration Constants ---
 KEY_NAME = "kurtosis-fleet"
 SECURITY_GROUP_ID = "sg-0e208fd6ad761cafc"
-SUBNET_ID = "subnet-000b1456766381ae9" # eu-west-1c
-DEFAULT_INSTANCE_TYPE = "c6a.4xlarge"
-LARGE_BN_TYPES = {"prysm", "teku"}  # these BNs are CPU-heavy and need double the instance size
-LARGE_VC_TYPES = {"teku", "vouch"}  # these VCs are CPU-heavy and need double the instance size
+SUBNET_ID = "subnet-000b1456766381ae9"  # eu-west-1c
+DEFAULT_INSTANCE_TYPE = "c6a.8xlarge"
 VOLUME_SIZE = 50
 VOLUME_TYPE = "gp3"
 VOLUME_IOPS = 6000  # optimized for Charon test runs
 VOLUME_THROUGHPUT = 250  # MB/s
 BASE_TAG = "kurtosis-fleet"
-DEFAULT_ENV_DIR = "../deployments/env"
 GIT_REPO = "https://github.com/ObolNetwork/kurtosis-charon.git"
+NETWORK_PARAMS_DIR = "network-params"
+ETHEREUM_PACKAGE = "github.com/ObolNetwork/ethereum-package@charon"
+KURTOSIS_DEB_URL = "https://github.com/kurtosis-tech/kurtosis-cli-release-artifacts/releases/download/1.20.0/kurtosis-cli_1.20.0_linux_amd64.deb"
+
+# All 36 CL x VC combos. Shares args-files with the DV cycler (network-params/).
+_BNS = ["lighthouse", "lodestar", "nimbus", "teku", "prysm", "grandine"]
+_VCS = ["lighthouse", "lodestar", "nimbus", "teku", "prysm", "vouch"]
+COMBOS = [
+    {
+        "name": f"{bn}-{vc}",
+        "bn": bn,
+        "vc": vc,
+        "file": f"{bn}-{vc}.yaml",
+    }
+    for bn in _BNS
+    for vc in _VCS
+]
+
+
+def enclave_name(combo):
+    return f"{combo['bn']}-charon-{combo['vc']}"
+
 
 ec2 = boto3.client("ec2")
 ec2_resource = boto3.resource("ec2")
@@ -62,77 +78,42 @@ def get_latest_ubuntu_ami():
         safe_exit(f"Failed to fetch latest Ubuntu AMI: {e}")
 
 
-def get_combos(env_dir):
-    try:
-        files = os.listdir(env_dir)
-    except FileNotFoundError:
-        safe_exit(f"Environment directory not found: {env_dir}")
-
-    el = sorted({f.split('_')[1].split('.')[0] for f in files if f.startswith("el_")})
-    cl = sorted({f.split('_')[1].split('.')[0] for f in files if f.startswith("cl_")})
-    vc = sorted({f.split('_')[1].split('.')[0] for f in files if f.startswith("vc_")})
-
-    if not el or not cl or not vc:
-        safe_exit("Missing el_*.env, cl_*.env, or vc_*.env files in the environment directory.")
-
-    return [f"{el_client}-{cl_client}-charon-{vc_client}" for el_client in el for cl_client in cl for vc_client in vc]
-
-
-def parse_charon_version(charon_version):
-    """Parse charon version which can be a tag (v1.9.2) or full image ref (obolnetwork/charon:v1.9.2).
-
-    Also handles registry prefixes with ports (e.g. registry.example.com:5000/image:tag)
-    by splitting on the last colon.
+def generate_user_data(combo, branch, shutdown_minutes, monitoring_token, charon_version):
+    """Cloud-init that installs Docker + Kurtosis, clones kurtosis-charon, then runs
+    the native-Charon kurtosis command (mirrors `make run-native`) against this
+    combo's split args-file. $PROMETHEUS_REMOTE_WRITE_TOKEN and $CHARON_VERSION
+    placeholders in the args-file are substituted with envsubst before the run.
     """
-    if not charon_version:
-        return None, None
-    if ":" in charon_version:
-        image, version = charon_version.rsplit(":", 1)
-        if not image or not version:
-            safe_exit(f"Invalid --charon-version format: '{charon_version}'. Expected 'tag' or 'image:tag'.")
-        return image, version
-    return None, charon_version
-
-
-def generate_user_data(combo, branch, shutdown_minutes, monitoring_token, cluster_name, charon_version=None):
-    charon_image, charon_tag = parse_charon_version(charon_version)
-    charon_exports = ""
-    if charon_tag:
-        charon_exports += f'export CHARON_VERSION="{charon_tag}"\n'
-    if charon_image:
-        charon_exports += f'export CHARON_IMAGE="{charon_image}"\n'
+    args_file = f"{NETWORK_PARAMS_DIR}/{combo['file']}"
+    enclave = enclave_name(combo)
     return f"""#!/bin/bash
-set -euxo pipefail
+set -euo pipefail
 sleep 20
 
-# Schedule shutdown early
+# Schedule shutdown early so the instance always self-terminates.
 nohup bash -c "sleep {shutdown_minutes}m && /sbin/shutdown -h now" >/home/ubuntu/shutdown.log 2>&1 &
 
 apt-get update -y
 apt-get install -y apt-transport-https ca-certificates curl software-properties-common git make jq gettext bash
 curl -fsSL https://get.docker.com | sh
 usermod -aG docker ubuntu
-DOCKER_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)
-curl -L "https://github.com/docker/compose/releases/download/${{DOCKER_COMPOSE_VERSION}}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose
-echo "deb [trusted=yes] https://apt.fury.io/kurtosis-tech/ /" > /etc/apt/sources.list.d/kurtosis.list
-apt update -y
-apt install -y kurtosis-cli
+curl -fsSL -o /tmp/kurtosis-cli.deb {KURTOSIS_DEB_URL}
+dpkg -i /tmp/kurtosis-cli.deb
 
 su - ubuntu <<'EOF'
 cd /home/ubuntu
 git clone -b {branch} {GIT_REPO}
 cd kurtosis-charon
-{charon_exports}
-echo "PROMETHEUS_REMOTE_WRITE_TOKEN={monitoring_token}" >> deployments/env/charon.env
-echo "CLUSTER_NAME={cluster_name}" >> deployments/env/charon.env
-make {combo} || true
+export PROMETHEUS_REMOTE_WRITE_TOKEN="{monitoring_token}"
+export CHARON_VERSION="{charon_version}"
+envsubst '$PROMETHEUS_REMOTE_WRITE_TOKEN $CHARON_VERSION' < {args_file} > /tmp/network_params.yaml
+kurtosis run --enclave {enclave} {ETHEREUM_PACKAGE} --args-file /tmp/network_params.yaml || true
 EOF
 """
 
 
 def instance_tag(combo):
-    return f"{BASE_TAG}-{combo}"
+    return f"{BASE_TAG}-{combo['name']}"
 
 
 def instance_exists(tag_value):
@@ -148,7 +129,7 @@ def instance_exists(tag_value):
         safe_exit(f"Error checking existing instances: {e}")
 
 
-def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, instance_type, on_demand, cluster_name, charon_version=None):
+def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, charon_version, instance_type, on_demand):
     tag = instance_tag(combo)
     if instance_exists(tag):
         print(f"⚠️  Skipping existing instance: {tag}")
@@ -162,7 +143,7 @@ def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, i
         "MaxCount": 1,
         "SubnetId": SUBNET_ID,
         "SecurityGroupIds": [SECURITY_GROUP_ID],
-        "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token, cluster_name, charon_version),
+        "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token, charon_version),
         "BlockDeviceMappings": [{
             "DeviceName": "/dev/sda1",
             "Ebs": {
@@ -184,7 +165,7 @@ def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, i
         instance = resp["Instances"][0]
         return instance["InstanceId"], tag
     except Exception as e:
-        print(f"❌ Failed to launch {combo}: {e}")
+        print(f"❌ Failed to launch {combo['name']}: {e}")
         return None, None
 
 
@@ -262,30 +243,43 @@ def terminate_instances(tag_values):
         safe_exit(f"Failed to terminate instances: {e}")
 
 
-def double_instance_size(instance_type: str) -> str:
-    size_map = {"2xlarge": "4xlarge", "4xlarge": "8xlarge", "8xlarge": "12xlarge"}
-    try:
-        family, size = instance_type.rsplit(".", 1)
-        if size in size_map:
-            return f"{family}.{size_map[size]}"
-    except (ValueError, AttributeError):
-        pass
-    return f"{instance_type.rsplit('.', 1)[0]}.12xlarge" if "." in instance_type else "c6a.12xlarge"
-
-
 def main():
-    parser = argparse.ArgumentParser(description="Launch or terminate Kurtosis EC2 test fleet.")
-    parser.add_argument("--branch", default="main", help="Git branch to clone (default: main)")
+    parser = argparse.ArgumentParser(description="Launch or terminate a native-Charon Kurtosis EC2 test fleet (one instance per combo).")
+    parser.add_argument("--branch", default="main", help="kurtosis-charon git branch to clone (default: main)")
     parser.add_argument("--lifetime", default="60m", help="Shutdown after time (default: 60m e.g. 90m, 2h)")
-    parser.add_argument("--env-dir", default=DEFAULT_ENV_DIR, help="Directory of combos .env files")
-    parser.add_argument("--monitoring-token", help="Monitoring token for Prometheus remote write")
+    parser.add_argument("--monitoring-token", help="PROMETHEUS_REMOTE_WRITE_TOKEN for Prometheus remote_write")
+    parser.add_argument("--charon-version", required=False, help="Charon image tag to substitute into args-files (e.g. v1.11.0)")
     parser.add_argument("--terminate", action="store_true", help="Terminate matching EC2 instances")
     parser.add_argument("--on-demand", action="store_true", help="Use On-Demand EC2 instances (default is Spot)")
-    parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help="EC2 instance type (default: c6a.4xlarge); large BN/VC combos automatically use double the size")
-    parser.add_argument("--charon-version", default=os.environ.get("CHARON_VERSION"), help="Override Charon version (e.g. v1.9.2 or obolnetwork/charon:v1.9.2). Defaults to CHARON_VERSION env var if set.")
+    parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help=f"EC2 instance type for all combos (default: {DEFAULT_INSTANCE_TYPE})")
+    parser.add_argument("--only", help="Comma-separated filter: combo names (lighthouse-prysm), cl:<client> for all combos with that CL, vc:<client> for all combos with that VC")
     args = parser.parse_args()
 
-    combos = get_combos(args.env_dir)
+    combos = COMBOS
+    if args.only:
+        filters = [f.strip() for f in args.only.split(",") if f.strip()]
+        matched = []
+        for f in filters:
+            if f.startswith("cl:"):
+                cl = f[3:]
+                batch = [c for c in COMBOS if c["bn"] == cl]
+                if not batch:
+                    safe_exit(f"Unknown CL '{cl}'. Options: {', '.join(_BNS)}")
+                matched.extend(batch)
+            elif f.startswith("vc:"):
+                vc = f[3:]
+                batch = [c for c in COMBOS if c["vc"] == vc]
+                if not batch:
+                    safe_exit(f"Unknown VC '{vc}'. Options: {', '.join(_VCS)}")
+                matched.extend(batch)
+            else:
+                batch = [c for c in COMBOS if c["name"] == f]
+                if not batch:
+                    safe_exit(f"Unknown combo '{f}'. Use <cl>-<vc>, cl:<client>, or vc:<client>")
+                matched.extend(batch)
+        seen = set()
+        combos = [c for c in matched if c["name"] not in seen and not seen.add(c["name"])]
+
     tag_values = [instance_tag(c) for c in combos]
 
     if args.terminate:
@@ -294,34 +288,27 @@ def main():
 
     if not args.monitoring_token:
         safe_exit("Missing required --monitoring-token (unless using --terminate)")
+    if not args.charon_version:
+        safe_exit("Missing required --charon-version (e.g. v1.11.0)")
 
     shutdown_minutes = parse_lifetime_arg(args.lifetime)
 
-    print(f"🔍 Found {len(combos)} combinations:")
+    print(f"🔍 {len(combos)} combo(s) to launch:")
     for c in combos:
-        print(f"  - {c}")
-    confirm = input(f"\nLaunch {len(combos)} EC2 instances? [y/N]: ").strip().lower()
+        print(f"  - {c['name']:16s} {c['file']:42s} [{args.instance_type}]")
+    confirm = input(f"\nLaunch {len(combos)} EC2 instance(s)? [y/N]: ").strip().lower()
     if confirm not in ("y", "yes"):
         print("✋ Launch cancelled.")
         return
 
     ami_id = get_latest_ubuntu_ami()
     print(f"\n🚀 Launching with AMI {ami_id}, branch '{args.branch}', shutdown in {shutdown_minutes}m")
-    print(f"📌 Default instance type: {args.instance_type} (large BN/VC combos: {double_instance_size(args.instance_type)}), On-Demand: {args.on_demand}")
-    if args.charon_version:
-        print(f"📌 Charon version override: {args.charon_version}")
-    print()
+    print(f"📌 Instance type: {args.instance_type}, On-Demand: {args.on_demand}, Charon: {args.charon_version}\n")
 
     launched_ids = []
     id_to_tag = {}
     for combo in combos:
-        # Derive cluster name from combo: "geth-{cl}-charon-{vc}" -> "kurtosis-{cl}-{vc}"
-        parts = combo.split("-charon-")
-        cl = parts[0].split("-", 1)[1]  # strip EL prefix (e.g. "geth-")
-        vc = parts[1]
-        cluster_name = f"kurtosis-{cl}-{vc}"
-        effective_instance_type = double_instance_size(args.instance_type) if cl in LARGE_BN_TYPES or vc in LARGE_VC_TYPES else args.instance_type
-        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, effective_instance_type, args.on_demand, cluster_name, args.charon_version)
+        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, args.charon_version, args.instance_type, args.on_demand)
         if iid:
             launched_ids.append(iid)
             id_to_tag[iid] = tag
