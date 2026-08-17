@@ -3,7 +3,7 @@
 # --- Local (single combo) ---
 # Usage: make start-local/lighthouse-lodestar
 start-local/%:
-	kurtosis run --enclave $* github.com/ObolNetwork/ethereum-package@6.1.0-obol.1 --args-file ./deployments/$*.yaml
+	kurtosis run --enclave $* github.com/ObolNetwork/ethereum-package@6.1.0-obol.2 --args-file ./deployments/$*.yaml
 
 stop-local/%:
 	kurtosis enclave rm -f $*

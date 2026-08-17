@@ -197,7 +197,7 @@ func applyFlags(cfg *config, args []string) {
 func loadConfig() (config, error) {
 	cfg := config{
 		charonTag:              "next",
-		packageRef:             "github.com/ObolNetwork/ethereum-package@6.1.0-obol.1",
+		packageRef:             "github.com/ObolNetwork/ethereum-package@6.1.0-obol.2",
 		runMinutes:             90,
 		startupDeadlineMinutes: 25,
 		sampleIntervalS:        15,

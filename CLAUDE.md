@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Kurtosis-Charon is a test harness for running Ethereum networks with Charon Distributed Validator (DV) clusters. It uses ObolNetwork's fork of ethereum-package (the `obol` branch, tagged `6.1.0-obol.1`) with Kurtosis to spin up full EL+CL+Charon+VC stacks in a single `kurtosis run` command.
+Kurtosis-Charon is a test harness for running Ethereum networks with Charon Distributed Validator (DV) clusters. It uses ObolNetwork's fork of ethereum-package (the `obol` branch, tagged `6.1.0-obol.2`) with Kurtosis to spin up full EL+CL+Charon+VC stacks in a single `kurtosis run` command.
 
 All 36 CL x VC combos (6 CLs: lighthouse, lodestar, nimbus, teku, prysm, grandine; 6 VCs: lighthouse, lodestar, nimbus, teku, prysm, vouch) are defined as self-contained args-files in `deployments/<cl>-<vc>.yaml`.
 
