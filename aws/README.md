@@ -62,7 +62,7 @@ make stop-aws
 # Check fleet status:
 make status-aws
 # or directly:
-python3 kurtosis_aws_runner.py --terminate
+python3 kurtosis_aws_runner.py --status
 ```
 
 ## Configuration
