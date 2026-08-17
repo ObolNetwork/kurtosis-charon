@@ -1,14 +1,14 @@
-// Command cycler cycles the ethereum-package devnet through every static
+// Command runner cycles the ethereum-package devnet through every static
 // args-file in deployments/ (one per CL x VC pairing behind the DV client),
 // sampling metrics and posting a Slack report for each run. This file
-// (main.go) is a script-like Go port of the original Python cycler package:
+// (main.go) is a script-like Go port of the original Python runner package:
 // no sub-packages, no interfaces, just plain data records and package-level
 // functions/vars.
 //
-// Unlike the earlier code-generated-args-file design, the cycler no longer
+// Unlike the earlier code-generated-args-file design, the runner no longer
 // builds args-files itself: deployments/*.yaml are static, committed
 // files with pins inlined and a literal $PROMETHEUS_REMOTE_WRITE_TOKEN
-// placeholder. The cycler enumerates whatever *.yaml files exist in that
+// placeholder. The runner enumerates whatever *.yaml files exist in that
 // directory on every loop iteration, runs each one in turn, and picks up
 // newly added files automatically (no restart needed).
 package main
@@ -240,7 +240,7 @@ func loadConfig() (config, error) {
 		if err != nil || home == "" {
 			home = "."
 		}
-		cfg.logDir = filepath.Join(home, "cycler-logs")
+		cfg.logDir = filepath.Join(home, "runner-logs")
 	}
 
 	var missing []string
@@ -260,7 +260,7 @@ func loadConfig() (config, error) {
 	// resultsPath defaults next to the state file (statePath is guaranteed set
 	// by the required-config check above).
 	if cfg.resultsPath == "" {
-		cfg.resultsPath = filepath.Join(filepath.Dir(cfg.statePath), "cycler-results.json")
+		cfg.resultsPath = filepath.Join(filepath.Dir(cfg.statePath), "runner-results.json")
 	}
 	return cfg, nil
 }
@@ -363,7 +363,7 @@ func loadState(path string) (state, error) {
 	// clamped in mainLoop instead), but negative values are never valid.
 	if s.NextIndex < 0 || s.Cycle < 0 {
 		fmt.Fprintf(os.Stderr,
-			"cycler: state file %s has a negative next_index=%d or cycle=%d; starting fresh\n",
+			"runner: state file %s has a negative next_index=%d or cycle=%d; starting fresh\n",
 			path, s.NextIndex, s.Cycle)
 		return state{}, nil
 	}
@@ -994,7 +994,7 @@ func kurtosisRun(enclave, pkg, argsFile string) error {
 	// --image-download always so moving tags (the param files pin
 	// obolnetwork/charon:next) are re-pulled every run; otherwise Kurtosis's
 	// default ("missing") keeps using a stale locally-cached image and the
-	// cycler silently tests old client/Charon builds.
+	// runner silently tests old client/Charon builds.
 	out, err := runCommand("kurtosis", "run", "--enclave", enclave, "--image-download", "always", pkg, "--args-file", argsFile)
 	if err != nil {
 		return fmt.Errorf("kurtosis run failed for %s: %w (output: %s)", enclave, err, strings.TrimSpace(out))
@@ -1361,12 +1361,12 @@ func fmtWindow(start, end time.Time) string {
 
 // failedReport builds a failed-status report for name/cycle. There are no
 // image pins to carry through anymore (those used to live in a separate
-// pins file the cycler no longer reads -- pins are now inline in each
+// pins file the runner no longer reads -- pins are now inline in each
 // static deployments file), so this is now a plain constructor.
 func failedReport(name string, cycle int, errMsg string) reportData {
 	// Mirror the failure to stderr so the local log carries the diagnosis;
 	// otherwise the only copy of the kurtosis error output lives in Slack.
-	fmt.Fprintf(os.Stderr, "cycler: %s cycle %d failed: %s\n", name, cycle, errMsg)
+	fmt.Fprintf(os.Stderr, "runner: %s cycle %d failed: %s\n", name, cycle, errMsg)
 	return reportData{
 		name:   name,
 		cycle:  cycle,
@@ -1501,7 +1501,7 @@ func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePat
 		"--filter", "label=com.kurtosistech.enclave-name="+enclave,
 		"--format", "{{.Names}}")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cycler: log capture: docker ps failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "runner: log capture: docker ps failed: %v\n", err)
 		return "", ""
 	}
 	var containers []string
@@ -1519,11 +1519,11 @@ func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePat
 	targets = append(targets, dvNodes...)
 	targets = append(targets, vcs...)
 	if len(targets) == 0 {
-		fmt.Fprintln(os.Stderr, "cycler: log capture: no BN/Charon/VC containers found")
+		fmt.Fprintln(os.Stderr, "runner: log capture: no BN/Charon/VC containers found")
 		return "", ""
 	}
 
-	staging, err := os.MkdirTemp("", "cycler-logs-*")
+	staging, err := os.MkdirTemp("", "runner-logs-*")
 	if err != nil {
 		return "", ""
 	}
@@ -1535,13 +1535,13 @@ func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePat
 	}
 
 	if err := os.MkdirAll(cfg.logDir, 0o755); err != nil {
-		fmt.Fprintf(os.Stderr, "cycler: log capture: mkdir %s failed: %v\n", cfg.logDir, err)
+		fmt.Fprintf(os.Stderr, "runner: log capture: mkdir %s failed: %v\n", cfg.logDir, err)
 		return "", ""
 	}
 	ts := nowFn().UTC().Format("20060102-150405")
 	archivePath = filepath.Join(cfg.logDir, fmt.Sprintf("cycle%d-%s-%s.tar.gz", cycle, name, ts))
 	if err := makeTarGz(staging, archivePath); err != nil {
-		fmt.Fprintf(os.Stderr, "cycler: log capture: archive failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "runner: log capture: archive failed: %v\n", err)
 		return "", ""
 	}
 
@@ -1627,12 +1627,12 @@ func uploadLogsBestEffort(cfg config, d reportData) {
 	comment := fmt.Sprintf("Logs for %s (cycle %d, %s)", d.name, d.cycle, d.status)
 	uploaded, err := uploadLogsToSlack(cfg, d.logArchivePath, comment)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cycler: slack log upload failed (keeping local %s): %v\n", d.logArchivePath, err)
+		fmt.Fprintf(os.Stderr, "runner: slack log upload failed (keeping local %s): %v\n", d.logArchivePath, err)
 		return
 	}
 	if uploaded {
 		if rmErr := os.Remove(d.logArchivePath); rmErr != nil {
-			fmt.Fprintf(os.Stderr, "cycler: could not delete uploaded archive %s: %v\n", d.logArchivePath, rmErr)
+			fmt.Fprintf(os.Stderr, "runner: could not delete uploaded archive %s: %v\n", d.logArchivePath, rmErr)
 		}
 	}
 	// not uploaded (upload not configured): keep the local archive.
@@ -1727,7 +1727,7 @@ func uploadLogsToSlack(cfg config, archivePath, comment string) (bool, error) {
 
 // writeTempArgsFile writes yaml to a fresh temp file and returns its path.
 func writeTempArgsFile(yaml string) (path string, err error) {
-	f, err := os.CreateTemp("", "cycler-args-*.yaml")
+	f, err := os.CreateTemp("", "runner-args-*.yaml")
 	if err != nil {
 		return "", err
 	}
@@ -2183,7 +2183,7 @@ func postMatrixBestEffort(cfg config, m matrixStore, combos []string) {
 	ts := nowFn().UTC().Format("2006-01-02 15:04 UTC")
 	text, blocks := buildMatrixBlocks(m, combos, cfg.summaryMention, ts)
 	if err := slackPost(cfg.slackWebhookURL, text, blocks); err != nil {
-		fmt.Fprintf(os.Stderr, "cycler: matrix post failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "runner: matrix post failed: %v\n", err)
 	}
 }
 
@@ -2201,18 +2201,18 @@ func postMatrixBestEffort(cfg config, m matrixStore, combos []string) {
 func mainLoop(cfg config) {
 	st, err := loadState(cfg.statePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cycler: failed to load state (starting fresh): %v\n", err)
+		fmt.Fprintf(os.Stderr, "runner: failed to load state (starting fresh): %v\n", err)
 		st = state{}
 	}
 	saveState := func() {
 		if err := st.save(cfg.statePath); err != nil {
-			fmt.Fprintf(os.Stderr, "cycler: failed to save state: %v\n", err)
+			fmt.Fprintf(os.Stderr, "runner: failed to save state: %v\n", err)
 		}
 	}
 
 	matrix, err := loadMatrix(cfg.resultsPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cycler: failed to load matrix (starting fresh): %v\n", err)
+		fmt.Fprintf(os.Stderr, "runner: failed to load matrix (starting fresh): %v\n", err)
 		matrix = matrixStore{Results: map[string]comboResult{}}
 	}
 	saveMatrix := func() {
@@ -2220,7 +2220,7 @@ func mainLoop(cfg config) {
 			return
 		}
 		if err := matrix.save(cfg.resultsPath); err != nil {
-			fmt.Fprintf(os.Stderr, "cycler: failed to save matrix: %v\n", err)
+			fmt.Fprintf(os.Stderr, "runner: failed to save matrix: %v\n", err)
 		}
 	}
 
@@ -2234,12 +2234,12 @@ func mainLoop(cfg config) {
 	for {
 		// Freshen the repo so CL/VC pin changes are seen before scheduling.
 		if err := gitPull(cfg.repoPath); err != nil {
-			fmt.Fprintf(os.Stderr, "cycler: git pull failed (using current checkout): %v\n", err)
+			fmt.Fprintf(os.Stderr, "runner: git pull failed (using current checkout): %v\n", err)
 		}
 
 		files, err := paramFiles(cfg.paramsDir)
 		if err != nil || len(files) == 0 {
-			fmt.Fprintf(os.Stderr, "cycler: no param files found in %s (err=%v); backing off\n", cfg.paramsDir, err)
+			fmt.Fprintf(os.Stderr, "runner: no param files found in %s (err=%v); backing off\n", cfg.paramsDir, err)
 			sleepFn(time.Duration(computeBackoff(consecutiveFailures, cfg.interRunBackoffS, cfg.maxBackoffS)) * time.Second)
 			continue
 		}
@@ -2307,12 +2307,12 @@ func mainLoop(cfg config) {
 
 func main() {
 	if err := loadDotEnv(dotEnvPath()); err != nil {
-		fmt.Fprintln(os.Stderr, "cycler: failed to read .env:", err)
+		fmt.Fprintln(os.Stderr, "runner: failed to read .env:", err)
 		os.Exit(1)
 	}
 	cfg, err := loadConfig()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "cycler:", err)
+		fmt.Fprintln(os.Stderr, "runner:", err)
 		os.Exit(1)
 	}
 	mainLoop(cfg)

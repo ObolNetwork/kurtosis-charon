@@ -506,8 +506,8 @@ func TestLoadConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("loadConfig error: %v", err)
 		}
-		if !strings.HasSuffix(cfg.logDir, "cycler-logs") {
-			t.Errorf("logDir default = %q, want suffix cycler-logs", cfg.logDir)
+		if !strings.HasSuffix(cfg.logDir, "runner-logs") {
+			t.Errorf("logDir default = %q, want suffix runner-logs", cfg.logDir)
 		}
 		if cfg.slackBotToken != "xoxb-abc" || cfg.slackChannelID != "C123" {
 			t.Errorf("bot token/channel = %q/%q", cfg.slackBotToken, cfg.slackChannelID)
@@ -525,7 +525,7 @@ func TestLoadConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("loadConfig error: %v", err)
 		}
-		want := filepath.Join("/var/lib/cyc", "cycler-results.json")
+		want := filepath.Join("/var/lib/cyc", "runner-results.json")
 		if cfg.resultsPath != want {
 			t.Errorf("resultsPath = %q, want %q", cfg.resultsPath, want)
 		}
@@ -1554,7 +1554,7 @@ func TestUploadLogsBestEffortKeepsWhenNotUploaded(t *testing.T) {
 func TestBuildBlocksLogsSection(t *testing.T) {
 	d := reportData{
 		name: "x", cycle: 1, status: "failed", window: "-",
-		logArchivePath: "/home/u/cycler-logs/cycle1-x-ts.tar.gz",
+		logArchivePath: "/home/u/runner-logs/cycle1-x-ts.tar.gz",
 		logExcerpt:     "charon-0:\nERRO boom",
 	}
 	dump := dumpBlocks(buildBlocks(d))

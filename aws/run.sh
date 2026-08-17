@@ -40,10 +40,11 @@ else
   aws sso login
 fi
 
-python3 -m venv ./aws
-source ./aws/bin/activate
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+python3 -m venv "$SCRIPT_DIR/.venv"
+source "$SCRIPT_DIR/.venv/bin/activate"
 trap deactivate EXIT
-pip3 install -r aws/requirements.txt -q
+pip3 install -r "$SCRIPT_DIR/requirements.txt" -q
 
 RUNNER_ARGS=(
   --monitoring-token "$PROMETHEUS_REMOTE_WRITE_TOKEN"
@@ -58,4 +59,4 @@ if [ -n "${ONLY:-}" ]; then
   RUNNER_ARGS+=(--only "$ONLY")
 fi
 
-python3 aws/kurtosis_aws_runner.py "${RUNNER_ARGS[@]}"
+python3 "$SCRIPT_DIR/kurtosis_aws_runner.py" "${RUNNER_ARGS[@]}"

@@ -1,20 +1,18 @@
-.PHONY: run-native stop-native run-aws stop-aws clean
+.PHONY: run-aws stop-aws clean
 
-# Run a single native Charon combo locally.
-# Usage: make run-native COMBO=lighthouse-lighthouse
-COMBO ?= lighthouse-lighthouse
+# Run a single combo locally.
+# Usage: make run-local/lighthouse-lodestar
+run-local/%:
+	kurtosis run --enclave $* github.com/ObolNetwork/ethereum-package@6.1.0-obol --args-file ./deployments/$*.yaml
 
-run-native:
-	kurtosis run --enclave $(COMBO) github.com/ObolNetwork/ethereum-package@6.1.0-obol --args-file ./deployments/$(COMBO).yaml
-
-stop-native:
-	kurtosis enclave rm -f $(COMBO)
+stop-local/%:
+	kurtosis enclave rm -f $*
 
 run-aws:
-	./run_aws.sh
+	./aws/run.sh
 
 stop-aws:
-	./stop_aws.sh
+	./aws/stop.sh
 
 clean:
 	-kurtosis clean -a

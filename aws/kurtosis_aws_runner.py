@@ -19,7 +19,7 @@ NETWORK_PARAMS_DIR = "deployments"
 ETHEREUM_PACKAGE = "github.com/ObolNetwork/ethereum-package@6.1.0-obol"
 KURTOSIS_DEB_URL = "https://github.com/kurtosis-tech/kurtosis-cli-release-artifacts/releases/download/1.20.0/kurtosis-cli_1.20.0_linux_amd64.deb"
 
-# All 36 CL x VC combos. Shares args-files with the local cycler (deployments/).
+# All 36 CL x VC combos. Shares args-files with the local runner (deployments/).
 _BNS = ["lighthouse", "lodestar", "nimbus", "teku", "prysm", "grandine"]
 _VCS = ["lighthouse", "lodestar", "nimbus", "teku", "prysm", "vouch"]
 COMBOS = [
@@ -80,7 +80,7 @@ def get_latest_ubuntu_ami():
 
 def generate_user_data(combo, branch, shutdown_minutes, monitoring_token, charon_version):
     """Cloud-init that installs Docker + Kurtosis, clones kurtosis-charon, then runs
-    the native-Charon kurtosis command (mirrors `make run-native`) against this
+    the Charon kurtosis command (mirrors `make run-local/<combo>`) against this
     combo's split args-file. $PROMETHEUS_REMOTE_WRITE_TOKEN and $CHARON_VERSION
     placeholders in the args-file are substituted with envsubst before the run.
     """

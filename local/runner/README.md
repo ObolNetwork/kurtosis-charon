@@ -1,6 +1,6 @@
-# DV matrix cycler
+# DV test runner
 
-A small Go program (`package main`, `local/cycler/main.go`) that runs every
+A small Go program (`package main`, `local/runner/main.go`) that runs every
 static args-file in `deployments/` (one per CL/VC pairing behind the DV
 client) 24/7 on a host machine, using the local Kurtosis `ethereum-package`
 harness.
@@ -8,25 +8,25 @@ harness.
 ## Static param files (`deployments/`)
 
 Unlike an earlier design that generated each run's args-file from code, the
-cycler now just runs whatever `*.yaml` files exist in `deployments/`
+runner now just runs whatever `*.yaml` files exist in `deployments/`
 (default: `<CYCLER_REPO_PATH>/deployments`, overridable via
 `CYCLER_PARAMS_DIR`). Each file is a complete, self-contained
 ethereum-package args-file (participants, network params, MEV, monitoring,
 etc.) with client/DV image pins inlined and a literal
-`$PROMETHEUS_REMOTE_WRITE_TOKEN` placeholder that the cycler substitutes at
+`$PROMETHEUS_REMOTE_WRITE_TOKEN` placeholder that the runner substitutes at
 runtime with `CYCLER_MONITORING_TOKEN`.
 
 The directory is re-scanned (sorted lexically) on every loop iteration, so:
 
 - **Adding a file picks it up automatically.** Drop a 37th file into
   `deployments/` (e.g. `newclient-teku.yaml`) and it runs in its turn on
-  the very next pass through the directory — no cycler restart needed.
+  the very next pass through the directory — no runner restart needed.
 - **Bumping a pin means editing that file.** There's no shared `images.json`
-  for the cycler anymore — each `deployments/*.yaml` carries its own
+  for the runner anymore — each `deployments/*.yaml` carries its own
   pins. Edit the file, commit, push to `CYCLER_REPO_PATH`; the next time
-  that file comes up in rotation (after the cycler's per-run `git pull`) it
+  that file comes up in rotation (after the runner's per-run `git pull`) it
   launches with the new pin.
-- **Moving tags are always re-pulled.** The cycler runs `kurtosis run` with
+- **Moving tags are always re-pulled.** The runner runs `kurtosis run` with
   `--image-download always`, so a moving tag like `obolnetwork/charon:next`
   picks up a freshly-built image on the next run rather than reusing a stale
   locally-cached one (Kurtosis's default `missing` policy would never re-pull
@@ -36,7 +36,7 @@ The directory is re-scanned (sorted lexically) on every loop iteration, so:
   full pass.
 
 `cluster_name` is *not* baked into the file or derived from its name — the
-cycler discovers it at runtime (see below), since it's an emergent property
+runner discovers it at runtime (see below), since it's an emergent property
 of the running enclave, not something the static file declares.
 
 ## What it does (the run cycle)
@@ -73,7 +73,7 @@ For each param file in the directory, in sorted order, forever:
 
 A failure at any stage (launch, health wait, cluster discovery, sampling,
 metrics query, report assembly) produces a `failed` Slack report instead of
-crashing the loop — the cycler always continues to the next file. An empty
+crashing the loop — the runner always continues to the next file. An empty
 or unreadable `deployments/` directory is treated the same way: a
 warning is logged, the loop backs off, and it retries (re-scanning the
 directory) rather than exiting. Slack-post failures are swallowed too; they
@@ -81,7 +81,7 @@ must never block teardown.
 
 ## Failure log capture
 
-When a run ends **non-`ok`** (`failed` or `degraded`), the cycler captures the
+When a run ends **non-`ok`** (`failed` or `degraded`), the runner captures the
 logs of the relevant services *before tearing the enclave down* — the DV
 participant's own beacon node, all Charon nodes (`*-charon-charon-<N>`), and all
 DV validator clients (`*-charon-vc-*`) — and writes them to a gzipped tarball
@@ -98,7 +98,7 @@ captured.
 
 Capture is best-effort — a problem gathering logs never breaks the run or the
 loop. It relies on `docker` being available to the service user and assumes a
-single enclave is running (true for the cycler, which tears down between runs),
+single enclave is running (true for the runner, which tears down between runs),
 so it scopes targets by service-name pattern.
 
 If `CYCLER_SLACK_BOT_TOKEN` and `CYCLER_SLACK_CHANNEL_ID` are set, the archive
@@ -116,14 +116,14 @@ upload didn't go through.
 
 ## Results matrix
 
-Alongside the per-run reports, the cycler maintains a **single persistent
+Alongside the per-run reports, the runner maintains a **single persistent
 matrix** (one row per combo) in `CYCLER_RESULTS_PATH`, so it survives restarts.
 Each row holds the combo's latest result — status, duty success %, Charon peak
 mem/cpu, host peak cpu/mem — plus the **versions it ran with**: the DV
 beacon-node image (`cl`), the Charon-managed VC image (`vc`), and the **Charon
 git commit** (`charon`, captured from `charon version` in the container).
 
-**Invalidation & re-test.** On each `git pull` the cycler diffs the current
+**Invalidation & re-test.** On each `git pull` the runner diffs the current
 param-file pins (each combo's DV `cl_image` and `charon_vc_image`) against what
 each row last ran with. Any combo whose CL or VC version changed is
 **invalidated**, and the scheduler **prioritises** those combos (runs them
@@ -133,7 +133,7 @@ ok/degraded/failed (a persistently-failing combo shows its failure but doesn't
 block completion). Example: bumping Lodestar (CL **and** VC) invalidates the 11
 combos where Lodestar is the beacon node or the VC.
 
-**Posting.** Once every combo is valid again (the matrix is whole), the cycler
+**Posting.** Once every combo is valid again (the matrix is whole), the runner
 posts the full matrix to Slack as a **fresh message** (via the webhook) —
 columns `combo | cl | vc | charon | status | duty% | chn-mem | chn-cpu |
 host-cpu | host-mem`, one message (the wide table is split across code blocks
@@ -146,11 +146,11 @@ a ping to the matrix message.
 
 ## Running it
 
-No build step is required — the cycler is run directly with `go run`, from
+No build step is required — the runner is run directly with `go run`, from
 the module directory. Put config in a `.env` file:
 
 ```bash
-cd local/cycler
+cd local/runner
 cp .env.example .env      # then edit .env (webhook, paths, token)
 go run .
 ```
@@ -158,10 +158,10 @@ go run .
 Or set the `CYCLER_*` variables in the environment (these override `.env`):
 
 ```bash
-cd local/cycler
+cd local/runner
 CYCLER_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/... \
 CYCLER_REPO_PATH=/opt/kurtosis-charon \
-CYCLER_STATE_PATH=/var/lib/cycler/state.json \
+CYCLER_STATE_PATH=/var/lib/runner/state.json \
 go run .
 ```
 
@@ -180,7 +180,7 @@ For a host without a supervisor, three helper scripts wrap the manual launch:
 ```
 
 `start.sh` reads `.env` from this directory, logs to `$CYCLER_LOG` (default
-`~/cycler.log`), and adds `$HOME/sdk/go/bin` or `/usr/local/go/bin` to `PATH`
+`~/runner.log`), and adds `$HOME/sdk/go/bin` or `/usr/local/go/bin` to `PATH`
 if `go` isn't already resolvable. `stop.sh` stops the loop process and tears
 down the in-flight enclave; the state file is preserved, so a later `start.sh`
 resumes at the same rotation position. These are a convenience for
@@ -188,7 +188,7 @@ manual operation; for unattended 24/7 use prefer the systemd unit below.
 
 ## Configuration
 
-Configuration is via `CYCLER_*` environment variables. At startup the cycler
+Configuration is via `CYCLER_*` environment variables. At startup the runner
 also loads a `.env` file (`KEY=value`) from its working directory — copy
 `.env.example` to `.env` and fill it in (point elsewhere with
 `CYCLER_ENV_FILE`). Real environment variables and `--flags` take precedence
@@ -199,15 +199,15 @@ the three required variables is unset or empty.
 | Env var | Required | Default | Description |
 |---|---|---|---|
 | `CYCLER_SLACK_WEBHOOK_URL` | yes | — | Slack Incoming Webhook URL for run reports. |
-| `CYCLER_REPO_PATH` | yes | — | Absolute path to this repo checkout on the host (the cycler `git pull`s this path before each run). |
+| `CYCLER_REPO_PATH` | yes | — | Absolute path to this repo checkout on the host (the runner `git pull`s this path before each run). |
 | `CYCLER_STATE_PATH` | yes | — | Absolute path to the state file (see below); the containing directory must exist and be writable by the service user. |
 | `CYCLER_PARAMS_DIR` | no | `<CYCLER_REPO_PATH>/deployments` | Directory scanned for `*.yaml` param files every loop iteration. |
 | `CYCLER_MONITORING_TOKEN` | no | `""` | Prometheus remote-write auth token (substituted for `$PROMETHEUS_REMOTE_WRITE_TOKEN` in each param file); empty disables remote-write auth. |
 | `CYCLER_PACKAGE_REF` | no | `github.com/ObolNetwork/ethereum-package@6.1.0-obol` | Kurtosis package reference to run. |
-| `CYCLER_LOG_DIR` | no | `<home>/cycler-logs` | Directory where failing-run log archives (`.tar.gz`) are written. |
+| `CYCLER_LOG_DIR` | no | `<home>/runner-logs` | Directory where failing-run log archives (`.tar.gz`) are written. |
 | `CYCLER_SLACK_BOT_TOKEN` | no | `""` | Slack bot token (`files:write` scope) for uploading failing-run log archives. Empty = local save only. |
 | `CYCLER_SLACK_CHANNEL_ID` | no | `""` | Slack channel id to upload failing-run log archives into (needs `CYCLER_SLACK_BOT_TOKEN`). |
-| `CYCLER_RESULTS_PATH` | no | `<state-dir>/cycler-results.json` | Persistent results-matrix file (one row per combo + versions). |
+| `CYCLER_RESULTS_PATH` | no | `<state-dir>/runner-results.json` | Persistent results-matrix file (one row per combo + versions). |
 | `CYCLER_SUMMARY_MENTION` | no | `""` | Slack mention prepended to the matrix message (e.g. `<!subteam^S123>`); empty = no ping. |
 | `CYCLER_RUN_MINUTES` | no | `90` | Length of each run's window. |
 | `CYCLER_WARMUP_MINUTES` | no | `15` | Leading portion of the run window excluded from duty/health scoring. |
@@ -224,15 +224,15 @@ unit file — create one like the following, adjusting `User`, the paths, and th
 
 ```ini
 [Unit]
-Description=DV 36-combo test cycler
+Description=DV 36-combo test runner
 After=docker.service network-online.target
 Wants=docker.service network-online.target
 
 [Service]
 Type=simple
 User=dv
-WorkingDirectory=/opt/kurtosis-charon/local/cycler
-Environment=GOCACHE=/var/cache/cycler/go-build
+WorkingDirectory=/opt/kurtosis-charon/local/runner
+Environment=GOCACHE=/var/cache/runner/go-build
 Environment=HOME=/opt/kurtosis-charon
 ExecStart=/usr/local/go/bin/go run .
 Restart=always
@@ -244,9 +244,9 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-Save it as `/etc/systemd/system/cycler.service`, then
-`sudo systemctl daemon-reload && sudo systemctl enable --now cycler`. The
-`WorkingDirectory` is the Go module root (`local/cycler/`), not the repo root.
+Save it as `/etc/systemd/system/runner.service`, then
+`sudo systemctl daemon-reload && sudo systemctl enable --now runner`. The
+`WorkingDirectory` is the Go module root (`local/runner/`), not the repo root.
 
 Notes:
 
@@ -261,16 +261,16 @@ Notes:
 ## Logs
 
 ```bash
-journalctl -u cycler -f
+journalctl -u runner -f
 ```
 
 Since the unit sets `StandardOutput=journal` / `StandardError=journal`, all
-cycler output (including per-run status) goes to the systemd journal under
-the `cycler` unit.
+runner output (including per-run status) goes to the systemd journal under
+the `runner` unit.
 
 ## State file and resume behavior
 
-The cycler persists its position in the `deployments/` rotation to
+The runner persists its position in the `deployments/` rotation to
 `CYCLER_STATE_PATH` after every run (`cycle`, `next_index`, and — while a run
 is in flight — `current_enclave`). On startup, `mainLoop`:
 
@@ -281,7 +281,7 @@ is in flight — `current_enclave`). On startup, `mainLoop`:
 - Resumes from `next_index`/`cycle` rather than starting over. Since the
   directory is re-scanned every iteration, `next_index` is clamped against
   the current file count each time (if a file was removed and `next_index`
-  now runs past the end of the list, the cycler wraps to index 0 and bumps
+  now runs past the end of the list, the runner wraps to index 0 and bumps
   `cycle` rather than erroring).
 
 This means a reboot or systemd restart loses at most the in-flight run — the
@@ -291,6 +291,6 @@ rotation.
 ## Running tests
 
 ```bash
-cd local/cycler
+cd local/runner
 go test ./...
 ```

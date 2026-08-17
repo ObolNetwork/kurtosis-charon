@@ -14,7 +14,7 @@ A single `kurtosis run` command spins up the full stack: EL + CL + Charon DV mid
 ### Run a local cluster
 
 ```bash
-make run-native COMBO=lighthouse-lodestar
+make run-local/lighthouse-lodestar
 ```
 
 Watch the Kurtosis enclave come up, then inspect with `kurtosis enclave inspect lighthouse-lodestar`.
@@ -22,7 +22,7 @@ Watch the Kurtosis enclave come up, then inspect with `kurtosis enclave inspect 
 ### Cleanup
 
 ```bash
-make stop-native COMBO=lighthouse-lodestar
+make stop-local/lighthouse-lodestar
 # or clean everything:
 make clean
 ```
@@ -58,13 +58,13 @@ make stop-aws
 
 See `aws/README.md` for full details.
 
-## DV Cycler
+## DV Runner
 
-The DV cycler (`local/cycler/`) runs 24/7, cycling all 36 combos and reporting results to Slack. It uses `charon:next` by default for bleeding-edge testing. See `local/cycler/README.md` for configuration.
+The DV runner (`local/runner/`) runs 24/7, cycling all 36 combos and reporting results to Slack. It uses `charon:next` by default for bleeding-edge testing. See `local/runner/README.md` for configuration.
 
 ## Network Params
 
-Args-files live in `deployments/<cl>-<vc>.yaml`. They use `$CHARON_VERSION` as a placeholder, substituted at runtime by the cycler and AWS runner. Client versions are pinned directly in each YAML file.
+Args-files live in `deployments/<cl>-<vc>.yaml`. They use `$CHARON_VERSION` as a placeholder, substituted at runtime by the runner and AWS runner. Client versions are pinned directly in each YAML file.
 
 ## Notes
 

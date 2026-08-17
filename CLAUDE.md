@@ -12,8 +12,8 @@ All 36 CL x VC combos (6 CLs: lighthouse, lodestar, nimbus, teku, prysm, grandin
 
 ### Running a local cluster
 ```bash
-make run-native COMBO=lighthouse-lodestar
-make stop-native COMBO=lighthouse-lodestar
+make run-local/lighthouse-lodestar
+make stop-local/lighthouse-lodestar
 make clean
 ```
 
@@ -43,7 +43,7 @@ ONLY=lighthouse-vouch make run-aws     # single combo
 
 ### DV Cycler
 
-`local/cycler/` is a Go program running 24/7, cycling all 36 combos sequentially. Uses `charon:next` by default (override with `CYCLER_CHARON_TAG` env var). After each run it scores duty success rates from Prometheus, reports to Slack, and archives logs on failure.
+`local/runner/` is a Go program running 24/7, cycling all 36 combos sequentially. Uses `charon:next` by default (override with `CYCLER_CHARON_TAG` env var). After each run it scores duty success rates from Prometheus, reports to Slack, and archives logs on failure.
 
 ## Prerequisites
 

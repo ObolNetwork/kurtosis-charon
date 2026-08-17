@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Start the cycler as a detached background process that survives logout.
+# Start the runner as a detached background process that survives logout.
 # Idempotent: refuses to start a second instance. Config is read from .env in
 # this directory (see .env.example). Override the log path with CYCLER_LOG.
 set -euo pipefail
 
 cd "$(dirname "$0")"
 
-# The cycler runs via `go run .`, so a Go toolchain must be on PATH. Fall back
+# The runner runs via `go run .`, so a Go toolchain must be on PATH. Fall back
 # to common install locations if `go` isn't already resolvable.
 if ! command -v go >/dev/null 2>&1; then
   for d in "$HOME/sdk/go/bin" /usr/local/go/bin; do
@@ -21,13 +21,13 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
-LOG="${CYCLER_LOG:-$HOME/cycler.log}"
-PAT='go-build.*/cycler|go run \.'
+LOG="${CYCLER_LOG:-$HOME/runner.log}"
+PAT='go-build.*/runner|go run \.'
 
 if pgrep -f "$PAT" >/dev/null 2>&1; then
-  echo "cycler already running (pids: $(pgrep -f "$PAT" | tr '\n' ' '))"
+  echo "runner already running (pids: $(pgrep -f "$PAT" | tr '\n' ' '))"
   exit 0
 fi
 
 setsid nohup go run . > "$LOG" 2>&1 < /dev/null &
-echo "started cycler (pid $!); logging to $LOG"
+echo "started runner (pid $!); logging to $LOG"
