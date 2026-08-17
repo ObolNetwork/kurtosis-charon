@@ -9,12 +9,12 @@ harness.
 
 Unlike an earlier design that generated each run's args-file from code, the
 runner now just runs whatever `*.yaml` files exist in `deployments/`
-(default: `<CYCLER_REPO_PATH>/deployments`, overridable via
-`CYCLER_PARAMS_DIR`). Each file is a complete, self-contained
+(default: `<RUNNER_REPO_PATH>/deployments`, overridable via
+`RUNNER_PARAMS_DIR`). Each file is a complete, self-contained
 ethereum-package args-file (participants, network params, MEV, monitoring,
 etc.) with client/DV image pins inlined and a literal
 `$PROMETHEUS_REMOTE_WRITE_TOKEN` placeholder that the runner substitutes at
-runtime with `CYCLER_MONITORING_TOKEN`.
+runtime with `RUNNER_MONITORING_TOKEN`.
 
 The directory is re-scanned (sorted lexically) on every loop iteration, so:
 
@@ -23,7 +23,7 @@ The directory is re-scanned (sorted lexically) on every loop iteration, so:
   the very next pass through the directory — no runner restart needed.
 - **Bumping a pin means editing that file.** There's no shared `images.json`
   for the runner anymore — each `deployments/*.yaml` carries its own
-  pins. Edit the file, commit, push to `CYCLER_REPO_PATH`; the next time
+  pins. Edit the file, commit, push to `RUNNER_REPO_PATH`; the next time
   that file comes up in rotation (after the runner's per-run `git pull`) it
   launches with the new pin.
 - **Moving tags are always re-pulled.** The runner runs `kurtosis run` with
@@ -43,7 +43,7 @@ of the running enclave, not something the static file declares.
 
 For each param file in the directory, in sorted order, forever:
 
-1. `git pull` the repo (`CYCLER_REPO_PATH`) so the run always picks up the
+1. `git pull` the repo (`RUNNER_REPO_PATH`) so the run always picks up the
    latest committed param files (pins, structure, or newly added/removed
    files) before launching.
 2. Tear down any stale enclave left over from a previous crash, substitute
@@ -51,25 +51,25 @@ For each param file in the directory, in sorted order, forever:
    fresh Kurtosis enclave from the resulting temp args-file (native
    Kurtosis path, no DV-specific harness changes).
 3. Wait for the cluster to become healthy (bounded by
-   `CYCLER_STARTUP_DEADLINE_MINUTES`); if it never comes up, the run is
+   `RUNNER_STARTUP_DEADLINE_MINUTES`); if it never comes up, the run is
    recorded as `failed`.
 4. Discover the enclave's charon `cluster_name` at runtime by querying
    Prometheus (there is exactly one charon cluster per enclave — the
    bootstrap lighthouse VCs are not charon and don't count).
-5. Sample host CPU/mem for the duration of the run (`CYCLER_RUN_MINUTES`,
-   default 90) at `CYCLER_SAMPLE_INTERVAL_S` intervals.
+5. Sample host CPU/mem for the duration of the run (`RUNNER_RUN_MINUTES`,
+   default 90) at `RUNNER_SAMPLE_INTERVAL_S` intervals.
 6. At the end of the window, query local Prometheus (scoped to the
    discovered `cluster_name`) for duty success ratios (worst node), DV
    CPU/mem peaks, and `app_health_checks` firing status. The scoring window
-   excludes the first `CYCLER_WARMUP_MINUTES` of the run so startup noise
+   excludes the first `RUNNER_WARMUP_MINUTES` of the run so startup noise
    doesn't count against the run.
 7. Post one Slack message (via Incoming Webhook) summarizing the run: the
    param file's name, the discovered cluster, status (`ok` / `degraded` /
    `failed`), worst-node duty ratios, DV CPU/mem peaks, host stats, and any
    firing health checks.
 8. Tear down the enclave (best-effort/idempotent) and advance to the next
-   file, backing off (`CYCLER_INTER_RUN_BACKOFF_S`, capped at
-   `CYCLER_MAX_BACKOFF_S`) after consecutive failures.
+   file, backing off (`RUNNER_INTER_RUN_BACKOFF_S`, capped at
+   `RUNNER_MAX_BACKOFF_S`) after consecutive failures.
 
 A failure at any stage (launch, health wait, cluster discovery, sampling,
 metrics query, report assembly) produces a `failed` Slack report instead of
@@ -85,7 +85,7 @@ When a run ends **non-`ok`** (`failed` or `degraded`), the runner captures the
 logs of the relevant services *before tearing the enclave down* — the DV
 participant's own beacon node, all Charon nodes (`*-charon-charon-<N>`), and all
 DV validator clients (`*-charon-vc-*`) — and writes them to a gzipped tarball
-under `CYCLER_LOG_DIR` named `cycle<N>-<combo>-<UTC-timestamp>.tar.gz`. The Slack
+under `RUNNER_LOG_DIR` named `cycle<N>-<combo>-<UTC-timestamp>.tar.gz`. The Slack
 report for that run includes the archive path and a short excerpt (recent
 error/warn/fatal lines from a Charon node).
 
@@ -101,23 +101,23 @@ loop. It relies on `docker` being available to the service user and assumes a
 single enclave is running (true for the runner, which tears down between runs),
 so it scopes targets by service-name pattern.
 
-If `CYCLER_SLACK_BOT_TOKEN` and `CYCLER_SLACK_CHANNEL_ID` are set, the archive
+If `RUNNER_SLACK_BOT_TOKEN` and `RUNNER_SLACK_CHANNEL_ID` are set, the archive
 is also uploaded to that Slack channel via the Web API
 (`files.getUploadURLExternal` → upload → `files.completeUploadExternal`). The
 incoming webhook used for the report itself cannot attach files, so without a
 bot token the logs are saved locally only (the report still links the path).
 
 **Local cleanup:** on a *successful* upload the local archive is **deleted** —
-Slack becomes the durable store, so `CYCLER_LOG_DIR` doesn't grow over time. If
+Slack becomes the durable store, so `RUNNER_LOG_DIR` doesn't grow over time. If
 upload isn't configured, or an upload fails, the local archive is **kept** (it's
 then the only copy). So a healthy, upload-configured deployment leaves
-`CYCLER_LOG_DIR` empty between failures; anything lingering there is a run whose
+`RUNNER_LOG_DIR` empty between failures; anything lingering there is a run whose
 upload didn't go through.
 
 ## Results matrix
 
 Alongside the per-run reports, the runner maintains a **single persistent
-matrix** (one row per combo) in `CYCLER_RESULTS_PATH`, so it survives restarts.
+matrix** (one row per combo) in `RUNNER_RESULTS_PATH`, so it survives restarts.
 Each row holds the combo's latest result — status, duty success %, Charon peak
 mem/cpu, host peak cpu/mem — plus the **versions it ran with**: the DV
 beacon-node image (`cl`), the Charon-managed VC image (`vc`), and the **Charon
@@ -141,7 +141,7 @@ to fit Slack's limits). So you get a new, notified matrix each time a version
 change finishes testing; normal rotation between changes refreshes rows quietly
 without re-posting. A new Charon `:next` build is *not* an invalidation trigger
 — it only updates the `charon` column opportunistically as combos re-run. Set
-`CYCLER_SUMMARY_MENTION` to a Slack mention (e.g. `<!subteam^S123>`) to prepend
+`RUNNER_SUMMARY_MENTION` to a Slack mention (e.g. `<!subteam^S123>`) to prepend
 a ping to the matrix message.
 
 ## Running it
@@ -155,13 +155,13 @@ cp .env.example .env      # then edit .env (webhook, paths, token)
 go run .
 ```
 
-Or set the `CYCLER_*` variables in the environment (these override `.env`):
+Or set the `RUNNER_*` variables in the environment (these override `.env`):
 
 ```bash
 cd local/runner
-CYCLER_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/... \
-CYCLER_REPO_PATH=/opt/kurtosis-charon \
-CYCLER_STATE_PATH=/var/lib/runner/state.json \
+RUNNER_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/... \
+RUNNER_REPO_PATH=/opt/kurtosis-charon \
+RUNNER_STATE_PATH=/var/lib/runner/state.json \
 go run .
 ```
 
@@ -179,7 +179,7 @@ For a host without a supervisor, three helper scripts wrap the manual launch:
 ./stop.sh     # stop the loop AND tear down the current run's enclave
 ```
 
-`start.sh` reads `.env` from this directory, logs to `$CYCLER_LOG` (default
+`start.sh` reads `.env` from this directory, logs to `$RUNNER_LOG` (default
 `~/runner.log`), and adds `$HOME/sdk/go/bin` or `/usr/local/go/bin` to `PATH`
 if `go` isn't already resolvable. `stop.sh` stops the loop process and tears
 down the in-flight enclave; the state file is preserved, so a later `start.sh`
@@ -188,33 +188,33 @@ manual operation; for unattended 24/7 use prefer the systemd unit below.
 
 ## Configuration
 
-Configuration is via `CYCLER_*` environment variables. At startup the runner
+Configuration is via `RUNNER_*` environment variables. At startup the runner
 also loads a `.env` file (`KEY=value`) from its working directory — copy
 `.env.example` to `.env` and fill it in (point elsewhere with
-`CYCLER_ENV_FILE`). Real environment variables and `--flags` take precedence
+`RUNNER_ENV_FILE`). Real environment variables and `--flags` take precedence
 over `.env`, and `.env` is gitignored so secrets stay out of the repo.
 `loadConfig()` returns an error naming every missing required key if any of
 the three required variables is unset or empty.
 
 | Env var | Required | Default | Description |
 |---|---|---|---|
-| `CYCLER_SLACK_WEBHOOK_URL` | yes | — | Slack Incoming Webhook URL for run reports. |
-| `CYCLER_REPO_PATH` | yes | — | Absolute path to this repo checkout on the host (the runner `git pull`s this path before each run). |
-| `CYCLER_STATE_PATH` | yes | — | Absolute path to the state file (see below); the containing directory must exist and be writable by the service user. |
-| `CYCLER_PARAMS_DIR` | no | `<CYCLER_REPO_PATH>/deployments` | Directory scanned for `*.yaml` param files every loop iteration. |
-| `CYCLER_MONITORING_TOKEN` | no | `""` | Prometheus remote-write auth token (substituted for `$PROMETHEUS_REMOTE_WRITE_TOKEN` in each param file); empty disables remote-write auth. |
-| `CYCLER_PACKAGE_REF` | no | `github.com/ObolNetwork/ethereum-package@6.1.0-obol` | Kurtosis package reference to run. |
-| `CYCLER_LOG_DIR` | no | `<home>/runner-logs` | Directory where failing-run log archives (`.tar.gz`) are written. |
-| `CYCLER_SLACK_BOT_TOKEN` | no | `""` | Slack bot token (`files:write` scope) for uploading failing-run log archives. Empty = local save only. |
-| `CYCLER_SLACK_CHANNEL_ID` | no | `""` | Slack channel id to upload failing-run log archives into (needs `CYCLER_SLACK_BOT_TOKEN`). |
-| `CYCLER_RESULTS_PATH` | no | `<state-dir>/runner-results.json` | Persistent results-matrix file (one row per combo + versions). |
-| `CYCLER_SUMMARY_MENTION` | no | `""` | Slack mention prepended to the matrix message (e.g. `<!subteam^S123>`); empty = no ping. |
-| `CYCLER_RUN_MINUTES` | no | `90` | Length of each run's window. |
-| `CYCLER_WARMUP_MINUTES` | no | `15` | Leading portion of the run window excluded from duty/health scoring. |
-| `CYCLER_STARTUP_DEADLINE_MINUTES` | no | `25` | How long to wait for the enclave to become healthy before recording the run `failed`. |
-| `CYCLER_SAMPLE_INTERVAL_S` | no | `15` | Host CPU/mem sampling interval during the run. |
-| `CYCLER_INTER_RUN_BACKOFF_S` | no | `30` | Base backoff between runs after a failure. |
-| `CYCLER_MAX_BACKOFF_S` | no | `900` | Cap on the (doubling) backoff after consecutive failures. |
+| `RUNNER_SLACK_WEBHOOK_URL` | yes | — | Slack Incoming Webhook URL for run reports. |
+| `RUNNER_REPO_PATH` | yes | — | Absolute path to this repo checkout on the host (the runner `git pull`s this path before each run). |
+| `RUNNER_STATE_PATH` | yes | — | Absolute path to the state file (see below); the containing directory must exist and be writable by the service user. |
+| `RUNNER_PARAMS_DIR` | no | `<RUNNER_REPO_PATH>/deployments` | Directory scanned for `*.yaml` param files every loop iteration. |
+| `RUNNER_MONITORING_TOKEN` | no | `""` | Prometheus remote-write auth token (substituted for `$PROMETHEUS_REMOTE_WRITE_TOKEN` in each param file); empty disables remote-write auth. |
+| `RUNNER_PACKAGE_REF` | no | `github.com/ObolNetwork/ethereum-package@6.1.0-obol` | Kurtosis package reference to run. |
+| `RUNNER_LOG_DIR` | no | `<home>/runner-logs` | Directory where failing-run log archives (`.tar.gz`) are written. |
+| `RUNNER_SLACK_BOT_TOKEN` | no | `""` | Slack bot token (`files:write` scope) for uploading failing-run log archives. Empty = local save only. |
+| `RUNNER_SLACK_CHANNEL_ID` | no | `""` | Slack channel id to upload failing-run log archives into (needs `RUNNER_SLACK_BOT_TOKEN`). |
+| `RUNNER_RESULTS_PATH` | no | `<state-dir>/runner-results.json` | Persistent results-matrix file (one row per combo + versions). |
+| `RUNNER_SUMMARY_MENTION` | no | `""` | Slack mention prepended to the matrix message (e.g. `<!subteam^S123>`); empty = no ping. |
+| `RUNNER_RUN_MINUTES` | no | `90` | Length of each run's window. |
+| `RUNNER_WARMUP_MINUTES` | no | `15` | Leading portion of the run window excluded from duty/health scoring. |
+| `RUNNER_STARTUP_DEADLINE_MINUTES` | no | `25` | How long to wait for the enclave to become healthy before recording the run `failed`. |
+| `RUNNER_SAMPLE_INTERVAL_S` | no | `15` | Host CPU/mem sampling interval during the run. |
+| `RUNNER_INTER_RUN_BACKOFF_S` | no | `30` | Base backoff between runs after a failure. |
+| `RUNNER_MAX_BACKOFF_S` | no | `900` | Cap on the (doubling) backoff after consecutive failures. |
 
 ## Running as a systemd service (optional)
 
@@ -271,10 +271,10 @@ the `runner` unit.
 ## State file and resume behavior
 
 The runner persists its position in the `deployments/` rotation to
-`CYCLER_STATE_PATH` after every run (`cycle`, `next_index`, and — while a run
+`RUNNER_STATE_PATH` after every run (`cycle`, `next_index`, and — while a run
 is in flight — `current_enclave`). On startup, `mainLoop`:
 
-- Loads `CYCLER_STATE_PATH` if it exists (otherwise starts fresh at cycle 0,
+- Loads `RUNNER_STATE_PATH` if it exists (otherwise starts fresh at cycle 0,
   index 0).
 - If `current_enclave` is set (meaning the previous process died mid-run), it
   tears down that stale enclave and clears the field before resuming.

@@ -16,7 +16,7 @@ echo
 echo "enclaves:"
 kurtosis enclave ls 2>/dev/null || echo "  (kurtosis unavailable)"
 
-LOG="${CYCLER_LOG:-$HOME/runner.log}"
+LOG="${RUNNER_LOG:-$HOME/runner.log}"
 echo
 echo "recent log ($LOG):"
 if [ -f "$LOG" ]; then

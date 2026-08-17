@@ -34,16 +34,16 @@ ONLY=lighthouse-vouch make run-aws     # single combo
 ### Network Params
 
 `deployments/*.yaml` are self-contained Kurtosis args-files. They use `$CHARON_VERSION` as a placeholder for the Charon Docker image tag, substituted at runtime by:
-- **DV Cycler**: `strings.ReplaceAll` in Go (defaults to `next`)
+- **DV Runner**: `strings.ReplaceAll` in Go (defaults to `next`)
 - **AWS Runner**: `envsubst` in cloud-init (pinned stable release via `--charon-version`)
 
 ### AWS Runner
 
 `aws/kurtosis_aws_runner.py` launches one EC2 instance per combo. Charon version is a required `--charon-version` CLI arg. The `--only` flag supports `cl:<client>`, `vc:<client>`, and exact combo names with union semantics.
 
-### DV Cycler
+### DV Runner
 
-`local/runner/` is a Go program running 24/7, cycling all 36 combos sequentially. Uses `charon:next` by default (override with `CYCLER_CHARON_TAG` env var). After each run it scores duty success rates from Prometheus, reports to Slack, and archives logs on failure.
+`local/runner/` is a Go program running 24/7, cycling all 36 combos sequentially. Uses `charon:next` by default (override with `RUNNER_CHARON_TAG` env var). After each run it scores duty success rates from Prometheus, reports to Slack, and archives logs on failure.
 
 ## Prerequisites
 

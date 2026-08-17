@@ -19,9 +19,9 @@ else
 fi
 
 # Tear down the in-flight enclave named in the state file (best-effort).
-STATE="${CYCLER_STATE_PATH:-}"
+STATE="${RUNNER_STATE_PATH:-}"
 if [ -z "$STATE" ]; then
-  STATE=$(grep -E '^CYCLER_STATE_PATH=' .env 2>/dev/null | sed -E 's/^CYCLER_STATE_PATH=//' || true)
+  STATE=$(grep -E '^RUNNER_STATE_PATH=' .env 2>/dev/null | sed -E 's/^RUNNER_STATE_PATH=//' || true)
 fi
 enc=""
 if [ -n "${STATE:-}" ] && [ -f "$STATE" ]; then

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Start the runner as a detached background process that survives logout.
 # Idempotent: refuses to start a second instance. Config is read from .env in
-# this directory (see .env.example). Override the log path with CYCLER_LOG.
+# this directory (see .env.example). Override the log path with RUNNER_LOG.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -21,7 +21,7 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
-LOG="${CYCLER_LOG:-$HOME/runner.log}"
+LOG="${RUNNER_LOG:-$HOME/runner.log}"
 PAT='go-build.*/runner|go run \.'
 
 if pgrep -f "$PAT" >/dev/null 2>&1; then

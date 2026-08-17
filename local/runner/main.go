@@ -62,11 +62,11 @@ type config struct {
 	summaryMention         string
 }
 
-// dotEnvPath returns the .env file to load: $CYCLER_ENV_FILE if set, else
+// dotEnvPath returns the .env file to load: $RUNNER_ENV_FILE if set, else
 // ".env" in the current working directory (under systemd that's the unit's
 // WorkingDirectory; under a manual `go run .` it's the module dir).
 func dotEnvPath() string {
-	if p := os.Getenv("CYCLER_ENV_FILE"); p != "" {
+	if p := os.Getenv("RUNNER_ENV_FILE"); p != "" {
 		return p
 	}
 	return ".env"
@@ -111,10 +111,10 @@ func loadDotEnv(path string) error {
 	return nil
 }
 
-// envInt reads an integer env var (CYCLER_<name>) into *dst if present and
+// envInt reads an integer env var (RUNNER_<name>) into *dst if present and
 // non-empty and parses cleanly; otherwise dst is left untouched.
 func envInt(name string, dst *int) {
-	v, ok := os.LookupEnv("CYCLER_" + name)
+	v, ok := os.LookupEnv("RUNNER_" + name)
 	if !ok || v == "" {
 		return
 	}
@@ -123,10 +123,10 @@ func envInt(name string, dst *int) {
 	}
 }
 
-// envStr reads a string env var (CYCLER_<name>) into *dst if present and
+// envStr reads a string env var (RUNNER_<name>) into *dst if present and
 // non-empty.
 func envStr(name string, dst *string) {
-	if v, ok := os.LookupEnv("CYCLER_" + name); ok && v != "" {
+	if v, ok := os.LookupEnv("RUNNER_" + name); ok && v != "" {
 		*dst = v
 	}
 }
@@ -245,13 +245,13 @@ func loadConfig() (config, error) {
 
 	var missing []string
 	if cfg.slackWebhookURL == "" {
-		missing = append(missing, "slack_webhook_url (CYCLER_SLACK_WEBHOOK_URL / --slack-webhook-url)")
+		missing = append(missing, "slack_webhook_url (RUNNER_SLACK_WEBHOOK_URL / --slack-webhook-url)")
 	}
 	if cfg.repoPath == "" {
-		missing = append(missing, "repo_path (CYCLER_REPO_PATH / --repo-path)")
+		missing = append(missing, "repo_path (RUNNER_REPO_PATH / --repo-path)")
 	}
 	if cfg.statePath == "" {
-		missing = append(missing, "state_path (CYCLER_STATE_PATH / --state-path)")
+		missing = append(missing, "state_path (RUNNER_STATE_PATH / --state-path)")
 	}
 	if len(missing) > 0 {
 		return config{}, fmt.Errorf("missing required config: %s", strings.Join(missing, ", "))
