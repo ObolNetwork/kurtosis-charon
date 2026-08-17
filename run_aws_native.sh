@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 
-# Launch the native-Charon Kurtosis test fleet on AWS: 6 CL x 6 VC = 36 combos,
+# Launch the native-Charon Kurtosis test fleet on AWS: all 36 CL x VC combos,
 # one EC2 instance per combo, all on c6a.4xlarge (uniform), On-Demand,
-# self-terminating after --lifetime. Charon is pinned to an exact stable version
-# in the deployment args-files under deployments/network_params/.
+# self-terminating after --lifetime. Charon version is set via CHARON_VERSION.
 #
 # The runner clones this repo at the CURRENT branch, so the branch must be PUSHED
 # to origin before launching. Override lifetime with LIFETIME (default 60m).
@@ -34,13 +33,11 @@ else
   exit 1
 fi
 
-echo "Logging to AWS SSO..."
-SSO_ACCOUNT=$(aws sts get-caller-identity --query "Account")
-if [ ${#SSO_ACCOUNT} -eq 14 ]; then
+if aws sts get-caller-identity --output text >/dev/null 2>&1; then
   echo "AWS SSO already logged in"
 else
+  echo "Logging to AWS SSO..."
   aws sso login
-  echo "AWS SSO logged in"
 fi
 
 python3 -m venv ./kurtosis-aws-runner

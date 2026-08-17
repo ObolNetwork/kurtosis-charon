@@ -77,11 +77,11 @@ Each VC directory (`lighthouse/`, `lodestar/`, `prysm/`, `nimbus/`, `teku/`, `vo
 
 Two runner scripts exist:
 - `kurtosis-aws-runner/kurtosis_aws_runner.py` — Legacy Docker Compose runner (discovers combos from `deployments/env/`).
-- `kurtosis-aws-runner/kurtosis_aws_runner_native.py` — Native Kurtosis runner: launches the full 6 CL x 6 VC = 36 combo matrix, one EC2 instance per combo. Each instance clones this repo at the specified branch and runs `kurtosis run` with a pinned charon version (set in `deployments/network_params/network_params_charon_*.yaml`). Charon must be pinned to an exact stable release in these files.
+- `kurtosis-aws-runner/kurtosis_aws_runner_native.py` — Native Kurtosis runner: launches all 36 CL x VC combos, one EC2 instance per combo. Charon version is passed via `--charon-version` (pinned stable release). Both runners share `network-params/*.yaml` args-files with the DV cycler.
 
 ### DV Cycler
 
-The DV cycler (`dv-cycler/`) is a Go program that runs continuously on dappnode, cycling through all 36 CL x VC combos sequentially. It uses `charon:next` for bleeding-edge testing (client versions are pinned in `dv-cycler/network-params/*.yaml`). After each run it scores duty success rates from Prometheus, reports to Slack, and archives logs on failure.
+The DV cycler (`dv-cycler/`) is a Go program that runs continuously on dappnode, cycling through all 36 CL x VC combos sequentially. It uses `charon:next` by default for bleeding-edge testing (override with `CHARON_TAG` env var). Client versions are pinned in `network-params/*.yaml`. After each run it scores duty success rates from Prometheus, reports to Slack, and archives logs on failure.
 
 ## CI
 

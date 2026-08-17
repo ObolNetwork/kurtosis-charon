@@ -19,15 +19,18 @@ NETWORK_PARAMS_DIR = "network-params"
 ETHEREUM_PACKAGE = "github.com/ObolNetwork/ethereum-package@charon"
 KURTOSIS_DEB_URL = "https://github.com/kurtosis-tech/kurtosis-cli-release-artifacts/releases/download/1.20.0/kurtosis-cli_1.20.0_linux_amd64.deb"
 
-# 6 diagonal combos (each client paired with itself, plus grandine-vouch).
-# Shares the same args-files as the DV cycler (dv-cycler/network-params/).
+# All 36 CL x VC combos. Shares args-files with the DV cycler (network-params/).
+_BNS = ["lighthouse", "lodestar", "nimbus", "teku", "prysm", "grandine"]
+_VCS = ["lighthouse", "lodestar", "nimbus", "teku", "prysm", "vouch"]
 COMBOS = [
-    {"name": "lighthouse",     "bn": "lighthouse", "vc": "lighthouse", "file": "lighthouse-lighthouse.yaml"},
-    {"name": "lodestar",       "bn": "lodestar",   "vc": "lodestar",   "file": "lodestar-lodestar.yaml"},
-    {"name": "nimbus",         "bn": "nimbus",     "vc": "nimbus",     "file": "nimbus-nimbus.yaml"},
-    {"name": "teku",           "bn": "teku",       "vc": "teku",       "file": "teku-teku.yaml"},
-    {"name": "prysm",          "bn": "prysm",      "vc": "prysm",      "file": "prysm-prysm.yaml"},
-    {"name": "grandine-vouch", "bn": "grandine",   "vc": "vouch",      "file": "grandine-vouch.yaml"},
+    {
+        "name": f"{bn}-{vc}",
+        "bn": bn,
+        "vc": vc,
+        "file": f"{bn}-{vc}.yaml",
+    }
+    for bn in _BNS
+    for vc in _VCS
 ]
 
 
@@ -249,16 +252,33 @@ def main():
     parser.add_argument("--terminate", action="store_true", help="Terminate matching EC2 instances")
     parser.add_argument("--on-demand", action="store_true", help="Use On-Demand EC2 instances (default is Spot)")
     parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help=f"EC2 instance type for all combos (default: {DEFAULT_INSTANCE_TYPE})")
-    parser.add_argument("--only", help="Comma-separated combo names to launch (default: all). Options: " + ", ".join(c["name"] for c in COMBOS))
+    parser.add_argument("--only", help="Comma-separated filter: combo names (lighthouse-prysm), cl:<client> for all combos with that CL, vc:<client> for all combos with that VC")
     args = parser.parse_args()
 
     combos = COMBOS
     if args.only:
-        wanted = {n.strip() for n in args.only.split(",") if n.strip()}
-        unknown = wanted - {c["name"] for c in COMBOS}
-        if unknown:
-            safe_exit(f"Unknown combo(s): {', '.join(sorted(unknown))}. Options: {', '.join(c['name'] for c in COMBOS)}")
-        combos = [c for c in COMBOS if c["name"] in wanted]
+        filters = [f.strip() for f in args.only.split(",") if f.strip()]
+        matched = []
+        for f in filters:
+            if f.startswith("cl:"):
+                cl = f[3:]
+                batch = [c for c in COMBOS if c["bn"] == cl]
+                if not batch:
+                    safe_exit(f"Unknown CL '{cl}'. Options: {', '.join(_BNS)}")
+                matched.extend(batch)
+            elif f.startswith("vc:"):
+                vc = f[3:]
+                batch = [c for c in COMBOS if c["vc"] == vc]
+                if not batch:
+                    safe_exit(f"Unknown VC '{vc}'. Options: {', '.join(_VCS)}")
+                matched.extend(batch)
+            else:
+                batch = [c for c in COMBOS if c["name"] == f]
+                if not batch:
+                    safe_exit(f"Unknown combo '{f}'. Use <cl>-<vc>, cl:<client>, or vc:<client>")
+                matched.extend(batch)
+        seen = set()
+        combos = [c for c in matched if c["name"] not in seen and not seen.add(c["name"])]
 
     tag_values = [instance_tag(c) for c in combos]
 
