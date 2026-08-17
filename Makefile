@@ -2,8 +2,14 @@
 
 # --- Local (single combo) ---
 # Usage: make start-local/lighthouse-lodestar
+# Override the Charon image tag with CHARON_VERSION=<tag>.
+CHARON_VERSION ?= v1.10.3
+
 start-local/%:
-	kurtosis run --enclave $* github.com/ObolNetwork/ethereum-package@6.1.0-obol.2 --args-file ./deployments/$*.yaml
+	CHARON_VERSION="$(CHARON_VERSION)" \
+		envsubst '$$CHARON_VERSION $$PROMETHEUS_REMOTE_WRITE_TOKEN' \
+		< ./deployments/$*.yaml > /tmp/$*.yaml
+	kurtosis run --enclave $* github.com/ObolNetwork/ethereum-package@6.1.0-obol.2 --args-file /tmp/$*.yaml
 
 stop-local/%:
 	kurtosis enclave rm -f $*
