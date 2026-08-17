@@ -14,10 +14,7 @@ if [ -z "${PROMETHEUS_REMOTE_WRITE_TOKEN:-}" ]; then
   exit 1
 fi
 
-if [ -z "${CHARON_VERSION:-}" ]; then
-  echo "CHARON_VERSION environment variable is not set (e.g. export CHARON_VERSION=v1.11.0)."
-  exit 1
-fi
+CHARON_VERSION="${CHARON_VERSION:-v1.10.3}"
 
 BRANCH="$(git branch --show-current)"
 LIFETIME="${LIFETIME:-60m}"
