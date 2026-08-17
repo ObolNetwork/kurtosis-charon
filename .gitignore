@@ -25,3 +25,4 @@ network_params.yaml
 .DS_Store
 __pycache__/
 *.py[cod]
+docs/superpowers/

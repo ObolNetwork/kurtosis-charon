@@ -1,4 +1,4 @@
-.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku geth-grandine charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku run-charon-vouch run-aws stop-aws clean
+.PHONY: run geth-lighthouse geth-nimbus geth-lodestar geth-prysm geth-teku geth-grandine charon run-charon-lighthouse run-charon-nimbus run-charon-lodestar run-charon-prysm run-charon-teku run-charon-vouch run-aws stop-aws run-aws-native stop-aws-native run-native stop-native clean
 
 ETHEREUM_PACKAGE_VERSION ?= 6.1.0
 
@@ -237,6 +237,21 @@ run-aws:
 
 stop-aws:
 	./stop_aws.sh
+
+# Launch/terminate the native-Charon fleet (full 6 CL x 6 VC = 36 matrix,
+# charon:next via ObolNetwork/ethereum-package@charon, uniform c6a.4xlarge).
+run-aws-native:
+	./run_aws_native.sh
+
+stop-aws-native:
+	./stop_aws_native.sh
+
+# Run/stop the native Charon cluster from the Obol ethereum-package charon branch.
+run-native:
+	kurtosis run --enclave lighthouse-charon-lighthouse github.com/ObolNetwork/ethereum-package@charon --args-file ./network-params/lighthouse-lighthouse.yaml
+
+stop-native:
+	kurtosis enclave rm -f lighthouse-charon-lighthouse
 
 clean:
 	-docker compose -f compose.charon.yaml -f compose.lighthouse.yaml -f compose.lodestar.yaml -f compose.nimbus.yaml -f compose.prysm.yaml -f compose.teku.yaml -f compose.vouch.yaml down

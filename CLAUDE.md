@@ -75,7 +75,13 @@ Each VC directory (`lighthouse/`, `lodestar/`, `prysm/`, `nimbus/`, `teku/`, `vo
 
 ### AWS Runner
 
-`kurtosis-aws-runner/kurtosis_aws_runner.py` — Python script that discovers all client combos from `deployments/env/`, launches separate EC2 Spot instances per combo, injects monitoring tokens, and auto-terminates after configurable lifetime.
+Two runner scripts exist:
+- `kurtosis-aws-runner/kurtosis_aws_runner.py` — Legacy Docker Compose runner (discovers combos from `deployments/env/`).
+- `kurtosis-aws-runner/kurtosis_aws_runner_native.py` — Native Kurtosis runner: launches all 36 CL x VC combos, one EC2 instance per combo. Charon version is passed via `--charon-version` (pinned stable release). Both runners share `network-params/*.yaml` args-files with the DV cycler.
+
+### DV Cycler
+
+The DV cycler (`dv-cycler/`) is a Go program that runs continuously on dappnode, cycling through all 36 CL x VC combos sequentially. It uses `charon:next` by default for bleeding-edge testing (override with `CHARON_TAG` env var). Client versions are pinned in `network-params/*.yaml`. After each run it scores duty success rates from Prometheus, reports to Slack, and archives logs on failure.
 
 ## CI
 
