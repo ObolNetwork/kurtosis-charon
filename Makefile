@@ -5,7 +5,7 @@
 COMBO ?= lighthouse-lighthouse
 
 run-native:
-	kurtosis run --enclave $(COMBO) github.com/ObolNetwork/ethereum-package@charon --args-file ./deployments/$(COMBO).yaml
+	kurtosis run --enclave $(COMBO) github.com/ObolNetwork/ethereum-package@6.1.0-obol --args-file ./deployments/$(COMBO).yaml
 
 stop-native:
 	kurtosis enclave rm -f $(COMBO)

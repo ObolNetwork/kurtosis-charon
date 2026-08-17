@@ -1,6 +1,6 @@
 # Kurtosis-Charon
 
-Test harness for running Ethereum networks with [Charon](https://github.com/ObolNetwork/charon) Distributed Validator clusters, powered by [Kurtosis](https://docs.kurtosis.com) and ObolNetwork's [ethereum-package](https://github.com/ObolNetwork/ethereum-package/tree/charon) fork.
+Test harness for running Ethereum networks with [Charon](https://github.com/ObolNetwork/charon) Distributed Validator clusters, powered by [Kurtosis](https://docs.kurtosis.com) and ObolNetwork's [ethereum-package](https://github.com/ObolNetwork/ethereum-package/tree/obol) fork.
 
 A single `kurtosis run` command spins up the full stack: EL + CL + Charon DV middleware + VC. All 36 CL x VC combinations (6 CLs x 6 VCs) are defined as self-contained args-files in `deployments/`.
 

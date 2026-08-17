@@ -203,7 +203,7 @@ the three required variables is unset or empty.
 | `CYCLER_STATE_PATH` | yes | — | Absolute path to the state file (see below); the containing directory must exist and be writable by the service user. |
 | `CYCLER_PARAMS_DIR` | no | `<CYCLER_REPO_PATH>/deployments` | Directory scanned for `*.yaml` param files every loop iteration. |
 | `CYCLER_MONITORING_TOKEN` | no | `""` | Prometheus remote-write auth token (substituted for `$PROMETHEUS_REMOTE_WRITE_TOKEN` in each param file); empty disables remote-write auth. |
-| `CYCLER_PACKAGE_REF` | no | `github.com/ObolNetwork/ethereum-package@charon` | Kurtosis package reference to run. |
+| `CYCLER_PACKAGE_REF` | no | `github.com/ObolNetwork/ethereum-package@6.1.0-obol` | Kurtosis package reference to run. |
 | `CYCLER_LOG_DIR` | no | `<home>/cycler-logs` | Directory where failing-run log archives (`.tar.gz`) are written. |
 | `CYCLER_SLACK_BOT_TOKEN` | no | `""` | Slack bot token (`files:write` scope) for uploading failing-run log archives. Empty = local save only. |
 | `CYCLER_SLACK_CHANNEL_ID` | no | `""` | Slack channel id to upload failing-run log archives into (needs `CYCLER_SLACK_BOT_TOKEN`). |
