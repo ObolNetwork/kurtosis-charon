@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-# Launch the native-Charon Kurtosis test fleet on AWS: the full 6 CL x 6 VC = 36
-# combination matrix, one EC2 instance per combo, all on c6a.4xlarge (uniform),
-# On-Demand, self-terminating after --lifetime. Each instance runs charon:next
-# via github.com/ObolNetwork/ethereum-package@charon.
+# Launch the native-Charon Kurtosis test fleet on AWS: 6 CL x 6 VC = 36 combos,
+# one EC2 instance per combo, all on c6a.4xlarge (uniform), On-Demand,
+# self-terminating after --lifetime. Charon is pinned to an exact stable version
+# in the deployment args-files under deployments/network_params/.
 #
 # The runner clones this repo at the CURRENT branch, so the branch must be PUSHED
 # to origin before launching. Override lifetime with LIFETIME (default 60m).
@@ -12,6 +12,11 @@ set -euo pipefail
 
 if [ -z "${PROMETHEUS_REMOTE_WRITE_TOKEN:-}" ]; then
   echo "PROMETHEUS_REMOTE_WRITE_TOKEN environment variable is not set for external monitoring."
+  exit 1
+fi
+
+if [ -z "${CHARON_VERSION:-}" ]; then
+  echo "CHARON_VERSION environment variable is not set (e.g. export CHARON_VERSION=v1.11.0)."
   exit 1
 fi
 
@@ -45,6 +50,7 @@ pip3 install -r kurtosis-aws-runner/requirements.txt -q
 
 python3 kurtosis-aws-runner/kurtosis_aws_runner_native.py \
   --monitoring-token "$PROMETHEUS_REMOTE_WRITE_TOKEN" \
+  --charon-version "$CHARON_VERSION" \
   --on-demand \
   --branch="$BRANCH" \
   --instance-type=c6a.4xlarge \

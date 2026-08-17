@@ -476,14 +476,14 @@ func TestLoadConfig(t *testing.T) {
 		if cfg.statePath != "/var/lib/cycler/state.json" {
 			t.Errorf("statePath = %q", cfg.statePath)
 		}
-		wantParamsDir := filepath.Join("/srv/kurtosis-charon", "dv-cycler", "network-params")
+		wantParamsDir := filepath.Join("/srv/kurtosis-charon", "network-params")
 		if cfg.paramsDir != wantParamsDir {
 			t.Errorf("paramsDir = %q, want %q", cfg.paramsDir, wantParamsDir)
 		}
 		if cfg.runMinutes != 90 {
 			t.Errorf("runMinutes = %d, want 90", cfg.runMinutes)
 		}
-		if !strings.HasSuffix(cfg.packageRef, "ethereum-package@charon") {
+		if !strings.HasSuffix(cfg.packageRef, "ethereum-package@6.1.0-obol") {
 			t.Errorf("packageRef = %q", cfg.packageRef)
 		}
 		if cfg.startupDeadlineMinutes != 25 || cfg.sampleIntervalS != 15 {

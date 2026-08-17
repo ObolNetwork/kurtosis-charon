@@ -48,6 +48,7 @@ type config struct {
 	statePath              string
 	paramsDir              string
 	monitoringToken        string
+	charonTag              string
 	packageRef             string
 	runMinutes             int
 	startupDeadlineMinutes int
@@ -155,6 +156,8 @@ func applyFlags(cfg *config, args []string) {
 			cfg.paramsDir = val
 		case "monitoring-token":
 			cfg.monitoringToken = val
+		case "charon-tag":
+			cfg.charonTag = val
 		case "package-ref":
 			cfg.packageRef = val
 		case "log-dir":
@@ -193,6 +196,7 @@ func applyFlags(cfg *config, args []string) {
 
 func loadConfig() (config, error) {
 	cfg := config{
+		charonTag:              "next",
 		packageRef:             "github.com/ObolNetwork/ethereum-package@6.1.0-obol",
 		runMinutes:             90,
 		startupDeadlineMinutes: 25,
@@ -206,6 +210,7 @@ func loadConfig() (config, error) {
 	envStr("STATE_PATH", &cfg.statePath)
 	envStr("PARAMS_DIR", &cfg.paramsDir)
 	envStr("MONITORING_TOKEN", &cfg.monitoringToken)
+	envStr("CHARON_TAG", &cfg.charonTag)
 	envStr("PACKAGE_REF", &cfg.packageRef)
 	envStr("LOG_DIR", &cfg.logDir)
 	envStr("SLACK_BOT_TOKEN", &cfg.slackBotToken)
@@ -227,7 +232,7 @@ func loadConfig() (config, error) {
 	// value wins there is the one the default is based on) -- but only if
 	// paramsDir itself wasn't explicitly overridden.
 	if cfg.paramsDir == "" && cfg.repoPath != "" {
-		cfg.paramsDir = filepath.Join(cfg.repoPath, "dv-cycler", "network-params")
+		cfg.paramsDir = filepath.Join(cfg.repoPath, "network-params")
 	}
 
 	if cfg.logDir == "" {
@@ -1826,6 +1831,7 @@ func runOne(cfg config, paramFile, name string, cycle int) (result reportData) {
 		return data
 	}
 	argsYAML := strings.ReplaceAll(string(raw), "$PROMETHEUS_REMOTE_WRITE_TOKEN", cfg.monitoringToken)
+	argsYAML = strings.ReplaceAll(argsYAML, "$CHARON_VERSION", cfg.charonTag)
 
 	tmpArgsPath, err := writeTempArgsFile(argsYAML)
 	if err != nil {

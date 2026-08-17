@@ -15,19 +15,19 @@ VOLUME_IOPS = 6000  # optimized for Charon test runs
 VOLUME_THROUGHPUT = 250  # MB/s
 BASE_TAG = "kurtosis-fleet"
 GIT_REPO = "https://github.com/ObolNetwork/kurtosis-charon.git"
-NETWORK_PARAMS_DIR = "deployments/network_params"
+NETWORK_PARAMS_DIR = "network-params"
 ETHEREUM_PACKAGE = "github.com/ObolNetwork/ethereum-package@charon"
+KURTOSIS_DEB_URL = "https://github.com/kurtosis-tech/kurtosis-cli-release-artifacts/releases/download/1.20.0/kurtosis-cli_1.20.0_linux_amd64.deb"
 
-# One EC2 instance per combo. "file" is the split network_params args-file; "bn"/"vc"
-# are the beacon-node and validator-client clients, used for the enclave name
-# (<bn>-charon-<vc>, e.g. lighthouse-charon-lighthouse).
+# 6 diagonal combos (each client paired with itself, plus grandine-vouch).
+# Shares the same args-files as the DV cycler (dv-cycler/network-params/).
 COMBOS = [
-    {"name": "lighthouse",     "bn": "lighthouse", "vc": "lighthouse", "file": "network_params_charon_1_lighthouse.yaml"},
-    {"name": "lodestar",       "bn": "lodestar",   "vc": "lodestar",   "file": "network_params_charon_2_lodestar.yaml"},
-    {"name": "nimbus",         "bn": "nimbus",     "vc": "nimbus",     "file": "network_params_charon_3_nimbus.yaml"},
-    {"name": "teku",           "bn": "teku",       "vc": "teku",       "file": "network_params_charon_4_teku.yaml"},
-    {"name": "prysm",          "bn": "prysm",      "vc": "prysm",      "file": "network_params_charon_5_prysm.yaml"},
-    {"name": "grandine-vouch", "bn": "grandine",   "vc": "vouch",      "file": "network_params_charon_6_grandine_vouch.yaml"},
+    {"name": "lighthouse",     "bn": "lighthouse", "vc": "lighthouse", "file": "lighthouse-lighthouse.yaml"},
+    {"name": "lodestar",       "bn": "lodestar",   "vc": "lodestar",   "file": "lodestar-lodestar.yaml"},
+    {"name": "nimbus",         "bn": "nimbus",     "vc": "nimbus",     "file": "nimbus-nimbus.yaml"},
+    {"name": "teku",           "bn": "teku",       "vc": "teku",       "file": "teku-teku.yaml"},
+    {"name": "prysm",          "bn": "prysm",      "vc": "prysm",      "file": "prysm-prysm.yaml"},
+    {"name": "grandine-vouch", "bn": "grandine",   "vc": "vouch",      "file": "grandine-vouch.yaml"},
 ]
 
 
@@ -75,11 +75,11 @@ def get_latest_ubuntu_ami():
         safe_exit(f"Failed to fetch latest Ubuntu AMI: {e}")
 
 
-def generate_user_data(combo, branch, shutdown_minutes, monitoring_token):
+def generate_user_data(combo, branch, shutdown_minutes, monitoring_token, charon_version):
     """Cloud-init that installs Docker + Kurtosis, clones kurtosis-charon, then runs
     the native-Charon kurtosis command (mirrors `make run-native`) against this
-    combo's split args-file. The PROMETHEUS_REMOTE_WRITE_TOKEN placeholder in the
-    args-file is substituted with envsubst before the run.
+    combo's split args-file. $PROMETHEUS_REMOTE_WRITE_TOKEN and $CHARON_VERSION
+    placeholders in the args-file are substituted with envsubst before the run.
     """
     args_file = f"{NETWORK_PARAMS_DIR}/{combo['file']}"
     enclave = enclave_name(combo)
@@ -94,17 +94,16 @@ apt-get update -y
 apt-get install -y apt-transport-https ca-certificates curl software-properties-common git make jq gettext bash
 curl -fsSL https://get.docker.com | sh
 usermod -aG docker ubuntu
-echo "deb [trusted=yes] https://apt.fury.io/kurtosis-tech/ /" > /etc/apt/sources.list.d/kurtosis.list
-apt update -y
-apt install -y kurtosis-cli
+curl -fsSL -o /tmp/kurtosis-cli.deb {KURTOSIS_DEB_URL}
+dpkg -i /tmp/kurtosis-cli.deb
 
 su - ubuntu <<'EOF'
 cd /home/ubuntu
 git clone -b {branch} {GIT_REPO}
 cd kurtosis-charon
 export PROMETHEUS_REMOTE_WRITE_TOKEN="{monitoring_token}"
-# Substitute only the token placeholder, then run the native-Charon package.
-envsubst '$PROMETHEUS_REMOTE_WRITE_TOKEN' < {args_file} > /tmp/network_params.yaml
+export CHARON_VERSION="{charon_version}"
+envsubst '$PROMETHEUS_REMOTE_WRITE_TOKEN $CHARON_VERSION' < {args_file} > /tmp/network_params.yaml
 kurtosis run --enclave {enclave} {ETHEREUM_PACKAGE} --args-file /tmp/network_params.yaml || true
 EOF
 """
@@ -127,7 +126,7 @@ def instance_exists(tag_value):
         safe_exit(f"Error checking existing instances: {e}")
 
 
-def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, instance_type, on_demand):
+def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, charon_version, instance_type, on_demand):
     tag = instance_tag(combo)
     if instance_exists(tag):
         print(f"⚠️  Skipping existing instance: {tag}")
@@ -141,7 +140,7 @@ def launch_instance(combo, ami_id, branch, shutdown_minutes, monitoring_token, i
         "MaxCount": 1,
         "SubnetId": SUBNET_ID,
         "SecurityGroupIds": [SECURITY_GROUP_ID],
-        "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token),
+        "UserData": generate_user_data(combo, branch, shutdown_minutes, monitoring_token, charon_version),
         "BlockDeviceMappings": [{
             "DeviceName": "/dev/sda1",
             "Ebs": {
@@ -246,6 +245,7 @@ def main():
     parser.add_argument("--branch", default="main", help="kurtosis-charon git branch to clone (default: main)")
     parser.add_argument("--lifetime", default="60m", help="Shutdown after time (default: 60m e.g. 90m, 2h)")
     parser.add_argument("--monitoring-token", help="PROMETHEUS_REMOTE_WRITE_TOKEN for Prometheus remote_write")
+    parser.add_argument("--charon-version", required=False, help="Charon image tag to substitute into args-files (e.g. v1.11.0)")
     parser.add_argument("--terminate", action="store_true", help="Terminate matching EC2 instances")
     parser.add_argument("--on-demand", action="store_true", help="Use On-Demand EC2 instances (default is Spot)")
     parser.add_argument("--instance-type", default=DEFAULT_INSTANCE_TYPE, help=f"EC2 instance type for all combos (default: {DEFAULT_INSTANCE_TYPE})")
@@ -268,6 +268,8 @@ def main():
 
     if not args.monitoring_token:
         safe_exit("Missing required --monitoring-token (unless using --terminate)")
+    if not args.charon_version:
+        safe_exit("Missing required --charon-version (e.g. v1.11.0)")
 
     shutdown_minutes = parse_lifetime_arg(args.lifetime)
 
@@ -281,12 +283,12 @@ def main():
 
     ami_id = get_latest_ubuntu_ami()
     print(f"\n🚀 Launching with AMI {ami_id}, branch '{args.branch}', shutdown in {shutdown_minutes}m")
-    print(f"📌 Instance type: {args.instance_type}, On-Demand: {args.on_demand}\n")
+    print(f"📌 Instance type: {args.instance_type}, On-Demand: {args.on_demand}, Charon: {args.charon_version}\n")
 
     launched_ids = []
     id_to_tag = {}
     for combo in combos:
-        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, args.instance_type, args.on_demand)
+        iid, tag = launch_instance(combo, ami_id, args.branch, shutdown_minutes, args.monitoring_token, args.charon_version, args.instance_type, args.on_demand)
         if iid:
             launched_ids.append(iid)
             id_to_tag[iid] = tag
