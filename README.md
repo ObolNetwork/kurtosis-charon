@@ -19,14 +19,18 @@ make start-local/lighthouse-lodestar
 
 Watch the Kurtosis enclave come up, then inspect with `kurtosis enclave inspect lighthouse-lodestar`.
 
-### Cleanup
+### Stop
 
 ```bash
 make stop-local/lighthouse-lodestar
-# or check running enclaves:
-make status-local
-# or clean everything:
+# or clean all enclaves:
 make clean
+```
+
+### Status
+
+```bash
+make status-local
 ```
 
 ## AWS Fleet Testing
@@ -52,12 +56,15 @@ ONLY=lighthouse-vouch make start-aws
 ONLY=cl:lighthouse,vc:vouch make start-aws
 ```
 
-Terminate the fleet:
+### Stop
 
 ```bash
 make stop-aws
+```
 
-# or check fleet status:
+### Status
+
+```bash
 make status-aws
 ```
 
@@ -75,12 +82,8 @@ Args-files live in `deployments/<cl>-<vc>.yaml`. They use `$CHARON_VERSION` as a
 
 ### Validators
 
-Each combo runs 256 validators per node (768 total across 3 nodes). One of the 3 traditional VCs is replaced by a 3-node Charon DV cluster with 3 DVT-aware VCs.
+Each combo runs 3 participant nodes with 128 validator keys each (384 total). Two nodes run a traditional CL+VC stack. The third runs a 4-node Charon DV cluster with DVT-aware VCs.
 
 ### Nimbus CL
 
 When running Nimbus as a consensus client, Charon must use JSON request format instead of SSZ. The args-files for Nimbus CL combos include `CHARON_FEATURE_SET_ENABLE: json_requests` automatically.
-
-### Failed Initial Duties
-
-Missed duties in the first epoch are expected - they correspond to the transition period between the traditional VC being replaced and the Charon DV cluster starting.
