@@ -4,8 +4,8 @@ participants:
     cl_type: lighthouse
     cl_image: sigp/lighthouse:v8.2.1
     use_separate_vc: true
-    vc_type: lighthouse
-    vc_image: sigp/lighthouse:v8.2.1
+    vc_type: nimbus
+    vc_image: statusim/nimbus-validator-client:multiarch-v26.7.0
     count: 2
     supernode: true
 

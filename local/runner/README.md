@@ -203,7 +203,7 @@ the three required variables is unset or empty.
 | `RUNNER_STATE_PATH` | yes | — | Absolute path to the state file (see below); the containing directory must exist and be writable by the service user. |
 | `RUNNER_PARAMS_DIR` | no | `<RUNNER_REPO_PATH>/deployments` | Directory scanned for `*.yaml` param files every loop iteration. |
 | `RUNNER_MONITORING_TOKEN` | no | `""` | Prometheus remote-write auth token (substituted for `$PROMETHEUS_REMOTE_WRITE_TOKEN` in each param file); empty disables remote-write auth. |
-| `RUNNER_PACKAGE_REF` | no | `github.com/ObolNetwork/ethereum-package@6.1.0-obol.2` | Kurtosis package reference to run. |
+| `RUNNER_PACKAGE_REF` | no | `github.com/ObolNetwork/ethereum-package@6.1.0-obol.3` | Kurtosis package reference to run. |
 | `RUNNER_LOG_DIR` | no | `<home>/runner-logs` | Directory where failing-run log archives (`.tar.gz`) are written. |
 | `RUNNER_SLACK_BOT_TOKEN` | no | `""` | Slack bot token (`files:write` scope) for uploading failing-run log archives. Empty = local save only. |
 | `RUNNER_SLACK_CHANNEL_ID` | no | `""` | Slack channel id to upload failing-run log archives into (needs `RUNNER_SLACK_BOT_TOKEN`). |

@@ -1,11 +1,11 @@
 participants:
   - el_type: geth
     el_image: ethereum/client-go:v1.17.5
-    cl_type: lighthouse
-    cl_image: sigp/lighthouse:v8.2.1
+    cl_type: grandine
+    cl_image: sifrai/grandine:2.0.6
     use_separate_vc: true
-    vc_type: lighthouse
-    vc_image: sigp/lighthouse:v8.2.1
+    vc_type: prysm
+    vc_image: gcr.io/prysmaticlabs/prysm/validator:v7.1.8
     count: 2
     supernode: true
 

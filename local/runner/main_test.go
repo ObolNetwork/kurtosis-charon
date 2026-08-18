@@ -483,7 +483,7 @@ func TestLoadConfig(t *testing.T) {
 		if cfg.runMinutes != 90 {
 			t.Errorf("runMinutes = %d, want 90", cfg.runMinutes)
 		}
-		if !strings.HasSuffix(cfg.packageRef, "ethereum-package@6.1.0-obol.2") {
+		if !strings.HasSuffix(cfg.packageRef, "ethereum-package@6.1.0-obol.3") {
 			t.Errorf("packageRef = %q", cfg.packageRef)
 		}
 		if cfg.startupDeadlineMinutes != 25 || cfg.sampleIntervalS != 15 {
