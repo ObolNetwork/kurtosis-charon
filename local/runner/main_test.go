@@ -1368,7 +1368,7 @@ func TestCaptureFailureLogs(t *testing.T) {
 	}
 
 	logDir := t.TempDir()
-	archive, excerpt := captureFailureLogs(config{logDir: logDir}, "c2-lodestar-nimbus", "lodestar-nimbus", 2)
+	archive := captureFailureLogs(config{logDir: logDir}, "c2-lodestar-nimbus", "lodestar-nimbus", 2)
 	if archive == "" {
 		t.Fatal("archive path empty")
 	}
@@ -1400,9 +1400,6 @@ func TestCaptureFailureLogs(t *testing.T) {
 	}
 	if !strings.Contains(got["vc-3-geth-lodestar-charon-charon-0.log"], "something bad happened") {
 		t.Error("charon-0 log content missing from archive")
-	}
-	if !strings.Contains(excerpt, "something bad happened") {
-		t.Errorf("excerpt missing the error line: %q", excerpt)
 	}
 	if dockerLogsCalled {
 		t.Error("docker logs must not be used when kurtosis service logs succeeds")
@@ -1555,14 +1552,10 @@ func TestBuildBlocksLogsSection(t *testing.T) {
 	d := reportData{
 		name: "x", cycle: 1, status: "failed", window: "-",
 		logArchivePath: "/home/u/runner-logs/cycle1-x-ts.tar.gz",
-		logExcerpt:     "charon-0:\nERRO boom",
 	}
 	dump := dumpBlocks(buildBlocks(d))
 	if !strings.Contains(dump, "cycle1-x-ts.tar.gz") {
 		t.Errorf("logs section missing archive path: %s", dump)
-	}
-	if !strings.Contains(dump, "ERRO boom") {
-		t.Errorf("logs section missing excerpt: %s", dump)
 	}
 	if strings.Contains(dumpBlocks(buildBlocks(reportData{name: "x", status: "ok", window: "-"})), "*Logs:*") {
 		t.Error("logs section should be absent when no archive was captured")
@@ -1827,5 +1820,104 @@ func TestCountEpoch0FailuresLogParsing(t *testing.T) {
 	}
 	if len(got) != 3 {
 		t.Errorf("got %d keys, want 3 (slots 64+ excluded)", len(got))
+	}
+}
+
+// TestCountEpoch0FailuresSplitRecords covers charon records that docker split
+// across several lines. An attester "Duty failed" carries its per-validator
+// failure array twice, which pushes the trailing `"duty"` field onto its own
+// line; scanning raw lines finds "Duty failed" with no duty field and silently
+// drops the record, leaving the expected count un-reduced and reporting a
+// warmup failure as a real one.
+func TestCountEpoch0FailuresSplitRecords(t *testing.T) {
+	oldRun := runCommand
+	defer func() { runCommand = oldRun }()
+
+	// Mirrors a real cycle-19 log: the aggregator record fits on one line,
+	// the attester record is split, and the kurtosis "[service] " prefix is
+	// repeated on every physical line.
+	const p = `[vc-3-geth-lodestar-charon-charon-0] `
+	charonLogs := strings.Join([]string{
+		p + `05:29:58.000 INFO app-start Lock file loaded {"peer_name": "alert-word", "peer_index": 0}`,
+		p + `05:44:33.149 WARN tracker Duty failed: fetch aggregator data: 404 {"reason_code": "bug_fetch_error", "duty": "2/aggregator"}`,
+		p + `05:44:33.435 WARN tracker Duty failed: beacon api submit_attestations: POST failed with status 400: {"code":400,"failures":[{"index":0,"message":"PublishError.NoPeersSubscribedToTopic"}]} {"step": "bcast",`,
+		p + `"reason_code": "broadcast_bn_error", "duty": "2/attester"}`,
+		p + `	app/eth2wrap/eth2wrap.go:323 .wrapError`,
+		p + `05:44:45.072 WARN tracker Duty failed: beacon api submit_attestations: POST failed with status 400: {"code":400,"failures":[{"index":0,"message":"PublishError.NoPeersSubscribedToTopic"}]} {"step": "bcast",`,
+		p + `"reason_code": "broadcast_bn_error", "duty": "3/attester"}`,
+		// A split record beyond the warmup window must still be excluded.
+		p + `06:10:00.000 WARN tracker Duty failed: beacon api submit_attestations: POST failed with status 400: {"step": "bcast",`,
+		p + `"reason_code": "broadcast_bn_error", "duty": "200/attester"}`,
+	}, "\n")
+
+	runCommand = func(name string, args ...string) (string, error) {
+		if name == "docker" && len(args) > 0 && args[0] == "ps" {
+			return "vc-3-geth-lodestar-charon-charon-0--abc123\n", nil
+		}
+		if name == "kurtosis" && len(args) > 0 && args[0] == "service" {
+			return charonLogs, nil
+		}
+		return "", nil
+	}
+
+	got := countEpoch0Failures("test-enclave")
+	if v := got[epoch0Key{peer: "alert-word", duty: "attester"}]; v != 2 {
+		t.Errorf("attester = %v, want 2 (split records at slots 2 and 3)", v)
+	}
+	if v := got[epoch0Key{peer: "alert-word", duty: "aggregator"}]; v != 1 {
+		t.Errorf("aggregator = %v, want 1 (slot 2)", v)
+	}
+	if len(got) != 2 {
+		t.Errorf("got %d keys, want 2 (slot 200 excluded)", len(got))
+	}
+}
+
+func TestJoinLogRecords(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{
+			name: "continuation lines are merged",
+			in: "12:00:00.000 INFO a start\n" +
+				"12:00:01.000 WARN b head {\"x\":\n" +
+				"1}\n" +
+				"12:00:02.000 INFO c done",
+			want: []string{
+				`12:00:00.000 INFO a start`,
+				`12:00:01.000 WARN b head {"x":1}`,
+				`12:00:02.000 INFO c done`,
+			},
+		},
+		{
+			name: "kurtosis service prefix is recognised",
+			in:   "[svc-0] 12:00:00.000 INFO a head\n[svc-0] tail\n",
+			want: []string{`[svc-0] 12:00:00.000 INFO a head[svc-0] tail`},
+		},
+		{
+			name: "preamble before the first record is dropped",
+			in:   "garbage banner\n12:00:00.000 INFO a x",
+			want: []string{`12:00:00.000 INFO a x`},
+		},
+		{
+			name: "unrecognised format falls back to raw lines",
+			in:   "no timestamps here\nsecond line",
+			want: []string{"no timestamps here", "second line"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := joinLogRecords(tt.in)
+			if len(got) != len(tt.want) {
+				t.Fatalf("got %d records %q, want %d %q", len(got), got, len(tt.want), tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("record %d = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
 	}
 }
