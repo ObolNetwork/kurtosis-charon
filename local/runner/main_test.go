@@ -1368,7 +1368,7 @@ func TestCaptureFailureLogs(t *testing.T) {
 	}
 
 	logDir := t.TempDir()
-	archive, excerpt := captureFailureLogs(config{logDir: logDir}, "c2-lodestar-nimbus", "lodestar-nimbus", 2)
+	archive := captureFailureLogs(config{logDir: logDir}, "c2-lodestar-nimbus", "lodestar-nimbus", 2)
 	if archive == "" {
 		t.Fatal("archive path empty")
 	}
@@ -1400,9 +1400,6 @@ func TestCaptureFailureLogs(t *testing.T) {
 	}
 	if !strings.Contains(got["vc-3-geth-lodestar-charon-charon-0.log"], "something bad happened") {
 		t.Error("charon-0 log content missing from archive")
-	}
-	if !strings.Contains(excerpt, "something bad happened") {
-		t.Errorf("excerpt missing the error line: %q", excerpt)
 	}
 	if dockerLogsCalled {
 		t.Error("docker logs must not be used when kurtosis service logs succeeds")
@@ -1555,14 +1552,10 @@ func TestBuildBlocksLogsSection(t *testing.T) {
 	d := reportData{
 		name: "x", cycle: 1, status: "failed", window: "-",
 		logArchivePath: "/home/u/runner-logs/cycle1-x-ts.tar.gz",
-		logExcerpt:     "charon-0:\nERRO boom",
 	}
 	dump := dumpBlocks(buildBlocks(d))
 	if !strings.Contains(dump, "cycle1-x-ts.tar.gz") {
 		t.Errorf("logs section missing archive path: %s", dump)
-	}
-	if !strings.Contains(dump, "ERRO boom") {
-		t.Errorf("logs section missing excerpt: %s", dump)
 	}
 	if strings.Contains(dumpBlocks(buildBlocks(reportData{name: "x", status: "ok", window: "-"})), "*Logs:*") {
 		t.Error("logs section should be absent when no archive was captured")

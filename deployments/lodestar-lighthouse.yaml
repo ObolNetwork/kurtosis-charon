@@ -21,7 +21,7 @@ participants:
     charon_params:
       charon_vc: lighthouse
       # Temporary test image: v8.2.1 + DVT is_aggregator subscription fix.
-      charon_vc_image: kaloyantanev/lighthouse:dvt-agg-fix
+      charon_vc_image: kaloyantanev/lighthouse:dvt-agg-fix-2
     count: 1
 network_params:
   network: kurtosis

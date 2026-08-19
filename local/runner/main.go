@@ -696,7 +696,6 @@ type reportData struct {
 	errMsg      string
 
 	logArchivePath string // local path to the captured-logs tarball (failing runs)
-	logExcerpt     string // short excerpt (Charon error lines) for the Slack message
 	charonVersion  string // charon git commit hash captured during the run (matrix column)
 }
 
@@ -807,9 +806,6 @@ func buildBlocks(d reportData) []map[string]any {
 
 	if d.logArchivePath != "" {
 		txt := fmt.Sprintf("*Logs:* `%s`", d.logArchivePath)
-		if d.logExcerpt != "" {
-			txt += "\n```" + d.logExcerpt + "```"
-		}
 		blocks = append(blocks, map[string]any{
 			"type": "section",
 			"text": map[string]any{"type": "mrkdwn", "text": txt},
@@ -1534,13 +1530,12 @@ func fetchServiceLogs(enclave, container string) string {
 }
 
 // captureFailureLogs dumps the targeted logs for a failing run into a gzipped
-// tarball under cfg.logDir and returns its path plus a short excerpt (error
-// lines from a Charon node) for the Slack message. Best-effort: on any problem
+// tarball under cfg.logDir and returns its path. Best-effort: on any problem
 // it returns whatever it managed (possibly ""), never panicking. Containers are
 // scoped to this enclave via kurtosis's enclave-name label so a leftover
 // container from a prior run can never be captured; docker ps -a is kept so a
 // crashed container (e.g. a VC that exited) is still discovered and captured.
-func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePath, excerpt string) {
+func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePath string) {
 	defer func() { _ = recover() }()
 
 	out, err := runCommand("docker", "ps", "-a",
@@ -1548,7 +1543,7 @@ func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePat
 		"--format", "{{.Names}}")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "runner: log capture: docker ps failed: %v\n", err)
-		return "", ""
+		return ""
 	}
 	var containers []string
 	for _, ln := range strings.Split(out, "\n") {
@@ -1566,12 +1561,12 @@ func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePat
 	targets = append(targets, vcs...)
 	if len(targets) == 0 {
 		fmt.Fprintln(os.Stderr, "runner: log capture: no BN/Charon/VC containers found")
-		return "", ""
+		return ""
 	}
 
 	staging, err := os.MkdirTemp("", "runner-logs-*")
 	if err != nil {
-		return "", ""
+		return ""
 	}
 	defer os.RemoveAll(staging)
 
@@ -1582,50 +1577,16 @@ func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePat
 
 	if err := os.MkdirAll(cfg.logDir, 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "runner: log capture: mkdir %s failed: %v\n", cfg.logDir, err)
-		return "", ""
+		return ""
 	}
 	ts := nowFn().UTC().Format("20060102-150405")
 	archivePath = filepath.Join(cfg.logDir, fmt.Sprintf("cycle%d-%s-%s.tar.gz", cycle, name, ts))
 	if err := makeTarGz(staging, archivePath); err != nil {
 		fmt.Fprintf(os.Stderr, "runner: log capture: archive failed: %v\n", err)
-		return "", ""
+		return ""
 	}
 
-	return archivePath, extractExcerpt(staging, dvNodes)
-}
-
-// extractExcerpt reads the first Charon node's captured log and returns up to
-// ~25 recent noteworthy lines (error/warn/fatal/panic/doppelganger), capped in
-// length, for inlining into the Slack message.
-func extractExcerpt(staging string, dvNodes []string) string {
-	if len(dvNodes) == 0 {
-		return ""
-	}
-	data, err := os.ReadFile(filepath.Join(staging, serviceLabel(dvNodes[0])+".log"))
-	if err != nil {
-		return ""
-	}
-	var hits []string
-	for _, ln := range strings.Split(string(data), "\n") {
-		low := strings.ToLower(ln)
-		if strings.Contains(low, "error") || strings.Contains(low, "erro ") ||
-			strings.Contains(low, "warn") || strings.Contains(low, "fatal") ||
-			strings.Contains(low, "panic") || strings.Contains(low, "doppelganger") {
-			hits = append(hits, ln)
-		}
-	}
-	if len(hits) == 0 {
-		return ""
-	}
-	if len(hits) > 25 {
-		hits = hits[len(hits)-25:]
-	}
-	out := strings.Join(hits, "\n")
-	const maxLen = 1500
-	if len(out) > maxLen {
-		out = out[len(out)-maxLen:]
-	}
-	return serviceLabel(dvNodes[0]) + ":\n" + out
+	return archivePath
 }
 
 // makeTarGz writes a gzipped tarball of every regular file directly in srcDir
@@ -1903,7 +1864,7 @@ func runOne(cfg config, paramFile, name string, cycle int) (result reportData) {
 	if data.status != "ok" {
 		// Capture BN/Charon/VC logs while the enclave is still up (teardown is
 		// deferred), for post-mortem of a failing/degraded combo.
-		data.logArchivePath, data.logExcerpt = captureFailureLogs(cfg, enclave, name, cycle)
+		data.logArchivePath = captureFailureLogs(cfg, enclave, name, cycle)
 	}
 	postBestEffort(cfg, data)
 	if data.logArchivePath != "" {
