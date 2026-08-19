@@ -20,7 +20,7 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: lighthouse
-      charon_vc_image: kaloyantanev/lighthouse:dvt-agg-fix-2
+      charon_vc_image: kaloyantanev/lighthouse:dvt-agg-fix-3
     count: 1
 network_params:
   network: kurtosis
