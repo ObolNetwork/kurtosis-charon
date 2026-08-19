@@ -1162,7 +1162,53 @@ const warmupSlots = 64 // exclude epochs 0 and 1 (2 × 32 slots)
 var (
 	dutyFailedRe = regexp.MustCompile(`"duty"\s*:\s*"(\d+)/([^"]+)"`)
 	peerNameRe   = regexp.MustCompile(`"peer_name"\s*:\s*"([^"]+)"`)
+	// logRecordStartRe matches the start of a charon log record: an optional
+	// kurtosis "[service-name] " prefix followed by the HH:MM:SS.mmm timestamp.
+	// A line that does not match is a continuation of the preceding record.
+	logRecordStartRe = regexp.MustCompile(`^(?:\[[^\]]*\]\s*)?\d{2}:\d{2}:\d{2}\.\d+\s`)
 )
+
+// joinLogRecords merges continuation lines back into the record they belong
+// to. Docker splits a container's stdout, so a single charon log record can
+// span several lines. Long structured payloads are the ones that split, and
+// they are exactly the ones we care about here: an attester "Duty failed"
+// carries its per-validator failure array twice (once in the message, once
+// escaped in the "data" field), which routinely pushes the trailing
+// `"duty": "<slot>/<type>"` field onto a line of its own. Scanning raw lines
+// then finds "Duty failed" without a duty field and drops the record.
+//
+// If the input has no recognisable record starts (an unexpected log format),
+// the raw lines are returned so callers behave no worse than before.
+func joinLogRecords(logs string) []string {
+	lines := strings.Split(logs, "\n")
+
+	var (
+		records []string
+		buf     strings.Builder
+		started bool
+	)
+	for _, line := range lines {
+		if logRecordStartRe.MatchString(line) {
+			if started {
+				records = append(records, buf.String())
+			}
+			buf.Reset()
+			started = true
+		} else if !started {
+			continue // preamble before the first record
+		}
+		buf.WriteString(line)
+	}
+	if started {
+		records = append(records, buf.String())
+	}
+
+	if len(records) == 0 {
+		return lines
+	}
+
+	return records
+}
 
 // epoch0Key is a (peer, duty-type) pair used to key per-node epoch-0
 // failure counts.
@@ -1191,12 +1237,12 @@ func countEpoch0Failures(enclave string) map[epoch0Key]float64 {
 	_, dvNodes, _ := selectLogTargets(containers)
 
 	for _, node := range dvNodes {
-		logs := fetchServiceLogs(enclave, node)
-		peerName := extractPeerName(logs)
+		records := joinLogRecords(fetchServiceLogs(enclave, node))
+		peerName := extractPeerName(records)
 		if peerName == "" {
 			continue
 		}
-		for _, line := range strings.Split(logs, "\n") {
+		for _, line := range records {
 			if !strings.Contains(line, "Duty failed") {
 				continue
 			}
@@ -1215,9 +1261,9 @@ func countEpoch0Failures(enclave string) map[epoch0Key]float64 {
 }
 
 // extractPeerName returns the cluster_peer name from a charon node's log
-// output by finding the "Lock file loaded" line which contains peer_name.
-func extractPeerName(logs string) string {
-	for _, line := range strings.Split(logs, "\n") {
+// records by finding the "Lock file loaded" record which contains peer_name.
+func extractPeerName(records []string) string {
+	for _, line := range records {
 		if !strings.Contains(line, "Lock file loaded") {
 			continue
 		}
