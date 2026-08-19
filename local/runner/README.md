@@ -60,9 +60,9 @@ For each param file in the directory, in sorted order, forever:
    default 90) at `RUNNER_SAMPLE_INTERVAL_S` intervals.
 6. At the end of the window, query local Prometheus (scoped to the
    discovered `cluster_name`) for duty success ratios (worst node), DV
-   CPU/mem peaks, and `app_health_checks` firing status. The scoring window
-   excludes the first `RUNNER_WARMUP_MINUTES` of the run so startup noise
-   doesn't count against the run.
+   CPU/mem peaks, and `app_health_checks` firing status. Duties that failed
+   in epochs 0 and 1 (`warmupSlots`) are subtracted from the expected counts
+   so genesis noise doesn't count against the run.
 7. Post one Slack message (via Incoming Webhook) summarizing the run: the
    param file's name, the discovered cluster, status (`ok` / `degraded` /
    `failed`), worst-node duty ratios, DV CPU/mem peaks, host stats, and any
@@ -210,7 +210,6 @@ the three required variables is unset or empty.
 | `RUNNER_RESULTS_PATH` | no | `<state-dir>/runner-results.json` | Persistent results-matrix file (one row per combo + versions). |
 | `RUNNER_SUMMARY_MENTION` | no | `""` | Slack mention prepended to the matrix message (e.g. `<!subteam^S123>`); empty = no ping. |
 | `RUNNER_RUN_MINUTES` | no | `90` | Length of each run's window. |
-| `RUNNER_WARMUP_MINUTES` | no | `15` | Leading portion of the run window excluded from duty/health scoring. |
 | `RUNNER_STARTUP_DEADLINE_MINUTES` | no | `25` | How long to wait for the enclave to become healthy before recording the run `failed`. |
 | `RUNNER_SAMPLE_INTERVAL_S` | no | `15` | Host CPU/mem sampling interval during the run. |
 | `RUNNER_INTER_RUN_BACKOFF_S` | no | `30` | Base backoff between runs after a failure. |
