@@ -60,9 +60,13 @@ For each param file in the directory, in sorted order, forever:
    default 90) at `RUNNER_SAMPLE_INTERVAL_S` intervals.
 6. At the end of the window, query local Prometheus (scoped to the
    discovered `cluster_name`) for duty success ratios (worst node), DV
-   CPU/mem peaks, and `app_health_checks` firing status. Duties that failed
-   in epochs 0 and 1 (`warmupSlots`) are subtracted from the expected counts
-   so genesis noise doesn't count against the run.
+   CPU/mem peaks, and `app_health_checks` firing status. All queries
+   evaluate at the same instant, and duty ratios are computed as
+   success/(success+failed) from the tracker counters, so still-in-flight
+   duties never count against the run. Duties that failed in epochs 0
+   and 1 (`warmupSlots`, parsed per slot from charon logs — the startup
+   snapshot plus the end-of-run logs) are subtracted from the failed
+   counts so genesis noise doesn't count against the run either.
 7. Post one Slack message (via Incoming Webhook) summarizing the run: the
    param file's name, the discovered cluster, status (`ok` / `degraded` /
    `failed`), worst-node duty ratios, DV CPU/mem peaks, host stats, and any
