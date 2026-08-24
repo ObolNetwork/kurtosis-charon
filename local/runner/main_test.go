@@ -1402,8 +1402,8 @@ func TestCollectReportFailedBasedScoring(t *testing.T) {
 
 	// The warm-up grace subtracts from the failed counts: with all 5
 	// attester failures graced, the run scores a clean 95/95.
-	epoch0 := map[epoch0Key]float64{{peer: "0", duty: "attester"}: 5}
-	data, err = collectReport("http://x", "a-b", "kurtosis-a-b", 1, 60, time.Time{}, epoch0, hostStats{})
+	warmup := map[warmupKey]float64{{peer: "0", duty: "attester"}: 5}
+	data, err = collectReport("http://x", "a-b", "kurtosis-a-b", 1, 60, time.Time{}, warmup, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
@@ -2070,7 +2070,7 @@ func TestLoadMatrixRoundTrip(t *testing.T) {
 	}
 }
 
-func TestSubtractEpoch0(t *testing.T) {
+func TestSubtractWarmup(t *testing.T) {
 	failed := []sample{
 		{labels: map[string]string{"cluster_peer": "cute-child", "duty": "attester"}, value: 12},
 		{labels: map[string]string{"cluster_peer": "cute-child", "duty": "aggregator"}, value: 5},
@@ -2078,13 +2078,13 @@ func TestSubtractEpoch0(t *testing.T) {
 		{labels: map[string]string{"cluster_peer": "bold-storm", "duty": "aggregator"}, value: 3},
 	}
 
-	epoch0 := map[epoch0Key]float64{
+	warmup := map[warmupKey]float64{
 		{peer: "cute-child", duty: "attester"}:   10,
 		{peer: "cute-child", duty: "aggregator"}: 5,
 		{peer: "bold-storm", duty: "attester"}:   7,
 		{peer: "bold-storm", duty: "aggregator"}: 9, // more graced than counted: clamps to 0
 	}
-	got := subtractEpoch0(failed, epoch0)
+	got := subtractWarmup(failed, warmup)
 
 	for i, want := range []float64{2, 0, 0, 0} {
 		if got[i].value != want {
@@ -2094,7 +2094,7 @@ func TestSubtractEpoch0(t *testing.T) {
 	}
 
 	// nil map should be a no-op.
-	unchanged := subtractEpoch0(failed, nil)
+	unchanged := subtractWarmup(failed, nil)
 	for i, s := range unchanged {
 		if s.value != failed[i].value {
 			t.Errorf("nil map: sample %d changed from %v to %v", i, failed[i].value, s.value)
@@ -2102,7 +2102,7 @@ func TestSubtractEpoch0(t *testing.T) {
 	}
 }
 
-func TestCountEpoch0FailuresLogParsing(t *testing.T) {
+func TestCountWarmupFailuresLogParsing(t *testing.T) {
 	oldRun := runCommand
 	defer func() { runCommand = oldRun }()
 
@@ -2128,27 +2128,27 @@ func TestCountEpoch0FailuresLogParsing(t *testing.T) {
 		return "", nil
 	}
 
-	got := countEpoch0Failures("test-enclave", "")
-	if got[epoch0Key{peer: "cute-child", duty: "aggregator"}] != 3 {
-		t.Errorf("aggregator = %v, want 3 (slots 3, 31, 63)", got[epoch0Key{peer: "cute-child", duty: "aggregator"}])
+	got := countWarmupFailures("test-enclave", "")
+	if got[warmupKey{peer: "cute-child", duty: "aggregator"}] != 3 {
+		t.Errorf("aggregator = %v, want 3 (slots 3, 31, 63)", got[warmupKey{peer: "cute-child", duty: "aggregator"}])
 	}
-	if got[epoch0Key{peer: "cute-child", duty: "attester"}] != 1 {
-		t.Errorf("attester = %v, want 1 (slot 15)", got[epoch0Key{peer: "cute-child", duty: "attester"}])
+	if got[warmupKey{peer: "cute-child", duty: "attester"}] != 1 {
+		t.Errorf("attester = %v, want 1 (slot 15)", got[warmupKey{peer: "cute-child", duty: "attester"}])
 	}
-	if got[epoch0Key{peer: "cute-child", duty: "proposer"}] != 1 {
-		t.Errorf("proposer = %v, want 1 (slot 33)", got[epoch0Key{peer: "cute-child", duty: "proposer"}])
+	if got[warmupKey{peer: "cute-child", duty: "proposer"}] != 1 {
+		t.Errorf("proposer = %v, want 1 (slot 33)", got[warmupKey{peer: "cute-child", duty: "proposer"}])
 	}
 	if len(got) != 3 {
 		t.Errorf("got %d keys, want 3 (slots 64+ excluded)", len(got))
 	}
 }
 
-// TestCountEpoch0FailuresSplitRecords covers charon records that docker split
+// TestCountWarmupFailuresSplitRecords covers charon records that docker split
 // across several lines. An attester "Duty failed" carries its per-validator
 // failure array twice, which pushes the trailing `"duty"` field onto its own
 // line; scanning raw lines finds "Duty failed" with no duty field and silently
 // drops the record, leaving a warmup failure reported as a real one.
-func TestCountEpoch0FailuresSplitRecords(t *testing.T) {
+func TestCountWarmupFailuresSplitRecords(t *testing.T) {
 	oldRun := runCommand
 	defer func() { runCommand = oldRun }()
 
@@ -2179,11 +2179,11 @@ func TestCountEpoch0FailuresSplitRecords(t *testing.T) {
 		return "", nil
 	}
 
-	got := countEpoch0Failures("test-enclave", "")
-	if v := got[epoch0Key{peer: "alert-word", duty: "attester"}]; v != 2 {
+	got := countWarmupFailures("test-enclave", "")
+	if v := got[warmupKey{peer: "alert-word", duty: "attester"}]; v != 2 {
 		t.Errorf("attester = %v, want 2 (split records at slots 2 and 3)", v)
 	}
-	if v := got[epoch0Key{peer: "alert-word", duty: "aggregator"}]; v != 1 {
+	if v := got[warmupKey{peer: "alert-word", duty: "aggregator"}]; v != 1 {
 		t.Errorf("aggregator = %v, want 1 (slot 2)", v)
 	}
 	if len(got) != 2 {
@@ -2191,13 +2191,13 @@ func TestCountEpoch0FailuresSplitRecords(t *testing.T) {
 	}
 }
 
-// TestCountEpoch0FailuresStartupSnapshot pins the two robustness upgrades:
+// TestCountWarmupFailuresStartupSnapshot pins the two robustness upgrades:
 // the peer name resolves from the startup snapshot when the boot lines have
 // rotated out of the end-of-run logs, and a warm-up duty the tracker counted
 // as failed without emitting a "Duty failed" line is still graced via its
 // component-level "Permanent failure" record (deduped by (slot, duty)
 // against any tracker line for the same instance).
-func TestCountEpoch0FailuresStartupSnapshot(t *testing.T) {
+func TestCountWarmupFailuresStartupSnapshot(t *testing.T) {
 	oldRun := runCommand
 	defer func() { runCommand = oldRun }()
 
@@ -2221,7 +2221,7 @@ func TestCountEpoch0FailuresStartupSnapshot(t *testing.T) {
 	}
 
 	t.Run("without snapshot: grace skipped (no peer name)", func(t *testing.T) {
-		if got := countEpoch0Failures("test-enclave", ""); len(got) != 0 {
+		if got := countWarmupFailures("test-enclave", ""); len(got) != 0 {
 			t.Errorf("got %v, want empty map when peer name is unavailable", got)
 		}
 	})
@@ -2233,8 +2233,8 @@ func TestCountEpoch0FailuresStartupSnapshot(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		got := countEpoch0Failures("test-enclave", dir)
-		if v := got[epoch0Key{peer: "vivacious-country", duty: "aggregator"}]; v != 2 {
+		got := countWarmupFailures("test-enclave", dir)
+		if v := got[warmupKey{peer: "vivacious-country", duty: "aggregator"}]; v != 2 {
 			t.Errorf("aggregator = %v, want 2 (slot 1 via Permanent failure + slot 2 counted once)", v)
 		}
 		if len(got) != 1 {

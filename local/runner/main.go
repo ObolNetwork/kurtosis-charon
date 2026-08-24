@@ -1216,11 +1216,11 @@ func joinLogRecords(logs string) []string {
 	return records
 }
 
-// epoch0Key is a (peer, duty-type) pair used to key per-node warm-up
+// warmupKey is a (peer, duty-type) pair used to key per-node warm-up
 // failure counts.
-type epoch0Key struct{ peer, duty string }
+type warmupKey struct{ peer, duty string }
 
-// countEpoch0Failures counts warm-up duty failures per (cluster_peer,
+// countWarmupFailures counts warm-up duty failures per (cluster_peer,
 // duty type) from every DV node's charon logs, for subtraction from the
 // failed-duty counters so that genesis-epoch warm-up failures do not
 // affect scoring.
@@ -1236,8 +1236,8 @@ type epoch0Key struct{ peer, duty string }
 // end-of-run logs entirely, which would otherwise silently disable this
 // grace for the node. Best-effort: returns an empty map on any error, and
 // warns loudly when a node's grace is skipped.
-func countEpoch0Failures(enclave, startupDir string) map[epoch0Key]float64 {
-	counts := map[epoch0Key]float64{}
+func countWarmupFailures(enclave, startupDir string) map[warmupKey]float64 {
+	counts := map[warmupKey]float64{}
 
 	_, dvNodes, err := logTargets(enclave)
 	if err != nil {
@@ -1282,7 +1282,7 @@ func countEpoch0Failures(enclave, startupDir string) map[epoch0Key]float64 {
 			seen[instance{slot: slot, duty: m[2]}] = true
 		}
 		for inst := range seen {
-			counts[epoch0Key{peer: peerName, duty: inst.duty}]++
+			counts[warmupKey{peer: peerName, duty: inst.duty}]++
 		}
 	}
 	return counts
@@ -1303,17 +1303,17 @@ func extractPeerName(records []string) string {
 	return ""
 }
 
-// subtractEpoch0 reduces the failed-duty Prometheus samples by the
+// subtractWarmup reduces the failed-duty Prometheus samples by the
 // per-(peer, duty-type) warm-up failure counts so that genesis-epoch
 // warm-up failures do not affect scoring.
-func subtractEpoch0(failed []sample, epoch0 map[epoch0Key]float64) []sample {
-	if len(epoch0) == 0 {
+func subtractWarmup(failed []sample, warmup map[warmupKey]float64) []sample {
+	if len(warmup) == 0 {
 		return failed
 	}
 	out := make([]sample, len(failed))
 	for i, s := range failed {
-		k := epoch0Key{peer: s.labels["cluster_peer"], duty: s.labels["duty"]}
-		adj := s.value - epoch0[k]
+		k := warmupKey{peer: s.labels["cluster_peer"], duty: s.labels["duty"]}
+		adj := s.value - warmup[k]
 		if adj < 0 {
 			adj = 0
 		}
@@ -1364,11 +1364,11 @@ const degradedPctThreshold = 100.0
 // disagree by sampling races, and a duty's expected total is derived as
 // success+failed -- see addSamples.
 //
-// epoch0Failures contains per-(peer, duty-type) failure counts from the
+// warmupFailures contains per-(peer, duty-type) failure counts from the
 // warm-up slots (parsed from charon logs). These are subtracted from the
 // failed duty counts so that genesis-epoch warm-up failures do not affect
 // scoring.
-func collectReport(baseURL, name, clusterName string, cycle, windowS int, end time.Time, epoch0Failures map[epoch0Key]float64, host hostStats) (reportData, error) {
+func collectReport(baseURL, name, clusterName string, cycle, windowS int, end time.Time, warmupFailures map[warmupKey]float64, host hostStats) (reportData, error) {
 	success, err := promQuery(baseURL, promDutySuccess(clusterName, windowS), end)
 	if err != nil {
 		return reportData{}, err
@@ -1383,7 +1383,7 @@ func collectReport(baseURL, name, clusterName string, cycle, windowS int, end ti
 	roundSamples(success)
 	roundSamples(failed)
 
-	failed = subtractEpoch0(failed, epoch0Failures)
+	failed = subtractWarmup(failed, warmupFailures)
 	expected := addSamples(success, failed)
 	worst, ok := selectWorstNode(expected, success)
 	var worstPtr *worstNode
@@ -1519,7 +1519,7 @@ func selectLogTargets(containers []string) (bn string, dvNodes, vcs []string) {
 	// Dedupe by service before sorting, keeping the FIRST occurrence: docker
 	// ps -a can list several containers for one kurtosis service (e.g. after
 	// a recreate), and duplicates would overwrite each other's dump files and
-	// double-count warm-up failures in countEpoch0Failures. Callers list
+	// double-count warm-up failures in countWarmupFailures. Callers list
 	// running containers ahead of the ps -a sweep, so the kept instance is
 	// the live one -- which is what the docker-logs fallback should read.
 	seen := map[string]bool{}
@@ -1943,8 +1943,8 @@ func runWindow(cfg config, name string, cycle int, enclave, startupDir string) r
 	close(stopCh)
 	host := <-sampleDone
 
-	epoch0Failures := countEpoch0Failures(enclave, startupDir)
-	data, err := collectReport(baseURL, name, clusterName, cycle, windowS, end, epoch0Failures, host)
+	warmupFailures := countWarmupFailures(enclave, startupDir)
+	data, err := collectReport(baseURL, name, clusterName, cycle, windowS, end, warmupFailures, host)
 	if err != nil {
 		return failedReport(name, cycle, err.Error())
 	}
