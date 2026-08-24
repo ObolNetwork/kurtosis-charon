@@ -1701,7 +1701,9 @@ func captureFailureLogs(cfg config, enclave, name string, cycle int, startupDir 
 		_ = os.WriteFile(filepath.Join(staging, serviceLabel(c)+".early.log"), early, 0o644)
 	}
 
-	if err := os.MkdirAll(cfg.logDir, 0o755); err != nil {
+	// 0700: failure archives can linger locally (kept whenever the Slack
+	// upload is unconfigured or fails), so keep them runner-user-only.
+	if err := os.MkdirAll(cfg.logDir, 0o700); err != nil {
 		fmt.Fprintf(os.Stderr, "runner: log capture: mkdir %s failed: %v\n", cfg.logDir, err)
 		return ""
 	}
