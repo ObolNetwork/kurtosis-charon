@@ -1494,18 +1494,52 @@ func TestSelectLogTargets(t *testing.T) {
 	}
 
 	// docker ps -a can list several containers for one service (recreates);
-	// duplicates must collapse to one target per service label.
+	// duplicates must collapse to one target per service label, keeping the
+	// FIRST occurrence (callers list running containers first, so the live
+	// instance wins) even when a stopped duplicate sorts lexically earlier.
 	_, dv, vcs = selectLogTargets([]string{
-		"vc-3-geth-lodestar-charon-charon-0--old",
-		"vc-3-geth-lodestar-charon-charon-0--new",
-		"vc-3-geth-lodestar-charon-vc-0-nimbus--old",
-		"vc-3-geth-lodestar-charon-vc-0-nimbus--new",
+		"vc-3-geth-lodestar-charon-charon-0--zzz-running",
+		"vc-3-geth-lodestar-charon-charon-0--aaa-stopped",
+		"vc-3-geth-lodestar-charon-vc-0-nimbus--zzz-running",
+		"vc-3-geth-lodestar-charon-vc-0-nimbus--aaa-stopped",
 	})
-	if len(dv) != 1 {
-		t.Errorf("dvNodes = %v, want duplicates for one service collapsed to 1", dv)
+	if len(dv) != 1 || !strings.HasSuffix(dv[0], "--zzz-running") {
+		t.Errorf("dvNodes = %v, want the single first-listed (running) instance", dv)
 	}
-	if len(vcs) != 1 {
-		t.Errorf("vcs = %v, want duplicates for one service collapsed to 1", vcs)
+	if len(vcs) != 1 || !strings.HasSuffix(vcs[0], "--zzz-running") {
+		t.Errorf("vcs = %v, want the single first-listed (running) instance", vcs)
+	}
+}
+
+// TestLogTargetsPrefersRunning pins the running-first composition: logTargets
+// lists running containers before the docker ps -a sweep, so a recreated
+// service's live container is the one captured (the docker-logs fallback
+// reads per-container, not per-service).
+func TestLogTargetsPrefersRunning(t *testing.T) {
+	oldRun := runCommand
+	defer func() { runCommand = oldRun }()
+
+	runCommand = func(name string, args ...string) (string, error) {
+		if name != "docker" || len(args) == 0 || args[0] != "ps" {
+			return "", nil
+		}
+		for _, a := range args {
+			if a == "-a" {
+				return "vc-3-geth-teku-charon-charon-0--stopped\nvc-3-geth-teku-charon-charon-0--running\n", nil
+			}
+		}
+		return "vc-3-geth-teku-charon-charon-0--running\n", nil
+	}
+
+	all, dvNodes, err := logTargets("c1-teku-nimbus")
+	if err != nil {
+		t.Fatalf("logTargets error: %v", err)
+	}
+	if len(all) != 1 || !strings.HasSuffix(all[0], "--running") {
+		t.Errorf("all = %v, want just the running instance", all)
+	}
+	if len(dvNodes) != 1 || !strings.HasSuffix(dvNodes[0], "--running") {
+		t.Errorf("dvNodes = %v, want just the running instance", dvNodes)
 	}
 }
 

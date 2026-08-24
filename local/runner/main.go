@@ -1239,19 +1239,10 @@ type epoch0Key struct{ peer, duty string }
 func countEpoch0Failures(enclave, startupDir string) map[epoch0Key]float64 {
 	counts := map[epoch0Key]float64{}
 
-	out, err := runCommand("docker", "ps", "-a",
-		"--filter", "label=com.kurtosistech.enclave-name="+enclave,
-		"--format", "{{.Names}}")
+	_, dvNodes, err := logTargets(enclave)
 	if err != nil {
 		return counts
 	}
-	var containers []string
-	for _, ln := range strings.Split(out, "\n") {
-		if ln = strings.TrimSpace(ln); ln != "" {
-			containers = append(containers, ln)
-		}
-	}
-	_, dvNodes, _ := selectLogTargets(containers)
 
 	for _, node := range dvNodes {
 		records := joinLogRecords(fetchServiceLogs(enclave, node))
@@ -1520,28 +1511,34 @@ func serviceLabel(container string) string {
 // uses. Helper containers (charon relay, split-keys) are excluded from the DV
 // node set.
 func selectLogTargets(containers []string) (bn string, dvNodes, vcs []string) {
-	sorted := append([]string(nil), containers...)
-	sort.Strings(sorted)
-	// Dedupe by service: docker ps -a can list several containers for one
-	// kurtosis service (e.g. after a recreate). Their logs come from the same
-	// service either way, and duplicates would overwrite each other's dump
-	// files and double-count warm-up failures in countEpoch0Failures.
+	// Dedupe by service before sorting, keeping the FIRST occurrence: docker
+	// ps -a can list several containers for one kurtosis service (e.g. after
+	// a recreate), and duplicates would overwrite each other's dump files and
+	// double-count warm-up failures in countEpoch0Failures. Callers list
+	// running containers ahead of the ps -a sweep, so the kept instance is
+	// the live one -- which is what the docker-logs fallback should read.
 	seen := map[string]bool{}
-	dvIndex := ""
-	for _, c := range sorted {
+	var deduped []string
+	for _, c := range containers {
 		label := serviceLabel(c)
 		if seen[label] {
 			continue
 		}
+		seen[label] = true
+		deduped = append(deduped, c)
+	}
+
+	sorted := deduped
+	sort.Strings(sorted)
+	dvIndex := ""
+	for _, c := range sorted {
 		switch {
 		case isCharonNode(c):
-			seen[label] = true
 			dvNodes = append(dvNodes, c)
 			if dvIndex == "" {
 				dvIndex = nodeIndex(c)
 			}
 		case strings.Contains(c, "-charon-vc-"):
-			seen[label] = true
 			vcs = append(vcs, c)
 		}
 	}
@@ -1607,32 +1604,39 @@ func fetchServiceLogs(enclave, container string) string {
 	return fallback
 }
 
-// logTargets lists the enclave's BN/Charon/VC containers worth capturing.
-// Containers are scoped to this enclave via kurtosis's enclave-name label so
-// a leftover container from a prior run can never be captured; docker ps -a
-// is used so a crashed container (e.g. a VC that exited) is still discovered.
-func logTargets(enclave string) ([]string, error) {
-	out, err := runCommand("docker", "ps", "-a",
-		"--filter", "label=com.kurtosistech.enclave-name="+enclave,
-		"--format", "{{.Names}}")
-	if err != nil {
-		return nil, err
-	}
+// logTargets lists the enclave's BN/Charon/VC containers worth capturing:
+// the flat capture set plus the charon DV nodes separately (for warm-up
+// grace parsing). Containers are scoped to this enclave via kurtosis's
+// enclave-name label so a leftover container from a prior run can never be
+// captured. Running containers are listed before the docker ps -a sweep --
+// selectLogTargets keeps the first container per service, so a live
+// instance beats a stopped leftover of the same service for the docker-logs
+// fallback -- while ps -a still discovers crashed containers (e.g. a VC
+// that exited).
+func logTargets(enclave string) (all, dvNodes []string, err error) {
 	var containers []string
-	for _, ln := range strings.Split(out, "\n") {
-		if ln = strings.TrimSpace(ln); ln != "" {
-			containers = append(containers, ln)
+	for _, extra := range [][]string{nil, {"-a"}} {
+		args := append(append([]string{"ps"}, extra...),
+			"--filter", "label=com.kurtosistech.enclave-name="+enclave,
+			"--format", "{{.Names}}")
+		out, err := runCommand("docker", args...)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, ln := range strings.Split(out, "\n") {
+			if ln = strings.TrimSpace(ln); ln != "" {
+				containers = append(containers, ln)
+			}
 		}
 	}
 	bn, dvNodes, vcs := selectLogTargets(containers)
 
-	var targets []string
 	if bn != "" {
-		targets = append(targets, bn)
+		all = append(all, bn)
 	}
-	targets = append(targets, dvNodes...)
-	targets = append(targets, vcs...)
-	return targets, nil
+	all = append(all, dvNodes...)
+	all = append(all, vcs...)
+	return all, dvNodes, nil
 }
 
 // serviceLogName is the shared filename convention for a container's dumped
@@ -1651,7 +1655,7 @@ func serviceLogName(container string) string {
 func snapshotStartupLogs(enclave string) (dir string) {
 	defer func() { _ = recover() }()
 
-	targets, err := logTargets(enclave)
+	targets, _, err := logTargets(enclave)
 	if err != nil || len(targets) == 0 {
 		return ""
 	}
@@ -1681,7 +1685,7 @@ func snapshotStartupLogs(enclave string) (dir string) {
 func captureFailureLogs(cfg config, enclave, name string, cycle int, startupDir string) (archivePath string) {
 	defer func() { _ = recover() }()
 
-	targets, err := logTargets(enclave)
+	targets, _, err := logTargets(enclave)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "runner: log capture: docker ps failed: %v\n", err)
 		return ""
