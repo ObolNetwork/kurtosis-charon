@@ -420,7 +420,7 @@ func computeBackoff(consecutiveFailures, base, cap int) int {
 }
 
 // ---------------------------------------------------------------------------
-// PromQL builders: promDutyExpected, promDutySuccess, promDVMemPeak,
+// PromQL builders: promDutyFailed, promDutySuccess, promDVMemPeak,
 // promDVCPUPeak, promHealthFired, promHealthFiringNow.
 // ---------------------------------------------------------------------------
 
@@ -428,8 +428,8 @@ func promSelector(clusterName string) string {
 	return fmt.Sprintf(`cluster_name="%s"`, clusterName)
 }
 
-func promDutyExpected(clusterName string, windowS int) string {
-	return fmt.Sprintf("sum(increase(core_tracker_expect_duties_total{%s}[%ds])) by (duty, cluster_peer)",
+func promDutyFailed(clusterName string, windowS int) string {
+	return fmt.Sprintf("sum(increase(core_tracker_failed_duties_total{%s}[%ds])) by (duty, cluster_peer)",
 		promSelector(clusterName), windowS)
 }
 
@@ -882,8 +882,18 @@ var (
 // promQuery GETs Prometheus's instant-query endpoint and parses the result
 // into samples. It returns an error (including errorType/error from the
 // response body) whenever the JSON "status" field isn't "success".
-func promQuery(baseURL, promQL string) ([]sample, error) {
+//
+// A non-zero evalTime is passed as the query's time= parameter so that a set
+// of related queries all evaluate at the same instant. Without it, sequential
+// queries each evaluate at their own arrival time, seconds apart, and two
+// still-moving counters sampled that way can disagree by a phantom ±1 after
+// increase() extrapolation and rounding. A zero evalTime means "now"
+// (health polling, cluster discovery).
+func promQuery(baseURL, promQL string, evalTime time.Time) ([]sample, error) {
 	u := strings.TrimRight(baseURL, "/") + "/api/v1/query?query=" + url.QueryEscape(promQL)
+	if !evalTime.IsZero() {
+		u += "&time=" + strconv.FormatInt(evalTime.Unix(), 10)
+	}
 	body, _, err := httpGet(u)
 	if err != nil {
 		return nil, err
@@ -934,7 +944,7 @@ func promQuery(baseURL, promQL string) ([]sample, error) {
 // no distinguishing extra cluster_name of their own in this query -- so
 // zero or more than one distinct value found is an error.
 func discoverClusterName(baseURL string) (string, error) {
-	samples, err := promQuery(baseURL, promClusterNameGroups)
+	samples, err := promQuery(baseURL, promClusterNameGroups, time.Time{})
 	if err != nil {
 		return "", err
 	}
@@ -1136,7 +1146,7 @@ func waitHealthy(baseURL string, deadlineS int) bool {
 	const promQL = "core_scheduler_validators_active > 0"
 	waited := 0
 	for waited < deadlineS {
-		samples, err := promQuery(baseURL, promQL)
+		samples, err := promQuery(baseURL, promQL, time.Time{})
 		if err != nil {
 			return false
 		}
@@ -1153,7 +1163,7 @@ func waitHealthy(baseURL string, deadlineS int) bool {
 // collectReport: assemble the post-run report.
 // ---------------------------------------------------------------------------
 
-const warmupSlots = 64 // exclude epochs 0 and 1 (2 × 32 slots)
+const warmupSlots = 64 // grace epochs 0 and 1 (2 × 32 slots)
 
 var (
 	dutyFailedRe = regexp.MustCompile(`"duty"\s*:\s*"(\d+)/([^"]+)"`)
@@ -1206,16 +1216,27 @@ func joinLogRecords(logs string) []string {
 	return records
 }
 
-// epoch0Key is a (peer, duty-type) pair used to key per-node epoch-0
+// epoch0Key is a (peer, duty-type) pair used to key per-node warm-up
 // failure counts.
 type epoch0Key struct{ peer, duty string }
 
-// countEpoch0Failures fetches charon logs from every DV node in the
-// enclave and counts "Duty failed" lines whose slot falls in epoch 0
-// (slot < 32). Returns a map keyed by (cluster_peer, duty_type) so
-// the subtraction matches the per-peer Prometheus samples exactly.
-// Best-effort: returns an empty map on any error.
-func countEpoch0Failures(enclave string) map[epoch0Key]float64 {
+// countEpoch0Failures counts warm-up duty failures per (cluster_peer,
+// duty type) from every DV node's charon logs, for subtraction from the
+// failed-duty counters so that genesis-epoch warm-up failures do not
+// affect scoring.
+//
+// Failures are collected as unique (slot, duty) instances -- the tracker
+// increments its failed counter once per duty instance -- from both
+// "Duty failed" tracker records and "Permanent failure" component records:
+// a tracker that boots mid-warmup can count a duty as failed without ever
+// emitting the "Duty failed" line, leaving only the component-level record
+// behind. Records come from the end-of-run logs merged with the startup
+// snapshot (startupDir, from snapshotStartupLogs), and the peer name is
+// resolved from the snapshot first: boot lines can rotate out of the
+// end-of-run logs entirely, which would otherwise silently disable this
+// grace for the node. Best-effort: returns an empty map on any error, and
+// warns loudly when a node's grace is skipped.
+func countEpoch0Failures(enclave, startupDir string) map[epoch0Key]float64 {
 	counts := map[epoch0Key]float64{}
 
 	out, err := runCommand("docker", "ps", "-a",
@@ -1234,12 +1255,24 @@ func countEpoch0Failures(enclave string) map[epoch0Key]float64 {
 
 	for _, node := range dvNodes {
 		records := joinLogRecords(fetchServiceLogs(enclave, node))
+		if startupDir != "" {
+			if b, err := os.ReadFile(filepath.Join(startupDir, serviceLogName(node))); err == nil && len(b) > 0 {
+				records = append(joinLogRecords(string(b)), records...)
+			}
+		}
 		peerName := extractPeerName(records)
 		if peerName == "" {
+			fmt.Fprintf(os.Stderr, "runner: warm-up grace skipped for %s: no peer name found in its logs\n", serviceLabel(node))
 			continue
 		}
+
+		type instance struct {
+			slot int
+			duty string
+		}
+		seen := map[instance]bool{}
 		for _, line := range records {
-			if !strings.Contains(line, "Duty failed") {
+			if !strings.Contains(line, "Duty failed") && !strings.Contains(line, "Permanent failure") {
 				continue
 			}
 			m := dutyFailedRe.FindStringSubmatch(line)
@@ -1250,7 +1283,10 @@ func countEpoch0Failures(enclave string) map[epoch0Key]float64 {
 			if err != nil || slot >= warmupSlots {
 				continue
 			}
-			counts[epoch0Key{peer: peerName, duty: m[2]}]++
+			seen[instance{slot: slot, duty: m[2]}] = true
+		}
+		for inst := range seen {
+			counts[epoch0Key{peer: peerName, duty: inst.duty}]++
 		}
 	}
 	return counts
@@ -1271,21 +1307,47 @@ func extractPeerName(records []string) string {
 	return ""
 }
 
-// subtractEpoch0 reduces the expected-duty Prometheus samples by the
-// per-(peer, duty-type) epoch-0 failure counts so that genesis-epoch
-// warmup failures do not affect scoring.
-func subtractEpoch0(expected []sample, epoch0 map[epoch0Key]float64) []sample {
+// subtractEpoch0 reduces the failed-duty Prometheus samples by the
+// per-(peer, duty-type) warm-up failure counts so that genesis-epoch
+// warm-up failures do not affect scoring.
+func subtractEpoch0(failed []sample, epoch0 map[epoch0Key]float64) []sample {
 	if len(epoch0) == 0 {
-		return expected
+		return failed
 	}
-	out := make([]sample, len(expected))
-	for i, s := range expected {
+	out := make([]sample, len(failed))
+	for i, s := range failed {
 		k := epoch0Key{peer: s.labels["cluster_peer"], duty: s.labels["duty"]}
 		adj := s.value - epoch0[k]
 		if adj < 0 {
 			adj = 0
 		}
 		out[i] = sample{labels: s.labels, value: adj}
+	}
+	return out
+}
+
+// addSamples merges two per-(duty, cluster_peer) sample sets by summing
+// values, returning one sample per key present in either input. It derives
+// the expected-duty totals as success+failed: the tracker increments those
+// two counters together with expect, so the sum equals expect while being
+// self-consistent by construction -- a duty in flight at query time is in
+// neither counter and can never register as a phantom miss.
+func addSamples(a, b []sample) []sample {
+	type key struct{ duty, peer string }
+	sums := map[key]float64{}
+	for _, sm := range a {
+		sums[key{duty: sm.labels["duty"], peer: sm.labels["cluster_peer"]}] += sm.value
+	}
+	for _, sm := range b {
+		sums[key{duty: sm.labels["duty"], peer: sm.labels["cluster_peer"]}] += sm.value
+	}
+
+	out := make([]sample, 0, len(sums))
+	for k, v := range sums {
+		out = append(out, sample{
+			labels: map[string]string{"duty": k.duty, "cluster_peer": k.peer},
+			value:  v,
+		})
 	}
 	return out
 }
@@ -1302,33 +1364,38 @@ const degradedPctThreshold = 100.0
 // the caller afterwards, since it's derived from wall-clock time, not from
 // anything collectReport queries.
 //
-// epoch0Failures contains per-(peer, duty-type) failure counts from
-// epoch 0 (parsed from charon logs). These are subtracted from the
-// expected duty counts so that genesis-epoch warmup failures do not
-// affect scoring.
-func collectReport(baseURL, name, clusterName string, cycle, windowS int, epoch0Failures map[epoch0Key]float64, host hostStats) (reportData, error) {
-	expected, err := promQuery(baseURL, promDutyExpected(clusterName, windowS))
+// Every query evaluates at the same end instant so the counters can't
+// disagree by sampling races, and a duty's expected total is derived as
+// success+failed -- see addSamples.
+//
+// epoch0Failures contains per-(peer, duty-type) failure counts from the
+// warm-up slots (parsed from charon logs). These are subtracted from the
+// failed duty counts so that genesis-epoch warm-up failures do not affect
+// scoring.
+func collectReport(baseURL, name, clusterName string, cycle, windowS int, end time.Time, epoch0Failures map[epoch0Key]float64, host hostStats) (reportData, error) {
+	success, err := promQuery(baseURL, promDutySuccess(clusterName, windowS), end)
 	if err != nil {
 		return reportData{}, err
 	}
-	success, err := promQuery(baseURL, promDutySuccess(clusterName, windowS))
+	failed, err := promQuery(baseURL, promDutyFailed(clusterName, windowS), end)
 	if err != nil {
 		return reportData{}, err
 	}
 	// Prometheus increase() extrapolates at window boundaries, producing
 	// non-integer values for integer counters. Round to avoid display
 	// artifacts like "361/361 - 99.99%".
-	roundSamples(expected)
 	roundSamples(success)
+	roundSamples(failed)
 
-	expected = subtractEpoch0(expected, epoch0Failures)
+	failed = subtractEpoch0(failed, epoch0Failures)
+	expected := addSamples(success, failed)
 	worst, ok := selectWorstNode(expected, success)
 	var worstPtr *worstNode
 	if ok {
 		worstPtr = &worst
 	}
 
-	memSamples, err := promQuery(baseURL, promDVMemPeak(clusterName, windowS))
+	memSamples, err := promQuery(baseURL, promDVMemPeak(clusterName, windowS), end)
 	if err != nil {
 		return reportData{}, err
 	}
@@ -1337,7 +1404,7 @@ func collectReport(baseURL, name, clusterName string, cycle, windowS int, epoch0
 		memPtr = &v
 	}
 
-	cpuSamples, err := promQuery(baseURL, promDVCPUPeak(clusterName, windowS))
+	cpuSamples, err := promQuery(baseURL, promDVCPUPeak(clusterName, windowS), end)
 	if err != nil {
 		return reportData{}, err
 	}
@@ -1346,11 +1413,11 @@ func collectReport(baseURL, name, clusterName string, cycle, windowS int, epoch0
 		cpuPtr = &v
 	}
 
-	fired, err := promQuery(baseURL, promHealthFired(clusterName, windowS))
+	fired, err := promQuery(baseURL, promHealthFired(clusterName, windowS), end)
 	if err != nil {
 		return reportData{}, err
 	}
-	firingNow, err := promQuery(baseURL, promHealthFiringNow(clusterName))
+	firingNow, err := promQuery(baseURL, promHealthFiringNow(clusterName), end)
 	if err != nil {
 		return reportData{}, err
 	}
@@ -1529,21 +1596,16 @@ func fetchServiceLogs(enclave, container string) string {
 	return fallback
 }
 
-// captureFailureLogs dumps the targeted logs for a failing run into a gzipped
-// tarball under cfg.logDir and returns its path. Best-effort: on any problem
-// it returns whatever it managed (possibly ""), never panicking. Containers are
-// scoped to this enclave via kurtosis's enclave-name label so a leftover
-// container from a prior run can never be captured; docker ps -a is kept so a
-// crashed container (e.g. a VC that exited) is still discovered and captured.
-func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePath string) {
-	defer func() { _ = recover() }()
-
+// logTargets lists the enclave's BN/Charon/VC containers worth capturing.
+// Containers are scoped to this enclave via kurtosis's enclave-name label so
+// a leftover container from a prior run can never be captured; docker ps -a
+// is used so a crashed container (e.g. a VC that exited) is still discovered.
+func logTargets(enclave string) ([]string, error) {
 	out, err := runCommand("docker", "ps", "-a",
 		"--filter", "label=com.kurtosistech.enclave-name="+enclave,
 		"--format", "{{.Names}}")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "runner: log capture: docker ps failed: %v\n", err)
-		return ""
+		return nil, err
 	}
 	var containers []string
 	for _, ln := range strings.Split(out, "\n") {
@@ -1559,6 +1621,60 @@ func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePat
 	}
 	targets = append(targets, dvNodes...)
 	targets = append(targets, vcs...)
+	return targets, nil
+}
+
+// serviceLogName is the shared filename convention for a container's dumped
+// logs, used both by the startup snapshot and by the failure archive so the
+// two always agree on where a service's snapshot lives.
+func serviceLogName(container string) string {
+	return serviceLabel(container) + ".log"
+}
+
+// snapshotStartupLogs dumps every log target's current logs into a fresh
+// temp dir and returns its path ("" when nothing could be captured). It is
+// meant to run right after launch, while the start of the run is still
+// retained: docker's local ring buffer (and at times the kurtosis log
+// aggregator) can wrap during a 90-minute run and silently drop the boot
+// lines, which are exactly the ones a post-mortem needs. Best-effort.
+func snapshotStartupLogs(enclave string) (dir string) {
+	defer func() { _ = recover() }()
+
+	targets, err := logTargets(enclave)
+	if err != nil || len(targets) == 0 {
+		return ""
+	}
+	dir, err = os.MkdirTemp("", "runner-startup-logs-*")
+	if err != nil {
+		return ""
+	}
+	for _, c := range targets {
+		logs := fetchServiceLogs(enclave, c)
+		_ = os.WriteFile(filepath.Join(dir, serviceLogName(c)), []byte(logs), 0o644)
+	}
+	return dir
+}
+
+// captureFailureLogs dumps the targeted logs for a failing run into a gzipped
+// tarball under cfg.logDir and returns its path. Best-effort: on any problem
+// it returns whatever it managed (possibly ""), never panicking.
+//
+// startupDir optionally points at a snapshotStartupLogs dir; each service's
+// snapshot is archived alongside its end-of-run logs as <service>.early.log,
+// so the boot lines survive even when the log retention window wrapped past
+// the start of the run. The snapshot is small (launch-time logs only), and
+// archiving it unconditionally beats detecting truncation: the two fetches
+// can come from different sources with different line formats (kurtosis
+// aggregator vs docker fallback), which makes any content comparison flaky
+// in both directions.
+func captureFailureLogs(cfg config, enclave, name string, cycle int, startupDir string) (archivePath string) {
+	defer func() { _ = recover() }()
+
+	targets, err := logTargets(enclave)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "runner: log capture: docker ps failed: %v\n", err)
+		return ""
+	}
 	if len(targets) == 0 {
 		fmt.Fprintln(os.Stderr, "runner: log capture: no BN/Charon/VC containers found")
 		return ""
@@ -1572,7 +1688,17 @@ func captureFailureLogs(cfg config, enclave, name string, cycle int) (archivePat
 
 	for _, c := range targets {
 		logs := fetchServiceLogs(enclave, c) // capture whatever exists
-		_ = os.WriteFile(filepath.Join(staging, serviceLabel(c)+".log"), []byte(logs), 0o644)
+		_ = os.WriteFile(filepath.Join(staging, serviceLogName(c)), []byte(logs), 0o644)
+
+		if startupDir == "" {
+			continue
+		}
+		early, err := os.ReadFile(filepath.Join(startupDir, serviceLogName(c)))
+		if err != nil || len(early) == 0 {
+			fmt.Fprintf(os.Stderr, "runner: log capture: no startup snapshot for %s; boot lines rely on end-of-run logs alone\n", serviceLabel(c))
+			continue
+		}
+		_ = os.WriteFile(filepath.Join(staging, serviceLabel(c)+".early.log"), early, 0o644)
 	}
 
 	if err := os.MkdirAll(cfg.logDir, 0o755); err != nil {
@@ -1750,8 +1876,10 @@ func writeTempArgsFile(yaml string) (path string, err error) {
 // sampler across the wait window, then collect the report. The sampler is
 // always started right before, and stopped right after, the wait loop --
 // there is no early return in between, so teardown of the sampler goroutine
-// is unconditional in the only case where it was started.
-func runWindow(cfg config, name string, cycle int, enclave string) reportData {
+// is unconditional in the only case where it was started. startupDir is the
+// launch-time log snapshot dir ("" when unavailable), used to source the
+// warm-up grace even when boot lines rotate out of the live logs.
+func runWindow(cfg config, name string, cycle int, enclave, startupDir string) reportData {
 	baseURL := prometheusBaseURL(enclave)
 	if baseURL == "" {
 		return failedReport(name, cycle, "could not resolve prometheus base URL")
@@ -1793,8 +1921,8 @@ func runWindow(cfg config, name string, cycle int, enclave string) reportData {
 	close(stopCh)
 	host := <-sampleDone
 
-	epoch0Failures := countEpoch0Failures(enclave)
-	data, err := collectReport(baseURL, name, clusterName, cycle, windowS, epoch0Failures, host)
+	epoch0Failures := countEpoch0Failures(enclave, startupDir)
+	data, err := collectReport(baseURL, name, clusterName, cycle, windowS, end, epoch0Failures, host)
 	if err != nil {
 		return failedReport(name, cycle, err.Error())
 	}
@@ -1860,11 +1988,19 @@ func runOne(cfg config, paramFile, name string, cycle int) (result reportData) {
 	}
 	defer kurtosisRemove(enclave) // guaranteed teardown after a successful launch
 
-	data := runWindow(cfg, name, cycle, enclave)
+	// Snapshot the boot logs now, while the log retention window still holds
+	// the start of the run; captureFailureLogs falls back to this snapshot
+	// for any service whose end-of-run logs turn out truncated.
+	startupLogs := snapshotStartupLogs(enclave)
+	if startupLogs != "" {
+		defer os.RemoveAll(startupLogs)
+	}
+
+	data := runWindow(cfg, name, cycle, enclave, startupLogs)
 	if data.status != "ok" {
 		// Capture BN/Charon/VC logs while the enclave is still up (teardown is
 		// deferred), for post-mortem of a failing/degraded combo.
-		data.logArchivePath = captureFailureLogs(cfg, enclave, name, cycle)
+		data.logArchivePath = captureFailureLogs(cfg, enclave, name, cycle, startupLogs)
 	}
 	postBestEffort(cfg, data)
 	if data.logArchivePath != "" {

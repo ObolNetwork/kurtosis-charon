@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -237,8 +239,12 @@ func TestPromQLBuilders(t *testing.T) {
 		t.Errorf("promDutySuccess missing group-by: %s", q)
 	}
 
-	if !strings.Contains(promDutyExpected("kurtosis-a-b", 60), "core_tracker_expect_duties_total") {
-		t.Errorf("promDutyExpected missing metric name")
+	qf := promDutyFailed("kurtosis-a-b", 60)
+	if !strings.Contains(qf, "core_tracker_failed_duties_total") {
+		t.Errorf("promDutyFailed missing metric name: %s", qf)
+	}
+	if !strings.Contains(qf, "[60s]") || !strings.Contains(qf, "by (duty, cluster_peer)") {
+		t.Errorf("promDutyFailed missing window or group-by: %s", qf)
 	}
 	if !strings.Contains(promDVMemPeak("kurtosis-a-b", 5400), "process_resident_memory_bytes") {
 		t.Errorf("promDVMemPeak missing metric name")
@@ -713,10 +719,12 @@ func TestPromQueryParsesAndErrors(t *testing.T) {
 	old := httpGet
 	defer func() { httpGet = old }()
 
-	httpGet = func(string) ([]byte, int, error) {
+	var capturedURL string
+	httpGet = func(u string) ([]byte, int, error) {
+		capturedURL = u
 		return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"42.5"]}]}}`), 200, nil
 	}
-	samples, err := promQuery("http://x", "up")
+	samples, err := promQuery("http://x", "up", time.Time{})
 	if err != nil {
 		t.Fatalf("promQuery error: %v", err)
 	}
@@ -726,14 +734,62 @@ func TestPromQueryParsesAndErrors(t *testing.T) {
 	if samples[0].labels["duty"] != "attester" || samples[0].labels["cluster_peer"] != "0" {
 		t.Errorf("labels = %+v", samples[0].labels)
 	}
+	if u, err := url.Parse(capturedURL); err != nil || u.Query().Has("time") {
+		t.Errorf("zero eval time must omit the time param, got %q", capturedURL)
+	}
+
+	// A non-zero eval time pins the query to that instant.
+	eval := time.Date(2026, 8, 24, 10, 0, 0, 0, time.UTC)
+	if _, err := promQuery("http://x", "up", eval); err != nil {
+		t.Fatalf("promQuery error: %v", err)
+	}
+	u, err := url.Parse(capturedURL)
+	if err != nil {
+		t.Fatalf("parse captured url: %v", err)
+	}
+	if got := u.Query().Get("time"); got != strconv.FormatInt(eval.Unix(), 10) {
+		t.Errorf("time param = %q, want %d", got, eval.Unix())
+	}
 
 	httpGet = func(string) ([]byte, int, error) {
 		return []byte(`{"status":"error","errorType":"bad_data"}`), 200, nil
 	}
-	if _, err := promQuery("http://x", "up"); err == nil {
+	if _, err := promQuery("http://x", "up", time.Time{}); err == nil {
 		t.Fatal("expected error when status != success")
 	} else if !strings.Contains(err.Error(), "bad_data") {
 		t.Errorf("error = %v, want mention of errorType bad_data", err)
+	}
+}
+
+func TestAddSamples(t *testing.T) {
+	success := []sample{
+		s(map[string]string{"duty": "attester", "cluster_peer": "0"}, 100),
+		s(map[string]string{"duty": "attester", "cluster_peer": "1"}, 95),
+		s(map[string]string{"duty": "proposer", "cluster_peer": "0"}, 10),
+	}
+	failed := []sample{
+		s(map[string]string{"duty": "attester", "cluster_peer": "1"}, 5),
+		s(map[string]string{"duty": "sync_message", "cluster_peer": "0"}, 3), // only in failed
+	}
+	got := addSamples(success, failed)
+
+	byKey := map[string]float64{}
+	for _, sm := range got {
+		byKey[sm.labels["duty"]+"/"+sm.labels["cluster_peer"]] = sm.value
+	}
+	want := map[string]float64{
+		"attester/0":     100, // no failures
+		"attester/1":     100, // 95 + 5
+		"proposer/0":     10,
+		"sync_message/0": 3, // failed-only series still appears
+	}
+	if len(byKey) != len(want) {
+		t.Fatalf("got %d series %v, want %d", len(byKey), byKey, len(want))
+	}
+	for k, v := range want {
+		if byKey[k] != v {
+			t.Errorf("%s = %v, want %v", k, byKey[k], v)
+		}
 	}
 }
 
@@ -1120,8 +1176,8 @@ func TestRunOneHappyPathOK(t *testing.T) {
 			return []byte(`{"status":"success","data":{"result":[{"metric":{},"value":[1,"1"]}]}}`), 200, nil
 		case strings.Contains(u, "cluster_name") && strings.Contains(u, "app_version"):
 			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_name":"kurtosis-teku-prysm"},"value":[1,"1"]}]}}`), 200, nil
-		case strings.Contains(u, "core_tracker_expect_duties_total"):
-			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"780"]}]}}`), 200, nil
+		case strings.Contains(u, "core_tracker_failed_duties_total"):
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"0"]}]}}`), 200, nil
 		case strings.Contains(u, "core_tracker_success_duties_total"):
 			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"780"]}]}}`), 200, nil
 		case strings.Contains(u, "process_resident_memory_bytes"):
@@ -1161,8 +1217,8 @@ func TestHealthCheckStatusGatedByToggle(t *testing.T) {
 	defer func() { httpGet = old }()
 	httpGet = func(u string) ([]byte, int, error) {
 		switch {
-		case strings.Contains(u, "core_tracker_expect_duties_total"):
-			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"1000"]}]}}`), 200, nil
+		case strings.Contains(u, "core_tracker_failed_duties_total"):
+			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"0"]}]}}`), 200, nil
 		case strings.Contains(u, "core_tracker_success_duties_total"):
 			return []byte(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"1000"]}]}}`), 200, nil
 		case strings.Contains(u, "app_health_checks"):
@@ -1175,7 +1231,7 @@ func TestHealthCheckStatusGatedByToggle(t *testing.T) {
 
 	// Default (disabled): a firing health check must NOT downgrade an otherwise
 	// healthy run.
-	data, err := collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, nil, hostStats{})
+	data, err := collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, time.Time{}, nil, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
@@ -1187,7 +1243,7 @@ func TestHealthCheckStatusGatedByToggle(t *testing.T) {
 	oldFlag := reportHealthChecks
 	reportHealthChecks = true
 	defer func() { reportHealthChecks = oldFlag }()
-	data, err = collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, nil, hostStats{})
+	data, err = collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, time.Time{}, nil, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
@@ -1221,10 +1277,11 @@ func TestDegradedTolerance(t *testing.T) {
 	mkResp := func(pct float64) func(string) ([]byte, int, error) {
 		expected := 1000.0
 		success := expected * pct / 100
+		failed := expected - success
 		return func(u string) ([]byte, int, error) {
 			switch {
-			case strings.Contains(u, "core_tracker_expect_duties_total"):
-				return []byte(fmt.Sprintf(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"%v"]}]}}`, expected)), 200, nil
+			case strings.Contains(u, "core_tracker_failed_duties_total"):
+				return []byte(fmt.Sprintf(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"%v"]}]}}`, failed)), 200, nil
 			case strings.Contains(u, "core_tracker_success_duties_total"):
 				return []byte(fmt.Sprintf(`{"status":"success","data":{"result":[{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"%v"]}]}}`, success)), 200, nil
 			default:
@@ -1234,7 +1291,7 @@ func TestDegradedTolerance(t *testing.T) {
 	}
 
 	httpGet = mkResp(100)
-	data, err := collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, nil, hostStats{})
+	data, err := collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, time.Time{}, nil, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
@@ -1243,12 +1300,122 @@ func TestDegradedTolerance(t *testing.T) {
 	}
 
 	httpGet = mkResp(99.9)
-	data, err = collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, nil, hostStats{})
+	data, err = collectReport("http://x", "teku-prysm", "kurtosis-teku-prysm", 1, 60, time.Time{}, nil, hostStats{})
 	if err != nil {
 		t.Fatalf("collectReport error: %v", err)
 	}
 	if data.status != "degraded" {
 		t.Errorf("status at 99.9%% pct = %q, want degraded", data.status)
+	}
+}
+
+// TestCollectReportEvalTime pins the shared evaluation timestamp: every
+// query fired by collectReport carries the same time= parameter, so two
+// still-moving counters can never disagree by a sampling race.
+func TestCollectReportEvalTime(t *testing.T) {
+	old := httpGet
+	defer func() { httpGet = old }()
+
+	var urls []string
+	httpGet = func(u string) ([]byte, int, error) {
+		urls = append(urls, u)
+		return []byte(`{"status":"success","data":{"result":[]}}`), 200, nil
+	}
+
+	end := time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
+	windowS := 5400
+	if _, err := collectReport("http://x", "a-b", "kurtosis-a-b", 1, windowS, end, nil, hostStats{}); err != nil {
+		t.Fatalf("collectReport error: %v", err)
+	}
+
+	if len(urls) == 0 {
+		t.Fatal("no queries fired")
+	}
+	for _, u := range urls {
+		parsed, err := url.Parse(u)
+		if err != nil {
+			t.Fatalf("parse queried url %q: %v", u, err)
+		}
+		q := parsed.Query().Get("query")
+		switch {
+		case strings.Contains(q, "core_tracker_success_duties_total"),
+			strings.Contains(q, "core_tracker_failed_duties_total"),
+			strings.Contains(q, "process_resident_memory_bytes"),
+			strings.Contains(q, "process_cpu_seconds_total"),
+			strings.Contains(q, "max_over_time(app_health_checks"):
+			// The CPU query is a subquery ("[5400s:1m]"), so match without
+			// the closing bracket.
+			if !strings.Contains(q, fmt.Sprintf("[%ds", windowS)) {
+				t.Errorf("query not over the full [%ds] window: %s", windowS, q)
+			}
+		}
+		if got := parsed.Query().Get("time"); got != strconv.FormatInt(end.Unix(), 10) {
+			t.Errorf("query %q has time=%q, want %d", q, got, end.Unix())
+		}
+	}
+}
+
+// TestCollectReportFailedBasedScoring pins the success/(success+failed)
+// scoring: a duty's expected total is derived from the two counters, so an
+// in-flight duty (in neither counter yet) can never register as a miss.
+func TestCollectReportFailedBasedScoring(t *testing.T) {
+	old := httpGet
+	defer func() { httpGet = old }()
+
+	httpGet = func(u string) ([]byte, int, error) {
+		switch {
+		case strings.Contains(u, "core_tracker_success_duties_total"):
+			return []byte(`{"status":"success","data":{"result":[
+				{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"95"]},
+				{"metric":{"cluster_peer":"0","duty":"proposer"},"value":[1,"10"]}
+			]}}`), 200, nil
+		case strings.Contains(u, "core_tracker_failed_duties_total"):
+			return []byte(`{"status":"success","data":{"result":[
+				{"metric":{"cluster_peer":"0","duty":"attester"},"value":[1,"5"]},
+				{"metric":{"cluster_peer":"0","duty":"proposer"},"value":[1,"0"]}
+			]}}`), 200, nil
+		default:
+			return []byte(`{"status":"success","data":{"result":[]}}`), 200, nil
+		}
+	}
+
+	data, err := collectReport("http://x", "a-b", "kurtosis-a-b", 1, 60, time.Time{}, nil, hostStats{})
+	if err != nil {
+		t.Fatalf("collectReport error: %v", err)
+	}
+	if data.status != "degraded" {
+		t.Errorf("status = %q, want degraded (attester has failures)", data.status)
+	}
+	if data.worst == nil {
+		t.Fatal("worst = nil, want populated")
+	}
+	byDuty := map[string]dutyResult{}
+	for _, d := range data.worst.duties {
+		byDuty[d.duty] = d
+	}
+	if att := byDuty["attester"]; att.expected != 100 || att.success != 95 {
+		t.Errorf("attester = %d/%d, want 95/100", int(att.success), int(att.expected))
+	}
+	if prop := byDuty["proposer"]; prop.expected != 10 || prop.success != 10 || prop.pct() != 100 {
+		t.Errorf("proposer = %+v, want a clean 10/10", prop)
+	}
+
+	// The warm-up grace subtracts from the failed counts: with all 5
+	// attester failures graced, the run scores a clean 95/95.
+	epoch0 := map[epoch0Key]float64{{peer: "0", duty: "attester"}: 5}
+	data, err = collectReport("http://x", "a-b", "kurtosis-a-b", 1, 60, time.Time{}, epoch0, hostStats{})
+	if err != nil {
+		t.Fatalf("collectReport error: %v", err)
+	}
+	if data.status != "ok" {
+		t.Errorf("status with graced failures = %q, want ok", data.status)
+	}
+	byDuty = map[string]dutyResult{}
+	for _, d := range data.worst.duties {
+		byDuty[d.duty] = d
+	}
+	if att := byDuty["attester"]; att.expected != 95 || att.success != 95 {
+		t.Errorf("graced attester = %d/%d, want 95/95", int(att.success), int(att.expected))
 	}
 }
 
@@ -1368,7 +1535,7 @@ func TestCaptureFailureLogs(t *testing.T) {
 	}
 
 	logDir := t.TempDir()
-	archive := captureFailureLogs(config{logDir: logDir}, "c2-lodestar-nimbus", "lodestar-nimbus", 2)
+	archive := captureFailureLogs(config{logDir: logDir}, "c2-lodestar-nimbus", "lodestar-nimbus", 2, "")
 	if archive == "" {
 		t.Fatal("archive path empty")
 	}
@@ -1404,6 +1571,116 @@ func TestCaptureFailureLogs(t *testing.T) {
 	if dockerLogsCalled {
 		t.Error("docker logs must not be used when kurtosis service logs succeeds")
 	}
+}
+
+func TestSnapshotStartupLogs(t *testing.T) {
+	oldRun := runCommand
+	defer func() { runCommand = oldRun }()
+
+	runCommand = func(name string, args ...string) (string, error) {
+		if name == "docker" && len(args) > 0 && args[0] == "ps" {
+			return "cl-3-teku-geth--a\nvc-3-geth-teku-charon-charon-0--b\nprometheus--c\n", nil
+		}
+		if name == "kurtosis" && len(args) >= 5 && args[0] == "service" && args[1] == "logs" {
+			return "boot line for " + args[len(args)-1] + "\n", nil
+		}
+		return "", nil
+	}
+
+	dir := snapshotStartupLogs("c1-teku-nimbus")
+	if dir == "" {
+		t.Fatal("snapshot dir empty")
+	}
+	defer os.RemoveAll(dir)
+
+	for _, want := range []string{"cl-3-teku-geth.log", "vc-3-geth-teku-charon-charon-0.log"} {
+		b, err := os.ReadFile(filepath.Join(dir, want))
+		if err != nil {
+			t.Fatalf("snapshot missing %s: %v", want, err)
+		}
+		if !strings.HasPrefix(string(b), "boot line for ") {
+			t.Errorf("%s content = %q", want, b)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "prometheus.log")); err == nil {
+		t.Error("prometheus must not be snapshotted (only BN/Charon/VC)")
+	}
+
+	// No targets at all -> "" (best-effort no-op), no dir left behind.
+	runCommand = func(name string, args ...string) (string, error) { return "", nil }
+	if got := snapshotStartupLogs("c1-x"); got != "" {
+		os.RemoveAll(got)
+		t.Errorf("snapshot dir = %q, want empty when no targets found", got)
+	}
+}
+
+// TestCaptureFailureLogsEarlySnapshot pins the boot-line recovery: every
+// service's startup snapshot is archived alongside its end-of-run logs as
+// <svc>.early.log (the end-of-run fetch can silently lose the start of the
+// run to log rotation), and an absent or empty snapshot degrades to the
+// end-of-run logs alone.
+func TestCaptureFailureLogsEarlySnapshot(t *testing.T) {
+	oldRun, oldNow := runCommand, nowFn
+	defer func() { runCommand, nowFn = oldRun, oldNow }()
+	nowFn = func() time.Time { return time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC) }
+
+	const bootLine = `07:00:01.000 INFO app-start Lock file loaded {"peer_name": "calm-shape"}`
+
+	runCommand = func(name string, args ...string) (string, error) {
+		if name == "docker" && len(args) > 0 && args[0] == "ps" {
+			return "vc-3-geth-teku-charon-charon-0--a\n", nil
+		}
+		if name == "kurtosis" && len(args) >= 5 && args[0] == "service" && args[1] == "logs" {
+			return "07:05:00.000 INFO wrapped: boot lines gone\n", nil
+		}
+		return "", nil
+	}
+
+	t.Run("snapshot present -> archived as early.log", func(t *testing.T) {
+		dir := t.TempDir()
+		early := bootLine + "\n07:00:02.000 INFO more boot\n"
+		if err := os.WriteFile(filepath.Join(dir, "vc-3-geth-teku-charon-charon-0.log"), []byte(early), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		archive := captureFailureLogs(config{logDir: t.TempDir()}, "c1-teku-nimbus", "teku-nimbus", 1, dir)
+		if archive == "" {
+			t.Fatal("archive path empty")
+		}
+		got := readTarGz(t, archive)
+		earlyGot, ok := got["vc-3-geth-teku-charon-charon-0.early.log"]
+		if !ok {
+			t.Fatalf("missing early log; archive has %v", keysOf(got))
+		}
+		if !strings.Contains(earlyGot, bootLine) {
+			t.Errorf("early log content = %q, want the boot line", earlyGot)
+		}
+	})
+
+	t.Run("no snapshot dir -> no early file", func(t *testing.T) {
+		archive := captureFailureLogs(config{logDir: t.TempDir()}, "c1-teku-nimbus", "teku-nimbus", 1, "")
+		if archive == "" {
+			t.Fatal("archive path empty")
+		}
+		got := readTarGz(t, archive)
+		if _, bad := got["vc-3-geth-teku-charon-charon-0.early.log"]; bad {
+			t.Errorf("early file must not appear without a snapshot; has %v", keysOf(got))
+		}
+	})
+
+	t.Run("empty snapshot file -> no early file", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "vc-3-geth-teku-charon-charon-0.log"), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		archive := captureFailureLogs(config{logDir: t.TempDir()}, "c1-teku-nimbus", "teku-nimbus", 1, dir)
+		if archive == "" {
+			t.Fatal("archive path empty")
+		}
+		got := readTarGz(t, archive)
+		if _, bad := got["vc-3-geth-teku-charon-charon-0.early.log"]; bad {
+			t.Errorf("empty snapshot must not be archived; has %v", keysOf(got))
+		}
+	})
 }
 
 func TestFetchServiceLogsFallback(t *testing.T) {
@@ -1745,39 +2022,33 @@ func TestLoadMatrixRoundTrip(t *testing.T) {
 }
 
 func TestSubtractEpoch0(t *testing.T) {
-	expected := []sample{
-		{labels: map[string]string{"cluster_peer": "cute-child", "duty": "attester"}, value: 100},
-		{labels: map[string]string{"cluster_peer": "cute-child", "duty": "aggregator"}, value: 50},
-		{labels: map[string]string{"cluster_peer": "bold-storm", "duty": "attester"}, value: 100},
-		{labels: map[string]string{"cluster_peer": "bold-storm", "duty": "aggregator"}, value: 50},
+	failed := []sample{
+		{labels: map[string]string{"cluster_peer": "cute-child", "duty": "attester"}, value: 12},
+		{labels: map[string]string{"cluster_peer": "cute-child", "duty": "aggregator"}, value: 5},
+		{labels: map[string]string{"cluster_peer": "bold-storm", "duty": "attester"}, value: 7},
+		{labels: map[string]string{"cluster_peer": "bold-storm", "duty": "aggregator"}, value: 3},
 	}
 
 	epoch0 := map[epoch0Key]float64{
 		{peer: "cute-child", duty: "attester"}:   10,
 		{peer: "cute-child", duty: "aggregator"}: 5,
 		{peer: "bold-storm", duty: "attester"}:   7,
-		{peer: "bold-storm", duty: "aggregator"}: 3,
+		{peer: "bold-storm", duty: "aggregator"}: 9, // more graced than counted: clamps to 0
 	}
-	got := subtractEpoch0(expected, epoch0)
+	got := subtractEpoch0(failed, epoch0)
 
-	if got[0].value != 90 {
-		t.Errorf("attester cute-child: got %v, want 90", got[0].value)
-	}
-	if got[1].value != 45 {
-		t.Errorf("aggregator cute-child: got %v, want 45", got[1].value)
-	}
-	if got[2].value != 93 {
-		t.Errorf("attester bold-storm: got %v, want 93", got[2].value)
-	}
-	if got[3].value != 47 {
-		t.Errorf("aggregator bold-storm: got %v, want 47", got[3].value)
+	for i, want := range []float64{2, 0, 0, 0} {
+		if got[i].value != want {
+			t.Errorf("sample %d (%s/%s): got %v, want %v",
+				i, got[i].labels["cluster_peer"], got[i].labels["duty"], got[i].value, want)
+		}
 	}
 
 	// nil map should be a no-op.
-	unchanged := subtractEpoch0(expected, nil)
+	unchanged := subtractEpoch0(failed, nil)
 	for i, s := range unchanged {
-		if s.value != expected[i].value {
-			t.Errorf("nil map: sample %d changed from %v to %v", i, expected[i].value, s.value)
+		if s.value != failed[i].value {
+			t.Errorf("nil map: sample %d changed from %v to %v", i, failed[i].value, s.value)
 		}
 	}
 }
@@ -1808,7 +2079,7 @@ func TestCountEpoch0FailuresLogParsing(t *testing.T) {
 		return "", nil
 	}
 
-	got := countEpoch0Failures("test-enclave")
+	got := countEpoch0Failures("test-enclave", "")
 	if got[epoch0Key{peer: "cute-child", duty: "aggregator"}] != 3 {
 		t.Errorf("aggregator = %v, want 3 (slots 3, 31, 63)", got[epoch0Key{peer: "cute-child", duty: "aggregator"}])
 	}
@@ -1827,8 +2098,7 @@ func TestCountEpoch0FailuresLogParsing(t *testing.T) {
 // across several lines. An attester "Duty failed" carries its per-validator
 // failure array twice, which pushes the trailing `"duty"` field onto its own
 // line; scanning raw lines finds "Duty failed" with no duty field and silently
-// drops the record, leaving the expected count un-reduced and reporting a
-// warmup failure as a real one.
+// drops the record, leaving a warmup failure reported as a real one.
 func TestCountEpoch0FailuresSplitRecords(t *testing.T) {
 	oldRun := runCommand
 	defer func() { runCommand = oldRun }()
@@ -1860,7 +2130,7 @@ func TestCountEpoch0FailuresSplitRecords(t *testing.T) {
 		return "", nil
 	}
 
-	got := countEpoch0Failures("test-enclave")
+	got := countEpoch0Failures("test-enclave", "")
 	if v := got[epoch0Key{peer: "alert-word", duty: "attester"}]; v != 2 {
 		t.Errorf("attester = %v, want 2 (split records at slots 2 and 3)", v)
 	}
@@ -1870,6 +2140,58 @@ func TestCountEpoch0FailuresSplitRecords(t *testing.T) {
 	if len(got) != 2 {
 		t.Errorf("got %d keys, want 2 (slot 200 excluded)", len(got))
 	}
+}
+
+// TestCountEpoch0FailuresStartupSnapshot pins the two robustness upgrades:
+// the peer name resolves from the startup snapshot when the boot lines have
+// rotated out of the end-of-run logs, and a warm-up duty the tracker counted
+// as failed without emitting a "Duty failed" line is still graced via its
+// component-level "Permanent failure" record (deduped by (slot, duty)
+// against any tracker line for the same instance).
+func TestCountEpoch0FailuresStartupSnapshot(t *testing.T) {
+	oldRun := runCommand
+	defer func() { runCommand = oldRun }()
+
+	// End-of-run logs: truncated (no "Lock file loaded"), one fetcher
+	// "Permanent failure" for slot 1 with no matching "Duty failed", and a
+	// slot-2 instance reported by BOTH patterns (must count once).
+	finalLogs := strings.Join([]string{
+		`00:05:00.000 ERRO fetcher Permanent failure calling fetcher/fetch: fetch aggregator data: 404 {"duty": "1/aggregator"}`,
+		`00:05:12.000 ERRO fetcher Permanent failure calling fetcher/fetch: fetch aggregator data: 404 {"duty": "2/aggregator"}`,
+		`00:13:59.000 WARN tracker Duty failed {"duty": "2/aggregator", "step": "fetcher", "reason_code": "bug_fetch_error"}`,
+	}, "\n")
+
+	runCommand = func(name string, args ...string) (string, error) {
+		if name == "docker" && len(args) > 0 && args[0] == "ps" {
+			return "vc-3-geth-lighthouse-charon-charon-3--abc\n", nil
+		}
+		if name == "kurtosis" && len(args) > 0 && args[0] == "service" {
+			return finalLogs, nil
+		}
+		return "", nil
+	}
+
+	t.Run("without snapshot: grace skipped (no peer name)", func(t *testing.T) {
+		if got := countEpoch0Failures("test-enclave", ""); len(got) != 0 {
+			t.Errorf("got %v, want empty map when peer name is unavailable", got)
+		}
+	})
+
+	t.Run("with snapshot: peer resolved, permanent failures graced, deduped", func(t *testing.T) {
+		dir := t.TempDir()
+		boot := `00:00:01.000 INFO app-start Lock file loaded {"peer_name": "vivacious-country", "peer_index": 3}` + "\n"
+		if err := os.WriteFile(filepath.Join(dir, "vc-3-geth-lighthouse-charon-charon-3.log"), []byte(boot), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		got := countEpoch0Failures("test-enclave", dir)
+		if v := got[epoch0Key{peer: "vivacious-country", duty: "aggregator"}]; v != 2 {
+			t.Errorf("aggregator = %v, want 2 (slot 1 via Permanent failure + slot 2 counted once)", v)
+		}
+		if len(got) != 1 {
+			t.Errorf("got %d keys %v, want 1", len(got), got)
+		}
+	})
 }
 
 func TestJoinLogRecords(t *testing.T) {
