@@ -1241,6 +1241,11 @@ func countEpoch0Failures(enclave, startupDir string) map[epoch0Key]float64 {
 
 	_, dvNodes, err := logTargets(enclave)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "runner: warm-up grace skipped entirely: docker ps failed: %v\n", err)
+		return counts
+	}
+	if len(dvNodes) == 0 {
+		fmt.Fprintln(os.Stderr, "runner: warm-up grace skipped entirely: no charon containers found")
 		return counts
 	}
 
