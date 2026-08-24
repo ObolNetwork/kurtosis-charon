@@ -1492,6 +1492,21 @@ func TestSelectLogTargets(t *testing.T) {
 	if len(vcs) != 2 || !strings.Contains(vcs[0], "-vc-0-") || !strings.Contains(vcs[1], "-vc-1-") {
 		t.Errorf("vcs = %v, want the two charon-vc clients", vcs)
 	}
+
+	// docker ps -a can list several containers for one service (recreates);
+	// duplicates must collapse to one target per service label.
+	_, dv, vcs = selectLogTargets([]string{
+		"vc-3-geth-lodestar-charon-charon-0--old",
+		"vc-3-geth-lodestar-charon-charon-0--new",
+		"vc-3-geth-lodestar-charon-vc-0-nimbus--old",
+		"vc-3-geth-lodestar-charon-vc-0-nimbus--new",
+	})
+	if len(dv) != 1 {
+		t.Errorf("dvNodes = %v, want duplicates for one service collapsed to 1", dv)
+	}
+	if len(vcs) != 1 {
+		t.Errorf("vcs = %v, want duplicates for one service collapsed to 1", vcs)
+	}
 }
 
 func TestCaptureFailureLogs(t *testing.T) {

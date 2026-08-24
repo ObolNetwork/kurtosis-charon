@@ -1522,15 +1522,26 @@ func serviceLabel(container string) string {
 func selectLogTargets(containers []string) (bn string, dvNodes, vcs []string) {
 	sorted := append([]string(nil), containers...)
 	sort.Strings(sorted)
+	// Dedupe by service: docker ps -a can list several containers for one
+	// kurtosis service (e.g. after a recreate). Their logs come from the same
+	// service either way, and duplicates would overwrite each other's dump
+	// files and double-count warm-up failures in countEpoch0Failures.
+	seen := map[string]bool{}
 	dvIndex := ""
 	for _, c := range sorted {
+		label := serviceLabel(c)
+		if seen[label] {
+			continue
+		}
 		switch {
 		case isCharonNode(c):
+			seen[label] = true
 			dvNodes = append(dvNodes, c)
 			if dvIndex == "" {
 				dvIndex = nodeIndex(c)
 			}
 		case strings.Contains(c, "-charon-vc-"):
+			seen[label] = true
 			vcs = append(vcs, c)
 		}
 	}
