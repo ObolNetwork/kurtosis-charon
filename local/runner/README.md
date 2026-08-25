@@ -171,7 +171,10 @@ go run .
 
 Requires a Go toolchain (matching `go.mod`'s `go 1.26` directive or newer) on
 the host; `go run .` compiles and runs `main.go` on every invocation, so no
-binary is committed or needs to be rebuilt after a `git pull`.
+binary is committed or needs to be rebuilt after a `git pull`. When the
+per-cycle `git pull` brings changes under `local/runner/`, the runner
+re-execs itself (`go run .`) between runs, so merged runner fixes take
+effect without a manual restart.
 
 ### Start/stop scripts
 

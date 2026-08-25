@@ -2292,3 +2292,81 @@ func TestJoinLogRecords(t *testing.T) {
 		})
 	}
 }
+
+func TestGitHead(t *testing.T) {
+	oldRun := runCommand
+	defer func() { runCommand = oldRun }()
+
+	var captured []string
+	runCommand = func(name string, args ...string) (string, error) {
+		captured = append([]string{name}, args...)
+		return "abc123def\n", nil
+	}
+	if got := gitHead("/repo"); got != "abc123def" {
+		t.Errorf("gitHead = %q, want trimmed abc123def", got)
+	}
+	want := []string{"git", "-C", "/repo", "rev-parse", "HEAD"}
+	if !reflect.DeepEqual(captured, want) {
+		t.Errorf("command = %v, want %v", captured, want)
+	}
+
+	runCommand = func(string, ...string) (string, error) { return "", fmt.Errorf("boom") }
+	if got := gitHead("/repo"); got != "" {
+		t.Errorf("gitHead on error = %q, want empty", got)
+	}
+}
+
+func TestRunnerSourceChanged(t *testing.T) {
+	oldRun := runCommand
+	defer func() { runCommand = oldRun }()
+
+	mkDiff := func(out string, err error) func(string, ...string) (string, error) {
+		return func(name string, args ...string) (string, error) {
+			if len(args) > 0 && args[len(args)-1] != "local/runner/" {
+				t.Errorf("diff must be scoped to local/runner/, got %v", args)
+			}
+			return out, err
+		}
+	}
+
+	runCommand = mkDiff("local/runner/main.go\n", nil)
+	if !runnerSourceChanged("/repo", "aaa", "bbb") {
+		t.Error("changed runner file must report true")
+	}
+
+	runCommand = mkDiff("\n", nil)
+	if runnerSourceChanged("/repo", "aaa", "bbb") {
+		t.Error("no changed runner files must report false")
+	}
+
+	runCommand = mkDiff("", fmt.Errorf("boom"))
+	if runnerSourceChanged("/repo", "aaa", "bbb") {
+		t.Error("git error must report false (best-effort)")
+	}
+
+	// Same or unknown heads never restart, without even invoking git.
+	runCommand = func(string, ...string) (string, error) { t.Fatal("must not call git"); return "", nil }
+	if runnerSourceChanged("/repo", "aaa", "aaa") || runnerSourceChanged("/repo", "", "bbb") || runnerSourceChanged("/repo", "aaa", "") {
+		t.Error("same/empty heads must report false")
+	}
+}
+
+func TestRestartSelf(t *testing.T) {
+	oldExec := execFn
+	defer func() { execFn = oldExec }()
+
+	var gotArgs []string
+	execFn = func(argv0 string, argv []string, env []string) error {
+		if !strings.HasSuffix(argv0, "/go") && argv0 != "go" {
+			t.Errorf("argv0 = %q, want a go binary path", argv0)
+		}
+		gotArgs = argv
+		return nil
+	}
+	if err := restartSelf(); err != nil {
+		t.Fatalf("restartSelf error: %v", err)
+	}
+	if !reflect.DeepEqual(gotArgs, []string{"go", "run", "."}) {
+		t.Errorf("argv = %v, want [go run .]", gotArgs)
+	}
+}
