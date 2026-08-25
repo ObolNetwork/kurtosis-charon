@@ -2488,7 +2488,9 @@ func mainLoop(cfg config) {
 		// runner fixes take effect without a manual restart. This is the one
 		// safe point: no enclave is up and state/matrix were saved after the
 		// previous run. On exec failure, log and keep running the current
-		// build; the check retries next loop.
+		// build; the check retries next loop. runOne pulls again pre-launch,
+		// so a change landing mid-iteration is picked up here one cycle
+		// later at most -- restarting mid-iteration would not be safe.
 		if head := gitHead(cfg.repoPath); runnerSourceChanged(cfg.repoPath, startHead, head) {
 			fmt.Fprintf(os.Stderr, "runner: runner source changed (%.7s -> %.7s); restarting to pick it up\n", startHead, head)
 			if err := restartSelf(); err != nil {
