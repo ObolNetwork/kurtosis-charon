@@ -22,7 +22,7 @@ if ! command -v go >/dev/null 2>&1; then
 fi
 
 LOG="${RUNNER_LOG:-$HOME/runner.log}"
-PAT='go-build.*/runner|go run \.'
+PAT='go-build.*/runner|go run \.|kurtosis-charon-runner'
 
 if pgrep -f "$PAT" >/dev/null 2>&1; then
   echo "runner already running (pids: $(pgrep -f "$PAT" | tr '\n' ' '))"

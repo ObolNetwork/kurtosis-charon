@@ -28,6 +28,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -1071,16 +1072,51 @@ func runnerSourceChanged(repoPath, fromHead, toHead string) bool {
 // returns on success.
 var execFn = syscall.Exec
 
-// restartSelf replaces the current process with a fresh `go run .` in the
-// current working directory (the runner module dir, per start.sh/systemd).
-// `go run` recompiles from the pulled checkout, so the new runner source
-// takes effect; stdout/stderr redirections and the pid are preserved.
+// stagedRunnerPath is where restartSelf builds the updated runner binary.
+// The name must keep matching the pgrep pattern in start/stop/status.sh.
+var stagedRunnerPath = filepath.Join(os.TempDir(), "kurtosis-charon-runner")
+
+// restartSelf builds the pulled runner source (in the current working
+// directory, the runner module dir per start.sh/systemd) into a staged
+// binary and replaces the current process with it, preserving command-line
+// flags, stdout/stderr redirections and the pid. Building explicitly rather
+// than re-execing `go run .` keeps the process chain flat: exec from inside
+// go run's child would leave one more waiting `go run` supervisor behind on
+// every update. A build failure leaves the current build running.
 func restartSelf() error {
-	goBin, err := exec.LookPath("go")
+	goBin, err := goToolchain()
 	if err != nil {
 		return err
 	}
-	return execFn(goBin, []string{"go", "run", "."}, os.Environ())
+	if out, err := runCommand(goBin, "build", "-o", stagedRunnerPath, "."); err != nil {
+		return fmt.Errorf("build updated runner: %w (output: %s)", err, strings.TrimSpace(out))
+	}
+	return execFn(stagedRunnerPath, append([]string{stagedRunnerPath}, os.Args[1:]...), os.Environ())
+}
+
+// goToolchain resolves the go binary to build with: the toolchain this
+// process was built by (GOROOT), then PATH, then the same fallback install
+// locations start.sh probes -- under systemd, PATH typically lacks the
+// toolchain dir entirely.
+func goToolchain() (string, error) {
+	var candidates []string
+	if root := runtime.GOROOT(); root != "" {
+		candidates = append(candidates, filepath.Join(root, "bin", "go"))
+	}
+	if p, err := exec.LookPath("go"); err == nil {
+		candidates = append(candidates, p)
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		candidates = append(candidates, filepath.Join(home, "sdk", "go", "bin", "go"))
+	}
+	candidates = append(candidates, "/usr/local/go/bin/go")
+
+	for _, c := range candidates {
+		if info, err := os.Stat(c); err == nil && !info.IsDir() {
+			return c, nil
+		}
+	}
+	return "", fmt.Errorf("go toolchain not found (tried %v)", candidates)
 }
 
 // ---------------------------------------------------------------------------

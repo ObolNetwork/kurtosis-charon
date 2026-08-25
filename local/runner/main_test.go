@@ -2352,21 +2352,61 @@ func TestRunnerSourceChanged(t *testing.T) {
 }
 
 func TestRestartSelf(t *testing.T) {
-	oldExec := execFn
-	defer func() { execFn = oldExec }()
+	oldExec, oldRun := execFn, runCommand
+	defer func() { execFn, runCommand = oldExec, oldRun }()
 
+	var built []string
+	runCommand = func(name string, args ...string) (string, error) {
+		built = append([]string{name}, args...)
+		return "", nil
+	}
+
+	var gotArgv0 string
 	var gotArgs []string
 	execFn = func(argv0 string, argv []string, env []string) error {
-		if !strings.HasSuffix(argv0, "/go") && argv0 != "go" {
-			t.Errorf("argv0 = %q, want a go binary path", argv0)
-		}
+		gotArgv0 = argv0
 		gotArgs = argv
 		return nil
 	}
+
 	if err := restartSelf(); err != nil {
 		t.Fatalf("restartSelf error: %v", err)
 	}
-	if !reflect.DeepEqual(gotArgs, []string{"go", "run", "."}) {
-		t.Errorf("argv = %v, want [go run .]", gotArgs)
+
+	// The updated source is built to the staged binary first (a flat exec
+	// chain: re-execing `go run .` would leak one waiting supervisor per
+	// update), and the build runs with a resolved go toolchain.
+	if len(built) != 5 || built[1] != "build" || built[2] != "-o" || built[3] != stagedRunnerPath || built[4] != "." {
+		t.Errorf("build command = %v, want <go> build -o %s .", built, stagedRunnerPath)
+	}
+	if !strings.HasSuffix(built[0], "/go") && built[0] != "go" {
+		t.Errorf("toolchain = %q, want a go binary path", built[0])
+	}
+
+	// The staged binary is exec'd with the original flags preserved.
+	if gotArgv0 != stagedRunnerPath {
+		t.Errorf("argv0 = %q, want %q", gotArgv0, stagedRunnerPath)
+	}
+	want := append([]string{stagedRunnerPath}, os.Args[1:]...)
+	if !reflect.DeepEqual(gotArgs, want) {
+		t.Errorf("argv = %v, want %v (flags preserved)", gotArgs, want)
+	}
+
+	// A failed build must leave the current process running.
+	runCommand = func(string, ...string) (string, error) { return "compile error", fmt.Errorf("exit 1") }
+	if err := restartSelf(); err == nil {
+		t.Error("restartSelf must surface build failures")
+	}
+}
+
+func TestGoToolchain(t *testing.T) {
+	// In any environment able to run this test, at least one candidate (the
+	// building toolchain via GOROOT) must resolve.
+	goBin, err := goToolchain()
+	if err != nil {
+		t.Fatalf("goToolchain error: %v", err)
+	}
+	if !strings.HasSuffix(goBin, "go") {
+		t.Errorf("goToolchain = %q, want a go binary path", goBin)
 	}
 }

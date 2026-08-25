@@ -6,7 +6,7 @@ set -uo pipefail
 
 cd "$(dirname "$0")"
 
-PAT='go-build.*/runner|go run \.'
+PAT='go-build.*/runner|go run \.|kurtosis-charon-runner'
 pids=$(pgrep -f "$PAT" 2>/dev/null || true)
 if [ -z "$pids" ]; then
   echo "runner not running"
