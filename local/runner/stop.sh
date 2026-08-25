@@ -6,15 +6,16 @@ set -uo pipefail
 
 cd "$(dirname "$0")"
 
-PAT='go-build.*/runner|go run \.'
+PAT='go-build.*/runner|go run \.|kurtosis-charon-runner'
 pids=$(pgrep -f "$PAT" 2>/dev/null || true)
 if [ -z "$pids" ]; then
   echo "runner not running"
 else
   echo "stopping runner (pids: $(echo "$pids" | tr '\n' ' '))"
-  # SIGTERM to `go run` is forwarded to the compiled child; kill both to be safe.
-  pkill -TERM -f 'go run \.' 2>/dev/null || true
-  pkill -TERM -f 'go-build.*/runner' 2>/dev/null || true
+  # Kill everything the detection pattern matches: the `go run` supervisor,
+  # its compiled child, and the staged self-restart binary the runner may
+  # have exec'd into.
+  pkill -TERM -f "$PAT" 2>/dev/null || true
   sleep 2
 fi
 

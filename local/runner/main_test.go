@@ -2292,3 +2292,206 @@ func TestJoinLogRecords(t *testing.T) {
 		})
 	}
 }
+
+func TestGitHead(t *testing.T) {
+	oldRun := runCommand
+	defer func() { runCommand = oldRun }()
+
+	var captured []string
+	runCommand = func(name string, args ...string) (string, error) {
+		captured = append([]string{name}, args...)
+		return "abc123def\n", nil
+	}
+	if got := gitHead("/repo"); got != "abc123def" {
+		t.Errorf("gitHead = %q, want trimmed abc123def", got)
+	}
+	want := []string{"git", "-C", "/repo", "rev-parse", "HEAD"}
+	if !reflect.DeepEqual(captured, want) {
+		t.Errorf("command = %v, want %v", captured, want)
+	}
+
+	runCommand = func(string, ...string) (string, error) { return "", fmt.Errorf("boom") }
+	if got := gitHead("/repo"); got != "" {
+		t.Errorf("gitHead on error = %q, want empty", got)
+	}
+}
+
+func TestRunnerSourceChanged(t *testing.T) {
+	oldRun := runCommand
+	defer func() { runCommand = oldRun }()
+
+	mkDiff := func(out string, err error) func(string, ...string) (string, error) {
+		return func(name string, args ...string) (string, error) {
+			if len(args) > 0 && args[len(args)-1] != "local/runner/" {
+				t.Errorf("diff must be scoped to local/runner/, got %v", args)
+			}
+			return out, err
+		}
+	}
+
+	runCommand = mkDiff("local/runner/main.go\n", nil)
+	if !runnerSourceChanged("/repo", "aaa", "bbb") {
+		t.Error("changed runner file must report true")
+	}
+
+	runCommand = mkDiff("\n", nil)
+	if runnerSourceChanged("/repo", "aaa", "bbb") {
+		t.Error("no changed runner files must report false")
+	}
+
+	runCommand = mkDiff("", fmt.Errorf("boom"))
+	if runnerSourceChanged("/repo", "aaa", "bbb") {
+		t.Error("git error must report false (best-effort)")
+	}
+
+	// Same or unknown heads never restart, without even invoking git.
+	runCommand = func(string, ...string) (string, error) { t.Fatal("must not call git"); return "", nil }
+	if runnerSourceChanged("/repo", "aaa", "aaa") || runnerSourceChanged("/repo", "", "bbb") || runnerSourceChanged("/repo", "aaa", "") {
+		t.Error("same/empty heads must report false")
+	}
+}
+
+func TestRestartSelf(t *testing.T) {
+	oldExec, oldRun := execFn, runCommand
+	defer func() { execFn, runCommand = oldExec, oldRun }()
+
+	var built []string
+	runCommand = func(name string, args ...string) (string, error) {
+		built = append([]string{name}, args...)
+		return "", nil
+	}
+
+	var gotArgv0 string
+	var gotArgs []string
+	execFn = func(argv0 string, argv []string, env []string) error {
+		gotArgv0 = argv0
+		gotArgs = argv
+		return nil
+	}
+
+	if err := restartSelf(); err != nil {
+		t.Fatalf("restartSelf error: %v", err)
+	}
+
+	// The updated source is built to a staged binary first (a flat exec
+	// chain: re-execing `go run .` would leak one waiting supervisor per
+	// update), in a fresh private temp dir, keeping the basename the
+	// start/stop/status.sh pgrep pattern matches.
+	if len(built) != 5 || built[1] != "build" || built[2] != "-o" || built[4] != "." {
+		t.Fatalf("build command = %v, want <go> build -o <staged> .", built)
+	}
+	if !strings.HasSuffix(built[0], "/go") && built[0] != "go" {
+		t.Errorf("toolchain = %q, want a go binary path", built[0])
+	}
+	staged := built[3]
+	if filepath.Base(staged) != stagedRunnerName {
+		t.Errorf("staged basename = %q, want %q", filepath.Base(staged), stagedRunnerName)
+	}
+	dir := filepath.Dir(staged)
+	if !strings.HasPrefix(filepath.Base(dir), stagedRunnerName+"-") {
+		t.Errorf("staged dir = %q, want a private per-restart temp dir", dir)
+	}
+	if info, err := os.Stat(dir); err != nil || info.Mode().Perm() != 0o700 {
+		t.Errorf("staged dir perms/err = %v/%v, want 0700", info, err)
+	}
+	defer os.RemoveAll(dir)
+
+	// The staged binary is exec'd with the original flags preserved.
+	if gotArgv0 != staged {
+		t.Errorf("argv0 = %q, want %q", gotArgv0, staged)
+	}
+	want := append([]string{staged}, os.Args[1:]...)
+	if !reflect.DeepEqual(gotArgs, want) {
+		t.Errorf("argv = %v, want %v (flags preserved)", gotArgs, want)
+	}
+
+	// A failed build must leave the current process running.
+	runCommand = func(string, ...string) (string, error) { return "compile error", fmt.Errorf("exit 1") }
+	if err := restartSelf(); err == nil {
+		t.Error("restartSelf must surface build failures")
+	}
+}
+
+// TestMaybeRestart pins the mainLoop integration branch: a runner-source
+// change triggers the re-exec, an unchanged checkout does not, and an exec
+// failure returns normally so the loop continues with the current build.
+func TestMaybeRestart(t *testing.T) {
+	oldExec, oldRun := execFn, runCommand
+	defer func() { execFn, runCommand = oldExec, oldRun }()
+
+	mkGit := func(head, diff string) func(string, ...string) (string, error) {
+		return func(name string, args ...string) (string, error) {
+			switch {
+			case len(args) > 0 && args[len(args)-1] == "HEAD":
+				return head + "\n", nil
+			case len(args) > 1 && args[1] == "build":
+				return "", nil
+			default: // git diff
+				return diff, nil
+			}
+		}
+	}
+
+	execs := 0
+	execFn = func(string, []string, []string) error { execs++; return nil }
+
+	runCommand = mkGit("newhead", "local/runner/main.go\n")
+	maybeRestart("/repo", "oldhead")
+	if execs != 1 {
+		t.Errorf("changed source: execs = %d, want 1", execs)
+	}
+
+	runCommand = mkGit("oldhead", "")
+	maybeRestart("/repo", "oldhead")
+	if execs != 1 {
+		t.Errorf("unchanged source: execs = %d, want still 1", execs)
+	}
+
+	// Exec failure must not panic or stop the caller.
+	execFn = func(string, []string, []string) error { return fmt.Errorf("exec blocked") }
+	runCommand = mkGit("newhead", "local/runner/main.go\n")
+	maybeRestart("/repo", "oldhead")
+}
+
+func TestGoToolchain(t *testing.T) {
+	// In any environment able to run this test, at least one candidate (the
+	// building toolchain via GOROOT) must resolve.
+	goBin, err := goToolchain()
+	if err != nil {
+		t.Fatalf("goToolchain error: %v", err)
+	}
+	if !strings.HasSuffix(goBin, "go") {
+		t.Errorf("goToolchain = %q, want a go binary path", goBin)
+	}
+}
+
+func TestPruneStagedRunners(t *testing.T) {
+	stale1, err := os.MkdirTemp("", stagedRunnerName+"-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale2, err := os.MkdirTemp("", stagedRunnerName+"-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stale1, stagedRunnerName), []byte("old"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	unrelated, err := os.MkdirTemp("", "unrelated-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(unrelated)
+
+	pruneStagedRunners()
+
+	for _, dir := range []string{stale1, stale2} {
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			os.RemoveAll(dir)
+			t.Errorf("stale staging dir %s must be pruned", dir)
+		}
+	}
+	if _, err := os.Stat(unrelated); err != nil {
+		t.Errorf("unrelated temp dir must be untouched: %v", err)
+	}
+}

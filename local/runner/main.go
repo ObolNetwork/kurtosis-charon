@@ -28,9 +28,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -1040,6 +1042,124 @@ func gitPull(repoPath string) error {
 		return fmt.Errorf("git pull failed in %s: %w (output: %s)", repoPath, err, strings.TrimSpace(out))
 	}
 	return nil
+}
+
+// gitHead returns the repo's current HEAD commit, or "" on error
+// (best-effort, like the rest of the git plumbing here).
+func gitHead(repoPath string) string {
+	out, err := runCommand("git", "-C", repoPath, "rev-parse", "HEAD")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
+// runnerSourceChanged reports whether any file under local/runner/ differs
+// between the two commits. Best-effort: false on unknown heads or git errors,
+// so a plumbing failure can never restart-loop the runner.
+func runnerSourceChanged(repoPath, fromHead, toHead string) bool {
+	if fromHead == "" || toHead == "" || fromHead == toHead {
+		return false
+	}
+	out, err := runCommand("git", "-C", repoPath, "diff", "--name-only", fromHead, toHead, "--", "local/runner/")
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(out) != ""
+}
+
+// execFn is swappable for tests: syscall.Exec replaces the process and never
+// returns on success.
+var execFn = syscall.Exec
+
+// stagedRunnerName is the staged binary's basename. It must keep matching
+// the pgrep pattern in start/stop/status.sh.
+const stagedRunnerName = "kurtosis-charon-runner"
+
+// restartSelf builds the pulled runner source (in the current working
+// directory, the runner module dir per start.sh/systemd) into a staged
+// binary and replaces the current process with it, preserving command-line
+// flags, stdout/stderr redirections and the pid. Building explicitly rather
+// than re-execing `go run .` keeps the process chain flat: exec from inside
+// go run's child would leave one more waiting `go run` supervisor behind on
+// every update. A build failure leaves the current build running.
+//
+// The binary is staged in a fresh private temp dir (0700): a fixed path in
+// world-writable /tmp could be pre-created or symlinked by another local
+// user, and separate runner instances would collide on it.
+func restartSelf() error {
+	goBin, err := goToolchain()
+	if err != nil {
+		return err
+	}
+	pruneStagedRunners()
+	dir, err := os.MkdirTemp("", stagedRunnerName+"-*")
+	if err != nil {
+		return err
+	}
+	staged := filepath.Join(dir, stagedRunnerName)
+	if out, err := runCommand(goBin, "build", "-o", staged, "."); err != nil {
+		_ = os.RemoveAll(dir)
+		return fmt.Errorf("build updated runner: %w (output: %s)", err, strings.TrimSpace(out))
+	}
+	return execFn(staged, append([]string{staged}, os.Args[1:]...), os.Environ())
+}
+
+// pruneStagedRunners best-effort removes staging dirs left by previous
+// self-restarts: exec never returns, so a process cannot delete its own
+// staging dir, and they would otherwise accumulate for the host's uptime.
+// The currently-running executable's dir is kept. Only one runner instance
+// runs at a time (start.sh refuses doubles), so predecessors' dirs are
+// never live.
+func pruneStagedRunners() {
+	self, _ := os.Executable()
+	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), stagedRunnerName+"-*"))
+	for _, dir := range matches {
+		if self != "" && strings.HasPrefix(self, dir+string(os.PathSeparator)) {
+			continue
+		}
+		_ = os.RemoveAll(dir)
+	}
+}
+
+// maybeRestart re-execs the runner when its source changed between
+// startHead and the checkout's current HEAD. On exec failure it logs and
+// returns, so the caller continues with the current build and retries on
+// the next loop.
+func maybeRestart(repoPath, startHead string) {
+	head := gitHead(repoPath)
+	if !runnerSourceChanged(repoPath, startHead, head) {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "runner: runner source changed (%.7s -> %.7s); restarting to pick it up\n", startHead, head)
+	if err := restartSelf(); err != nil {
+		fmt.Fprintf(os.Stderr, "runner: self-restart failed (continuing with current build): %v\n", err)
+	}
+}
+
+// goToolchain resolves the go binary to build with: the toolchain this
+// process was built by (GOROOT), then PATH, then the same fallback install
+// locations start.sh probes -- under systemd, PATH typically lacks the
+// toolchain dir entirely.
+func goToolchain() (string, error) {
+	var candidates []string
+	if root := runtime.GOROOT(); root != "" {
+		candidates = append(candidates, filepath.Join(root, "bin", "go"))
+	}
+	if p, err := exec.LookPath("go"); err == nil {
+		candidates = append(candidates, p)
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		candidates = append(candidates, filepath.Join(home, "sdk", "go", "bin", "go"))
+	}
+	candidates = append(candidates, "/usr/local/go/bin/go")
+
+	for _, c := range candidates {
+		if info, err := os.Stat(c); err == nil && !info.IsDir() {
+			return c, nil
+		}
+	}
+	return "", fmt.Errorf("go toolchain not found (tried %v)", candidates)
 }
 
 // ---------------------------------------------------------------------------
@@ -2395,12 +2515,33 @@ func mainLoop(cfg config) {
 		saveState()
 	}
 
+	// The head this process was compiled from: `go run .` builds the checkout
+	// present at launch, so runner-source changes pulled later only take
+	// effect after a re-exec.
+	startHead := gitHead(cfg.repoPath)
+
 	consecutiveFailures := 0
 	for {
 		// Freshen the repo so CL/VC pin changes are seen before scheduling.
 		if err := gitPull(cfg.repoPath); err != nil {
 			fmt.Fprintf(os.Stderr, "runner: git pull failed (using current checkout): %v\n", err)
 		}
+
+		// Re-exec when the pull changed the runner's own source, so merged
+		// runner fixes take effect without a manual restart. This is the one
+		// safe point: no enclave is up and state/matrix were saved after the
+		// previous run. runOne pulls again pre-launch, so a change landing
+		// mid-iteration is picked up here one cycle later at most --
+		// restarting mid-iteration would not be safe.
+		//
+		// Retry the head capture while it is empty: a transient failure of
+		// the startup capture would otherwise disable self-restarts for the
+		// process lifetime (a late capture can at worst defer one restart
+		// to the next runner-source merge).
+		if startHead == "" {
+			startHead = gitHead(cfg.repoPath)
+		}
+		maybeRestart(cfg.repoPath, startHead)
 
 		files, err := paramFiles(cfg.paramsDir)
 		if err != nil || len(files) == 0 {
