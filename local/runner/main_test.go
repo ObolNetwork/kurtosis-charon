@@ -2464,3 +2464,34 @@ func TestGoToolchain(t *testing.T) {
 		t.Errorf("goToolchain = %q, want a go binary path", goBin)
 	}
 }
+
+func TestPruneStagedRunners(t *testing.T) {
+	stale1, err := os.MkdirTemp("", stagedRunnerName+"-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stale2, err := os.MkdirTemp("", stagedRunnerName+"-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stale1, stagedRunnerName), []byte("old"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	unrelated, err := os.MkdirTemp("", "unrelated-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(unrelated)
+
+	pruneStagedRunners()
+
+	for _, dir := range []string{stale1, stale2} {
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			os.RemoveAll(dir)
+			t.Errorf("stale staging dir %s must be pruned", dir)
+		}
+	}
+	if _, err := os.Stat(unrelated); err != nil {
+		t.Errorf("unrelated temp dir must be untouched: %v", err)
+	}
+}

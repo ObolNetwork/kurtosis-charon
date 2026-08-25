@@ -1092,6 +1092,7 @@ func restartSelf() error {
 	if err != nil {
 		return err
 	}
+	pruneStagedRunners()
 	dir, err := os.MkdirTemp("", stagedRunnerName+"-*")
 	if err != nil {
 		return err
@@ -1102,6 +1103,23 @@ func restartSelf() error {
 		return fmt.Errorf("build updated runner: %w (output: %s)", err, strings.TrimSpace(out))
 	}
 	return execFn(staged, append([]string{staged}, os.Args[1:]...), os.Environ())
+}
+
+// pruneStagedRunners best-effort removes staging dirs left by previous
+// self-restarts: exec never returns, so a process cannot delete its own
+// staging dir, and they would otherwise accumulate for the host's uptime.
+// The currently-running executable's dir is kept. Only one runner instance
+// runs at a time (start.sh refuses doubles), so predecessors' dirs are
+// never live.
+func pruneStagedRunners() {
+	self, _ := os.Executable()
+	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), stagedRunnerName+"-*"))
+	for _, dir := range matches {
+		if self != "" && strings.HasPrefix(self, dir+string(os.PathSeparator)) {
+			continue
+		}
+		_ = os.RemoveAll(dir)
+	}
 }
 
 // maybeRestart re-execs the runner when its source changed between
@@ -2515,6 +2533,14 @@ func mainLoop(cfg config) {
 		// previous run. runOne pulls again pre-launch, so a change landing
 		// mid-iteration is picked up here one cycle later at most --
 		// restarting mid-iteration would not be safe.
+		//
+		// Retry the head capture while it is empty: a transient failure of
+		// the startup capture would otherwise disable self-restarts for the
+		// process lifetime (a late capture can at worst defer one restart
+		// to the next runner-source merge).
+		if startHead == "" {
+			startHead = gitHead(cfg.repoPath)
+		}
 		maybeRestart(cfg.repoPath, startHead)
 
 		files, err := paramFiles(cfg.paramsDir)
