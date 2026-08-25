@@ -2373,21 +2373,34 @@ func TestRestartSelf(t *testing.T) {
 		t.Fatalf("restartSelf error: %v", err)
 	}
 
-	// The updated source is built to the staged binary first (a flat exec
+	// The updated source is built to a staged binary first (a flat exec
 	// chain: re-execing `go run .` would leak one waiting supervisor per
-	// update), and the build runs with a resolved go toolchain.
-	if len(built) != 5 || built[1] != "build" || built[2] != "-o" || built[3] != stagedRunnerPath || built[4] != "." {
-		t.Errorf("build command = %v, want <go> build -o %s .", built, stagedRunnerPath)
+	// update), in a fresh private temp dir, keeping the basename the
+	// start/stop/status.sh pgrep pattern matches.
+	if len(built) != 5 || built[1] != "build" || built[2] != "-o" || built[4] != "." {
+		t.Fatalf("build command = %v, want <go> build -o <staged> .", built)
 	}
 	if !strings.HasSuffix(built[0], "/go") && built[0] != "go" {
 		t.Errorf("toolchain = %q, want a go binary path", built[0])
 	}
+	staged := built[3]
+	if filepath.Base(staged) != stagedRunnerName {
+		t.Errorf("staged basename = %q, want %q", filepath.Base(staged), stagedRunnerName)
+	}
+	dir := filepath.Dir(staged)
+	if !strings.HasPrefix(filepath.Base(dir), stagedRunnerName+"-") {
+		t.Errorf("staged dir = %q, want a private per-restart temp dir", dir)
+	}
+	if info, err := os.Stat(dir); err != nil || info.Mode().Perm() != 0o700 {
+		t.Errorf("staged dir perms/err = %v/%v, want 0700", info, err)
+	}
+	defer os.RemoveAll(dir)
 
 	// The staged binary is exec'd with the original flags preserved.
-	if gotArgv0 != stagedRunnerPath {
-		t.Errorf("argv0 = %q, want %q", gotArgv0, stagedRunnerPath)
+	if gotArgv0 != staged {
+		t.Errorf("argv0 = %q, want %q", gotArgv0, staged)
 	}
-	want := append([]string{stagedRunnerPath}, os.Args[1:]...)
+	want := append([]string{staged}, os.Args[1:]...)
 	if !reflect.DeepEqual(gotArgs, want) {
 		t.Errorf("argv = %v, want %v (flags preserved)", gotArgs, want)
 	}
@@ -2397,6 +2410,47 @@ func TestRestartSelf(t *testing.T) {
 	if err := restartSelf(); err == nil {
 		t.Error("restartSelf must surface build failures")
 	}
+}
+
+// TestMaybeRestart pins the mainLoop integration branch: a runner-source
+// change triggers the re-exec, an unchanged checkout does not, and an exec
+// failure returns normally so the loop continues with the current build.
+func TestMaybeRestart(t *testing.T) {
+	oldExec, oldRun := execFn, runCommand
+	defer func() { execFn, runCommand = oldExec, oldRun }()
+
+	mkGit := func(head, diff string) func(string, ...string) (string, error) {
+		return func(name string, args ...string) (string, error) {
+			switch {
+			case len(args) > 0 && args[len(args)-1] == "HEAD":
+				return head + "\n", nil
+			case len(args) > 1 && args[1] == "build":
+				return "", nil
+			default: // git diff
+				return diff, nil
+			}
+		}
+	}
+
+	execs := 0
+	execFn = func(string, []string, []string) error { execs++; return nil }
+
+	runCommand = mkGit("newhead", "local/runner/main.go\n")
+	maybeRestart("/repo", "oldhead")
+	if execs != 1 {
+		t.Errorf("changed source: execs = %d, want 1", execs)
+	}
+
+	runCommand = mkGit("oldhead", "")
+	maybeRestart("/repo", "oldhead")
+	if execs != 1 {
+		t.Errorf("unchanged source: execs = %d, want still 1", execs)
+	}
+
+	// Exec failure must not panic or stop the caller.
+	execFn = func(string, []string, []string) error { return fmt.Errorf("exec blocked") }
+	runCommand = mkGit("newhead", "local/runner/main.go\n")
+	maybeRestart("/repo", "oldhead")
 }
 
 func TestGoToolchain(t *testing.T) {

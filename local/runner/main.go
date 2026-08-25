@@ -1072,9 +1072,9 @@ func runnerSourceChanged(repoPath, fromHead, toHead string) bool {
 // returns on success.
 var execFn = syscall.Exec
 
-// stagedRunnerPath is where restartSelf builds the updated runner binary.
-// The name must keep matching the pgrep pattern in start/stop/status.sh.
-var stagedRunnerPath = filepath.Join(os.TempDir(), "kurtosis-charon-runner")
+// stagedRunnerName is the staged binary's basename. It must keep matching
+// the pgrep pattern in start/stop/status.sh.
+const stagedRunnerName = "kurtosis-charon-runner"
 
 // restartSelf builds the pulled runner source (in the current working
 // directory, the runner module dir per start.sh/systemd) into a staged
@@ -1083,15 +1083,40 @@ var stagedRunnerPath = filepath.Join(os.TempDir(), "kurtosis-charon-runner")
 // than re-execing `go run .` keeps the process chain flat: exec from inside
 // go run's child would leave one more waiting `go run` supervisor behind on
 // every update. A build failure leaves the current build running.
+//
+// The binary is staged in a fresh private temp dir (0700): a fixed path in
+// world-writable /tmp could be pre-created or symlinked by another local
+// user, and separate runner instances would collide on it.
 func restartSelf() error {
 	goBin, err := goToolchain()
 	if err != nil {
 		return err
 	}
-	if out, err := runCommand(goBin, "build", "-o", stagedRunnerPath, "."); err != nil {
+	dir, err := os.MkdirTemp("", stagedRunnerName+"-*")
+	if err != nil {
+		return err
+	}
+	staged := filepath.Join(dir, stagedRunnerName)
+	if out, err := runCommand(goBin, "build", "-o", staged, "."); err != nil {
+		_ = os.RemoveAll(dir)
 		return fmt.Errorf("build updated runner: %w (output: %s)", err, strings.TrimSpace(out))
 	}
-	return execFn(stagedRunnerPath, append([]string{stagedRunnerPath}, os.Args[1:]...), os.Environ())
+	return execFn(staged, append([]string{staged}, os.Args[1:]...), os.Environ())
+}
+
+// maybeRestart re-execs the runner when its source changed between
+// startHead and the checkout's current HEAD. On exec failure it logs and
+// returns, so the caller continues with the current build and retries on
+// the next loop.
+func maybeRestart(repoPath, startHead string) {
+	head := gitHead(repoPath)
+	if !runnerSourceChanged(repoPath, startHead, head) {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "runner: runner source changed (%.7s -> %.7s); restarting to pick it up\n", startHead, head)
+	if err := restartSelf(); err != nil {
+		fmt.Fprintf(os.Stderr, "runner: self-restart failed (continuing with current build): %v\n", err)
+	}
 }
 
 // goToolchain resolves the go binary to build with: the toolchain this
@@ -2487,16 +2512,10 @@ func mainLoop(cfg config) {
 		// Re-exec when the pull changed the runner's own source, so merged
 		// runner fixes take effect without a manual restart. This is the one
 		// safe point: no enclave is up and state/matrix were saved after the
-		// previous run. On exec failure, log and keep running the current
-		// build; the check retries next loop. runOne pulls again pre-launch,
-		// so a change landing mid-iteration is picked up here one cycle
-		// later at most -- restarting mid-iteration would not be safe.
-		if head := gitHead(cfg.repoPath); runnerSourceChanged(cfg.repoPath, startHead, head) {
-			fmt.Fprintf(os.Stderr, "runner: runner source changed (%.7s -> %.7s); restarting to pick it up\n", startHead, head)
-			if err := restartSelf(); err != nil {
-				fmt.Fprintf(os.Stderr, "runner: self-restart failed (continuing with current build): %v\n", err)
-			}
-		}
+		// previous run. runOne pulls again pre-launch, so a change landing
+		// mid-iteration is picked up here one cycle later at most --
+		// restarting mid-iteration would not be safe.
+		maybeRestart(cfg.repoPath, startHead)
 
 		files, err := paramFiles(cfg.paramsDir)
 		if err != nil || len(files) == 0 {
