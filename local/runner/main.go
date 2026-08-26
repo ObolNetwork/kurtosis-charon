@@ -975,7 +975,12 @@ func discoverClusterName(baseURL string) (string, error) {
 // ---------------------------------------------------------------------------
 
 func slackPost(webhookURL, text string, blocks []map[string]any) error {
-	payload := map[string]any{"text": text, "blocks": blocks}
+	// Omit the blocks key entirely for text-only posts: "blocks": null (or
+	// an empty array) is not a valid value for Slack's array-typed field.
+	payload := map[string]any{"text": text}
+	if len(blocks) > 0 {
+		payload["blocks"] = blocks
+	}
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return err

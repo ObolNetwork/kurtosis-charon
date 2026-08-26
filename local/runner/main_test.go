@@ -2702,3 +2702,35 @@ func TestPendingQueueCrashAndCorruption(t *testing.T) {
 		}
 	})
 }
+
+// TestSlackPostOmitsEmptyBlocks pins the text-only payload shape: without
+// blocks, the "blocks" key must be absent ("blocks": null is not a valid
+// value for Slack's array-typed field).
+func TestSlackPostOmitsEmptyBlocks(t *testing.T) {
+	old := httpPost
+	defer func() { httpPost = old }()
+
+	var body []byte
+	httpPost = func(u string, b []byte) (int, error) { body = b; return 200, nil }
+
+	if err := slackPost("http://hook", "hello", nil); err != nil {
+		t.Fatalf("slackPost error: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if _, present := payload["blocks"]; present {
+		t.Errorf("text-only payload must omit the blocks key, got %s", body)
+	}
+
+	if err := slackPost("http://hook", "hello", []map[string]any{{"type": "section"}}); err != nil {
+		t.Fatalf("slackPost error: %v", err)
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if _, present := payload["blocks"]; !present {
+		t.Errorf("payload with blocks must include the blocks key, got %s", body)
+	}
+}
