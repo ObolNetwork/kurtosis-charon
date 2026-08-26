@@ -1659,12 +1659,16 @@ func savePendingPosts(path string, posts []pendingPost) error {
 	return os.Rename(tmp, path)
 }
 
-// sendPendingPost posts one queued entry.
+// sendPendingPost posts one queued entry. A malformed stored blocks payload
+// degrades to a text-only post instead of erroring: the queue file is
+// persistent, and failing here would stall every report behind the bad
+// entry forever, even with a healthy webhook.
 func sendPendingPost(cfg config, p pendingPost) error {
 	var blocks []map[string]any
 	if len(p.Blocks) > 0 {
 		if err := json.Unmarshal(p.Blocks, &blocks); err != nil {
-			return err
+			fmt.Fprintf(os.Stderr, "runner: queued report for %s has malformed blocks (sending text-only): %v\n", p.Name, err)
+			blocks = nil
 		}
 	}
 	return slackPost(cfg.slackWebhookURL, p.Text, blocks)
@@ -1702,6 +1706,14 @@ func postBestEffort(cfg config, d reportData) {
 		}
 		fmt.Fprintf(os.Stderr, "runner: delivered queued report for %s (from %s)\n", pending[0].Name, pending[0].CreatedAt)
 		pending = pending[1:]
+		// Persist each dequeue immediately: a crash before the final save
+		// below would otherwise re-send already-delivered reports on the
+		// next start.
+		if queuePath != "" {
+			if err := savePendingPosts(queuePath, pending); err != nil {
+				fmt.Fprintf(os.Stderr, "runner: failed to save pending-posts queue: %v\n", err)
+			}
+		}
 	}
 
 	blocks, err := json.Marshal(buildBlocks(d))

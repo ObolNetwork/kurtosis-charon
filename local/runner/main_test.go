@@ -2634,3 +2634,71 @@ func TestPendingPostsCap(t *testing.T) {
 		t.Errorf("cap must drop the OLDEST entries, got first=%s last=%s", got[0].Name, got[len(got)-1].Name)
 	}
 }
+
+// TestPendingQueueCrashAndCorruption pins two delivery-robustness rules:
+// each successful flush is persisted immediately (a crash mid-flush must
+// not re-send already-delivered reports), and a queued entry with malformed
+// blocks degrades to a text-only post instead of stalling the queue.
+func TestPendingQueueCrashAndCorruption(t *testing.T) {
+	oldPost, oldSleep := httpPost, sleepFn
+	defer func() { httpPost, sleepFn = oldPost, oldSleep }()
+	sleepFn = func(time.Duration) {}
+
+	t.Run("crash mid-flush does not resend delivered reports", func(t *testing.T) {
+		dir := t.TempDir()
+		cfg := config{slackWebhookURL: "http://hook", statePath: filepath.Join(dir, "state.json")}
+		queueFile := filepath.Join(dir, "runner-pending-posts.json")
+		if err := savePendingPosts(queueFile, []pendingPost{{Name: "aaa"}, {Name: "bbb"}}); err != nil {
+			t.Fatal(err)
+		}
+
+		posts := 0
+		httpPost = func(string, []byte) (int, error) {
+			posts++
+			if posts == 2 {
+				panic("simulated crash after first delivery")
+			}
+			return 200, nil
+		}
+		postBestEffort(cfg, reportData{name: "ccc"}) // recover() must swallow the panic
+
+		got, err := loadPendingPosts(queueFile)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != 1 || got[0].Name != "bbb" {
+			t.Fatalf("queue after crash = %+v, want only [bbb]: aaa was delivered and must not be re-sent", got)
+		}
+	})
+
+	t.Run("malformed blocks degrade to text-only, queue keeps draining", func(t *testing.T) {
+		dir := t.TempDir()
+		cfg := config{slackWebhookURL: "http://hook", statePath: filepath.Join(dir, "state.json")}
+		queueFile := filepath.Join(dir, "runner-pending-posts.json")
+		// Valid JSON of the wrong shape: whole-file invalidity is already
+		// handled by the queue-unreadable path; per-entry corruption
+		// surfaces as blocks that don't decode into []map[string]any.
+		bad := []pendingPost{{Name: "aaa", Text: "aaa report", Blocks: json.RawMessage(`"not-an-array"`)}}
+		if err := savePendingPosts(queueFile, bad); err != nil {
+			t.Fatal(err)
+		}
+
+		var sent []string
+		httpPost = func(u string, body []byte) (int, error) {
+			var payload struct {
+				Text string `json:"text"`
+			}
+			_ = json.Unmarshal(body, &payload)
+			sent = append(sent, payload.Text)
+			return 200, nil
+		}
+		postBestEffort(cfg, reportData{name: "bbb"})
+
+		if len(sent) != 2 || sent[0] != "aaa report" {
+			t.Fatalf("sent = %v, want the malformed entry delivered text-only, then the fresh report", sent)
+		}
+		if got, _ := loadPendingPosts(queueFile); len(got) != 0 {
+			t.Errorf("queue = %+v, want empty", got)
+		}
+	})
+}
