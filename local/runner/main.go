@@ -1601,12 +1601,144 @@ func failedReport(name string, cycle int, errMsg string) reportData {
 	}
 }
 
-// postBestEffort posts the run's Slack report on a best-effort basis: Slack
-// failures (including a panic from a misbehaving fake) must never break
-// runOne.
+// maxPendingPosts bounds the on-disk queue of undelivered reports so a
+// permanently broken webhook cannot grow the file forever; beyond it the
+// oldest entries are dropped.
+const maxPendingPosts = 100
+
+// pendingPost is one undelivered Slack report, stored fully rendered so a
+// queued report posts byte-identical later.
+type pendingPost struct {
+	Name      string          `json:"name"`
+	CreatedAt string          `json:"created_at"`
+	Text      string          `json:"text"`
+	Blocks    json.RawMessage `json:"blocks"`
+}
+
+// pendingPostsPath returns the queue file's location, next to the state
+// file ("" when no state path is configured, disabling persistence).
+func pendingPostsPath(cfg config) string {
+	if cfg.statePath == "" {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(cfg.statePath), "runner-pending-posts.json")
+}
+
+// loadPendingPosts reads the queue; a missing file is an empty queue.
+func loadPendingPosts(path string) ([]pendingPost, error) {
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var posts []pendingPost
+	if err := json.Unmarshal(data, &posts); err != nil {
+		return nil, err
+	}
+	return posts, nil
+}
+
+// savePendingPosts writes the queue atomically (temp+rename, like the state
+// file), dropping the oldest entries beyond maxPendingPosts.
+func savePendingPosts(path string, posts []pendingPost) error {
+	if len(posts) > maxPendingPosts {
+		fmt.Fprintf(os.Stderr, "runner: dropping %d oldest undelivered slack reports (queue capped at %d)\n",
+			len(posts)-maxPendingPosts, maxPendingPosts)
+		posts = posts[len(posts)-maxPendingPosts:]
+	}
+	data, err := json.MarshalIndent(posts, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
+// sendPendingPost posts one queued entry.
+func sendPendingPost(cfg config, p pendingPost) error {
+	var blocks []map[string]any
+	if len(p.Blocks) > 0 {
+		if err := json.Unmarshal(p.Blocks, &blocks); err != nil {
+			return err
+		}
+	}
+	return slackPost(cfg.slackWebhookURL, p.Text, blocks)
+}
+
+// postBestEffort delivers the run report to Slack, preserving run order
+// across outages. It first flushes any queued undelivered reports (in
+// order, one attempt each, stopping at the first failure -- same endpoint,
+// so the rest would fail too). With the queue empty, the fresh report is
+// posted with one retry after a short delay (transient resolver/network
+// blips clear quickly) and queued to disk if both attempts fail; while
+// older reports remain queued, the fresh one queues behind them without an
+// attempt so Slack never receives results out of run order. Failures
+// (including a panic from a misbehaving fake) are logged or swallowed,
+// never fatal to runOne.
 func postBestEffort(cfg config, d reportData) {
 	defer func() { _ = recover() }()
-	_ = slackPost(cfg.slackWebhookURL, buildText(d), buildBlocks(d))
+
+	queuePath := pendingPostsPath(cfg)
+
+	var pending []pendingPost
+	if queuePath != "" {
+		var err error
+		pending, err = loadPendingPosts(queuePath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "runner: pending-posts queue unreadable (starting a fresh queue): %v\n", err)
+			pending = nil
+		}
+	}
+
+	for len(pending) > 0 {
+		if err := sendPendingPost(cfg, pending[0]); err != nil {
+			fmt.Fprintf(os.Stderr, "runner: still cannot deliver queued report for %s: %v\n", pending[0].Name, err)
+			break
+		}
+		fmt.Fprintf(os.Stderr, "runner: delivered queued report for %s (from %s)\n", pending[0].Name, pending[0].CreatedAt)
+		pending = pending[1:]
+	}
+
+	blocks, err := json.Marshal(buildBlocks(d))
+	if err != nil {
+		blocks = nil
+	}
+	entry := pendingPost{
+		Name:      d.name,
+		CreatedAt: nowFn().UTC().Format(time.RFC3339),
+		Text:      buildText(d),
+		Blocks:    blocks,
+	}
+
+	switch {
+	case len(pending) > 0:
+		// Older reports are still undeliverable: queue behind them to keep
+		// run order.
+		fmt.Fprintf(os.Stderr, "runner: queueing report for %s behind %d undelivered report(s)\n", d.name, len(pending))
+		pending = append(pending, entry)
+	default:
+		err := sendPendingPost(cfg, entry)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "runner: slack report post failed for %s (retrying in 30s): %v\n", d.name, err)
+			sleepFn(30 * time.Second)
+			err = sendPendingPost(cfg, entry)
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "runner: slack report post retry failed for %s (queueing to disk): %v\n", d.name, err)
+			pending = append(pending, entry)
+		}
+	}
+
+	if queuePath != "" {
+		if err := savePendingPosts(queuePath, pending); err != nil {
+			fmt.Fprintf(os.Stderr, "runner: failed to save pending-posts queue: %v\n", err)
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------

@@ -2495,3 +2495,142 @@ func TestPruneStagedRunners(t *testing.T) {
 		t.Errorf("unrelated temp dir must be untouched: %v", err)
 	}
 }
+
+// TestPostBestEffortRetries pins the report-post retry: a transient failure
+// (e.g. a resolver blip) is retried once after a delay, and a failure on
+// both attempts is logged but never fatal.
+func TestPostBestEffortRetries(t *testing.T) {
+	oldPost, oldSleep := httpPost, sleepFn
+	defer func() { httpPost, sleepFn = oldPost, oldSleep }()
+
+	var slept []time.Duration
+	sleepFn = func(d time.Duration) { slept = append(slept, d) }
+
+	t.Run("first attempt succeeds: no retry", func(t *testing.T) {
+		slept = nil
+		posts := 0
+		httpPost = func(string, []byte) (int, error) { posts++; return 200, nil }
+		postBestEffort(config{slackWebhookURL: "http://hook"}, reportData{name: "a-b"})
+		if posts != 1 || len(slept) != 0 {
+			t.Errorf("posts=%d slept=%v, want 1 post and no sleep", posts, slept)
+		}
+	})
+
+	t.Run("transient failure: retried once and delivered", func(t *testing.T) {
+		slept = nil
+		posts := 0
+		httpPost = func(string, []byte) (int, error) {
+			posts++
+			if posts == 1 {
+				return 0, fmt.Errorf("dial tcp: lookup slack.com: server misbehaving")
+			}
+			return 200, nil
+		}
+		postBestEffort(config{slackWebhookURL: "http://hook"}, reportData{name: "a-b"})
+		if posts != 2 {
+			t.Errorf("posts = %d, want 2 (one retry)", posts)
+		}
+		if len(slept) != 1 {
+			t.Errorf("slept = %v, want one backoff before the retry", slept)
+		}
+	})
+
+	t.Run("both attempts fail: logged, not fatal", func(t *testing.T) {
+		slept = nil
+		posts := 0
+		httpPost = func(string, []byte) (int, error) { posts++; return 0, fmt.Errorf("still down") }
+		postBestEffort(config{slackWebhookURL: "http://hook"}, reportData{name: "a-b"}) // must not panic
+		if posts != 2 {
+			t.Errorf("posts = %d, want exactly 2 attempts", posts)
+		}
+	})
+}
+
+// TestPostBestEffortPendingQueue pins the ordered pending queue: reports
+// that fail both attempts are persisted, later reports queue behind them
+// (never posted ahead), and the first healthy post flushes the backlog in
+// run order before the fresh report.
+func TestPostBestEffortPendingQueue(t *testing.T) {
+	oldPost, oldSleep := httpPost, sleepFn
+	defer func() { httpPost, sleepFn = oldPost, oldSleep }()
+	sleepFn = func(time.Duration) {}
+
+	dir := t.TempDir()
+	cfg := config{slackWebhookURL: "http://hook", statePath: filepath.Join(dir, "state.json")}
+	queueFile := filepath.Join(dir, "runner-pending-posts.json")
+
+	readQueue := func(t *testing.T) []pendingPost {
+		t.Helper()
+		posts, err := loadPendingPosts(queueFile)
+		if err != nil {
+			t.Fatalf("load queue: %v", err)
+		}
+		return posts
+	}
+
+	// Outage: report A fails both attempts and is queued.
+	posts := 0
+	httpPost = func(string, []byte) (int, error) { posts++; return 0, fmt.Errorf("dns down") }
+	postBestEffort(cfg, reportData{name: "aaa-combo"})
+	if posts != 2 {
+		t.Errorf("posts = %d, want 2 attempts for the fresh report", posts)
+	}
+	if q := readQueue(t); len(q) != 1 || q[0].Name != "aaa-combo" {
+		t.Fatalf("queue = %+v, want [aaa-combo]", q)
+	}
+
+	// Still down: report B queues BEHIND A after one flush attempt; B itself
+	// is not attempted (order preservation).
+	posts = 0
+	postBestEffort(cfg, reportData{name: "bbb-combo"})
+	if posts != 1 {
+		t.Errorf("posts = %d, want exactly 1 (flush attempt for A only)", posts)
+	}
+	if q := readQueue(t); len(q) != 2 || q[0].Name != "aaa-combo" || q[1].Name != "bbb-combo" {
+		t.Fatalf("queue = %+v, want [aaa-combo bbb-combo]", q)
+	}
+
+	// Recovery: report C's post first flushes A then B, then posts C.
+	var sent []string
+	httpPost = func(u string, body []byte) (int, error) {
+		var payload struct {
+			Text string `json:"text"`
+		}
+		_ = json.Unmarshal(body, &payload)
+		sent = append(sent, payload.Text)
+		return 200, nil
+	}
+	postBestEffort(cfg, reportData{name: "ccc-combo"})
+	if len(sent) != 3 || !strings.Contains(sent[0], "aaa-combo") || !strings.Contains(sent[1], "bbb-combo") || !strings.Contains(sent[2], "ccc-combo") {
+		t.Fatalf("sent order = %v, want backlog A, B then fresh C", sent)
+	}
+	if q := readQueue(t); len(q) != 0 {
+		t.Errorf("queue after recovery = %+v, want empty", q)
+	}
+}
+
+// TestPendingPostsCap pins the queue bound: the oldest entries are dropped
+// beyond maxPendingPosts so a permanently broken webhook cannot grow the
+// file forever.
+func TestPendingPostsCap(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "q.json")
+
+	var posts []pendingPost
+	for i := range maxPendingPosts + 5 {
+		posts = append(posts, pendingPost{Name: fmt.Sprintf("combo-%03d", i)})
+	}
+	if err := savePendingPosts(path, posts); err != nil {
+		t.Fatal(err)
+	}
+	got, err := loadPendingPosts(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != maxPendingPosts {
+		t.Fatalf("len = %d, want capped at %d", len(got), maxPendingPosts)
+	}
+	if got[0].Name != "combo-005" || got[len(got)-1].Name != fmt.Sprintf("combo-%03d", maxPendingPosts+4) {
+		t.Errorf("cap must drop the OLDEST entries, got first=%s last=%s", got[0].Name, got[len(got)-1].Name)
+	}
+}

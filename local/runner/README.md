@@ -67,7 +67,11 @@ For each param file in the directory, in sorted order, forever:
    and 1 (`warmupSlots`, parsed per slot from charon logs — the startup
    snapshot plus the end-of-run logs) are subtracted from the failed
    counts so genesis noise doesn't count against the run either.
-7. Post one Slack message (via Incoming Webhook) summarizing the run: the
+7. Post one Slack message (via Incoming Webhook) summarizing the run,
+   retrying once after 30s. A report failing both attempts is queued on
+   disk (`runner-pending-posts.json`, next to the state file, capped at
+   100) and delivered ahead of the next run's report, so an outage delays
+   reports but never loses or reorders them. The message summarizes: the
    param file's name, the discovered cluster, status (`ok` / `degraded` /
    `failed`), worst-node duty ratios, DV CPU/mem peaks, host stats, and any
    firing health checks.
