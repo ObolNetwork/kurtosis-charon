@@ -887,7 +887,7 @@ func TestKurtosisRunAndRemove(t *testing.T) {
 		captured = append([]string{name}, args...)
 		return "", nil
 	}
-	if err := kurtosisRun("c1-teku-prysm", "pkg@ref", "/tmp/args.yaml"); err != nil {
+	if _, err := kurtosisRun("c1-teku-prysm", "pkg@ref", "/tmp/args.yaml"); err != nil {
 		t.Fatalf("kurtosisRun error: %v", err)
 	}
 	want := []string{"kurtosis", "run", "--enclave", "c1-teku-prysm", "--image-download", "always", "pkg@ref", "--args-file", "/tmp/args.yaml"}
@@ -896,8 +896,14 @@ func TestKurtosisRunAndRemove(t *testing.T) {
 	}
 
 	runCommand = func(string, ...string) (string, error) { return "boom", fmt.Errorf("exit status 1") }
-	if err := kurtosisRun("e", "pkg", "f"); err == nil {
+	out, err := kurtosisRun("e", "pkg", "f")
+	if err == nil {
 		t.Error("expected error from kurtosisRun on runCommand failure")
+	}
+	// The output is returned (not inlined into the error) so callers can ship it
+	// as a log-archive file rather than in the size-limited Slack message.
+	if out != "boom" {
+		t.Errorf("kurtosisRun output = %q, want %q (needed for the launch-fail log archive)", out, "boom")
 	}
 
 	// kurtosisRemove must never panic, even if the fake errors.
