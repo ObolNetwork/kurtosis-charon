@@ -1000,19 +1000,71 @@ func slackPost(webhookURL, text string, blocks []map[string]any) error {
 // gitPull.
 // ---------------------------------------------------------------------------
 
-// kurtosisRun launches an enclave via `kurtosis run`. It returns an error on
-// non-zero exit (runCommand's error already reflects that, as it does for
-// os/exec.Cmd.CombinedOutput).
-func kurtosisRun(enclave, pkg, argsFile string) error {
+// kurtosisRun launches an enclave via `kurtosis run`. It returns the combined
+// stdout+stderr (so callers can archive it on a launch failure, where it is the
+// only diagnostic) and an error on non-zero exit (runCommand's error already
+// reflects that, as it does for os/exec.Cmd.CombinedOutput). The output is
+// returned separately and never inlined into the error.
+func kurtosisRun(enclave, pkg, argsFile string) (string, error) {
 	// --image-download always so moving tags (the param files pin
 	// obolnetwork/charon:next) are re-pulled every run; otherwise Kurtosis's
 	// default ("missing") keeps using a stale locally-cached image and the
 	// runner silently tests old client/Charon builds.
 	out, err := runCommand("kurtosis", "run", "--enclave", enclave, "--image-download", "always", pkg, "--args-file", argsFile)
 	if err != nil {
-		return fmt.Errorf("kurtosis run failed for %s: %w (output: %s)", enclave, err, strings.TrimSpace(out))
+		// Return the output separately so callers can archive it as a Slack file
+		// attachment; it must never be inlined into the size-limited (~40KB)
+		// Slack webhook message. The error stays short.
+		return out, fmt.Errorf("kurtosis run failed for %s: %w", enclave, err)
 	}
-	return nil
+	return out, nil
+}
+
+// archiveKurtosisOutput writes the `kurtosis run` output to a gzipped tarball
+// under cfg.logDir and returns its path. A launch failure leaves no enclave
+// services for captureFailureLogs to collect, so this output is the only
+// diagnostic; it is shipped as a Slack file attachment (via uploadLogsBestEffort)
+// instead of inlined into the size-limited webhook message. Best-effort: returns
+// "" on empty output or any error.
+func archiveKurtosisOutput(cfg config, name string, cycle int, output string) (archivePath string) {
+	defer func() {
+		if recover() != nil {
+			// archivePath is a named return assigned before makeTarGz; a panic
+			// after that point would otherwise return a path to an archive that
+			// was never (fully) written, so the caller would upload a missing
+			// file. Clear it.
+			archivePath = ""
+		}
+	}()
+
+	if strings.TrimSpace(output) == "" {
+		return ""
+	}
+
+	staging, err := os.MkdirTemp("", "runner-launchfail-*")
+	if err != nil {
+		return ""
+	}
+	defer os.RemoveAll(staging)
+
+	if err := os.WriteFile(filepath.Join(staging, "kurtosis-run.log"), []byte(output), 0o644); err != nil {
+		return ""
+	}
+
+	if err := os.MkdirAll(cfg.logDir, 0o700); err != nil {
+		fmt.Fprintf(os.Stderr, "runner: launch-fail archive: mkdir %s failed: %v\n", cfg.logDir, err)
+		return ""
+	}
+
+	ts := nowFn().UTC().Format("20060102-150405")
+	archivePath = filepath.Join(cfg.logDir, fmt.Sprintf("cycle%d-%s-launchfail-%s.tar.gz", cycle, name, ts))
+	if err := makeTarGz(staging, archivePath); err != nil {
+		fmt.Fprintf(os.Stderr, "runner: launch-fail archive: %v\n", err)
+		_ = os.Remove(archivePath) // drop any partial/corrupt tarball
+		return ""
+	}
+
+	return archivePath
 }
 
 // kurtosisRemove tears down an enclave via `kurtosis enclave rm -f`. It is
@@ -2267,14 +2319,22 @@ func runOne(cfg config, paramFile, name string, cycle int) (result reportData) {
 	}
 	defer os.Remove(tmpArgsPath)
 
-	if err := kurtosisRun(enclave, cfg.packageRef, tmpArgsPath); err != nil {
+	if out, err := kurtosisRun(enclave, cfg.packageRef, tmpArgsPath); err != nil {
 		// kurtosis run can exit non-zero while still leaving the enclave and its
 		// containers behind (e.g. a service readiness check timing out under
 		// load). Tear it down so a failed launch doesn't leak an enclave and
 		// compound resource pressure on the next combo's run.
 		kurtosisRemove(enclave)
 		data := failedReport(name, cycle, fmt.Sprintf("launch failed: %v", err))
+		// A launch failure (Starlark validation, resource exhaustion, ...) often
+		// leaves no enclave services to capture, so the kurtosis run output is
+		// the only diagnostic. Archive it and upload as a Slack file attachment
+		// rather than inlining ~40KB of logs into the size-limited message.
+		data.logArchivePath = archiveKurtosisOutput(cfg, name, cycle, out)
 		postBestEffort(cfg, data)
+		if data.logArchivePath != "" {
+			uploadLogsBestEffort(cfg, data)
+		}
 		return data
 	}
 	defer kurtosisRemove(enclave) // guaranteed teardown after a successful launch

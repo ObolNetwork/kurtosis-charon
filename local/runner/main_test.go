@@ -887,7 +887,7 @@ func TestKurtosisRunAndRemove(t *testing.T) {
 		captured = append([]string{name}, args...)
 		return "", nil
 	}
-	if err := kurtosisRun("c1-teku-prysm", "pkg@ref", "/tmp/args.yaml"); err != nil {
+	if _, err := kurtosisRun("c1-teku-prysm", "pkg@ref", "/tmp/args.yaml"); err != nil {
 		t.Fatalf("kurtosisRun error: %v", err)
 	}
 	want := []string{"kurtosis", "run", "--enclave", "c1-teku-prysm", "--image-download", "always", "pkg@ref", "--args-file", "/tmp/args.yaml"}
@@ -896,8 +896,14 @@ func TestKurtosisRunAndRemove(t *testing.T) {
 	}
 
 	runCommand = func(string, ...string) (string, error) { return "boom", fmt.Errorf("exit status 1") }
-	if err := kurtosisRun("e", "pkg", "f"); err == nil {
+	out, err := kurtosisRun("e", "pkg", "f")
+	if err == nil {
 		t.Error("expected error from kurtosisRun on runCommand failure")
+	}
+	// The output is returned (not inlined into the error) so callers can ship it
+	// as a log-archive file rather than in the size-limited Slack message.
+	if out != "boom" {
+		t.Errorf("kurtosisRun output = %q, want %q (needed for the launch-fail log archive)", out, "boom")
 	}
 
 	// kurtosisRemove must never panic, even if the fake errors.
@@ -910,6 +916,64 @@ func TestKurtosisRunAndRemove(t *testing.T) {
 		}()
 		kurtosisRemove("c1-teku-prysm")
 	}()
+}
+
+func TestArchiveKurtosisOutput(t *testing.T) {
+	logDir := t.TempDir()
+	cfg := config{logDir: logDir}
+
+	// Empty/whitespace output -> no archive.
+	if got := archiveKurtosisOutput(cfg, "teku-prysm", 7, "   "); got != "" {
+		t.Errorf("empty output: archivePath = %q, want \"\"", got)
+	}
+
+	// Non-empty output -> a tar.gz under logDir containing kurtosis-run.log.
+	const output = "INFO enclave created\nERROR launch failed: not enough millicores\n"
+	path := archiveKurtosisOutput(cfg, "teku-prysm", 7, output)
+	if path == "" {
+		t.Fatal("non-empty output: archivePath is empty, want a tarball path")
+	}
+	if filepath.Dir(path) != logDir {
+		t.Errorf("archive %q not under logDir %q", path, logDir)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("archive not created: %v", err)
+	}
+
+	// The tarball must contain kurtosis-run.log with the exact output.
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		t.Fatalf("archive is not gzip: %v", err)
+	}
+	tr := tar.NewReader(gz)
+	var found bool
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if filepath.Base(hdr.Name) == "kurtosis-run.log" {
+			found = true
+			b, err := io.ReadAll(tr)
+			if err != nil {
+				t.Fatalf("read kurtosis-run.log from archive: %v", err)
+			}
+			if string(b) != output {
+				t.Errorf("kurtosis-run.log = %q, want %q", string(b), output)
+			}
+		}
+	}
+	if !found {
+		t.Error("kurtosis-run.log not found in archive")
+	}
 }
 
 func TestPrometheusBaseURLParse(t *testing.T) {
