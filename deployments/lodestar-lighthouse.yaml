@@ -20,7 +20,8 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: lighthouse
-      charon_vc_image: sigp/lighthouse:v8.2.1
+      # Test image: v8.2.2 + chong-he DVT is_aggregator fix (sigp/lighthouse#9947, cf7281f).
+      charon_vc_image: kaloyantanev/lighthouse:chong-he-dvt_is_aggregator-cf7281f
     count: 1
 network_params:
   network: kurtosis
