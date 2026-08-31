@@ -1000,9 +1000,11 @@ func slackPost(webhookURL, text string, blocks []map[string]any) error {
 // gitPull.
 // ---------------------------------------------------------------------------
 
-// kurtosisRun launches an enclave via `kurtosis run`. It returns an error on
-// non-zero exit (runCommand's error already reflects that, as it does for
-// os/exec.Cmd.CombinedOutput).
+// kurtosisRun launches an enclave via `kurtosis run`. It returns the combined
+// stdout+stderr (so callers can archive it on a launch failure, where it is the
+// only diagnostic) and an error on non-zero exit (runCommand's error already
+// reflects that, as it does for os/exec.Cmd.CombinedOutput). The output is
+// returned separately and never inlined into the error.
 func kurtosisRun(enclave, pkg, argsFile string) (string, error) {
 	// --image-download always so moving tags (the param files pin
 	// obolnetwork/charon:next) are re-pulled every run; otherwise Kurtosis's
@@ -1050,6 +1052,7 @@ func archiveKurtosisOutput(cfg config, name string, cycle int, output string) (a
 	archivePath = filepath.Join(cfg.logDir, fmt.Sprintf("cycle%d-%s-launchfail-%s.tar.gz", cycle, name, ts))
 	if err := makeTarGz(staging, archivePath); err != nil {
 		fmt.Fprintf(os.Stderr, "runner: launch-fail archive: %v\n", err)
+		_ = os.Remove(archivePath) // drop any partial/corrupt tarball
 		return ""
 	}
 
