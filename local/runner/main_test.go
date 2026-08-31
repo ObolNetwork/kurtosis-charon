@@ -962,7 +962,10 @@ func TestArchiveKurtosisOutput(t *testing.T) {
 		}
 		if filepath.Base(hdr.Name) == "kurtosis-run.log" {
 			found = true
-			b, _ := io.ReadAll(tr)
+			b, err := io.ReadAll(tr)
+			if err != nil {
+				t.Fatalf("read kurtosis-run.log from archive: %v", err)
+			}
 			if string(b) != output {
 				t.Errorf("kurtosis-run.log = %q, want %q", string(b), output)
 			}
