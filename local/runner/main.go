@@ -1027,7 +1027,15 @@ func kurtosisRun(enclave, pkg, argsFile string) (string, error) {
 // instead of inlined into the size-limited webhook message. Best-effort: returns
 // "" on empty output or any error.
 func archiveKurtosisOutput(cfg config, name string, cycle int, output string) (archivePath string) {
-	defer func() { _ = recover() }()
+	defer func() {
+		if recover() != nil {
+			// archivePath is a named return assigned before makeTarGz; a panic
+			// after that point would otherwise return a path to an archive that
+			// was never (fully) written, so the caller would upload a missing
+			// file. Clear it.
+			archivePath = ""
+		}
+	}()
 
 	if strings.TrimSpace(output) == "" {
 		return ""
