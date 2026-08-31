@@ -20,7 +20,6 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: lighthouse
-      # Temporary test image: v8.2.1 + DVT is_aggregator subscription fix.
       charon_vc_image: sigp/lighthouse:v8.2.1
     count: 1
 network_params:
