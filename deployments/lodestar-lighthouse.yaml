@@ -20,8 +20,11 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: lighthouse
-      # Test image: v8.2.2 + chong-he DVT is_aggregator fix (sigp/lighthouse#9947, cf7281f).
-      charon_vc_image: kaloyantanev/lighthouse:chong-he-dvt_is_aggregator-cf7281f
+      # Test image: v8.2.2 + chong-he DVT is_aggregator fix (sigp/lighthouse#9947, 8e15703).
+      # 8e15703 adds epoch-ahead selection resolution (batch_size==0 && !selections_endpoint),
+      # so all 4 nodes request selections one epoch early — tests whether the first-3-slots
+      # aggregation 404s are eliminated without the optimistic-flag fallback.
+      charon_vc_image: kaloyantanev/lighthouse:chong-he-dvt_is_aggregator-8e15703
     count: 1
 network_params:
   network: kurtosis
