@@ -16,18 +16,11 @@ participants:
     supernode: true
     use_separate_vc: true
     vc_type: charon
-    # Diagnostic charon build (branch kalo/vapi-committee-logging off main): logs what the
-    # VC POSTs on the beacon_committee_selections and beacon_committee_subscriptions
-    # endpoints (distinct slots + is_aggregator), to observe current vs lookahead requests.
-    vc_image: kaloyantanev/charon:vapi-committee-logging
+    vc_image: obolnetwork/charon:$CHARON_VERSION
     charon_node_count: 4
     charon_params:
       charon_vc: lighthouse
-      # Test image: v8.2.2 + chong-he DVT is_aggregator fix (sigp/lighthouse#9947, 8e15703).
-      # 8e15703 adds epoch-ahead selection resolution (batch_size==0 && !selections_endpoint),
-      # so all 4 nodes request selections one epoch early — tests whether the first-3-slots
-      # aggregation 404s are eliminated without the optimistic-flag fallback.
-      charon_vc_image: kaloyantanev/lighthouse:chong-he-dvt_is_aggregator-8e15703
+      charon_vc_image: sigp/lighthouse:v8.2.1
     count: 1
 network_params:
   network: kurtosis
