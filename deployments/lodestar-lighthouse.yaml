@@ -16,7 +16,10 @@ participants:
     supernode: true
     use_separate_vc: true
     vc_type: charon
-    vc_image: obolnetwork/charon:$CHARON_VERSION
+    # Diagnostic charon build (branch kalo/vapi-committee-logging off main): logs what the
+    # VC POSTs on the beacon_committee_selections and beacon_committee_subscriptions
+    # endpoints (distinct slots + is_aggregator), to observe current vs lookahead requests.
+    vc_image: kaloyantanev/charon:vapi-committee-logging
     charon_node_count: 4
     charon_params:
       charon_vc: lighthouse
