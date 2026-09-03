@@ -5,7 +5,7 @@ participants:
     cl_image: consensys/teku:26.8.0
     use_separate_vc: true
     vc_type: lodestar
-    vc_image: chainsafe/lodestar:v1.46.0
+    vc_image: chainsafe/lodestar:v1.47.0
     count: 2
     supernode: true
 
@@ -20,7 +20,7 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: lodestar
-      charon_vc_image: chainsafe/lodestar:v1.46.0
+      charon_vc_image: chainsafe/lodestar:v1.47.0
     count: 1
 network_params:
   network: kurtosis

@@ -2,17 +2,17 @@ participants:
   - el_type: geth
     el_image: ethereum/client-go:v1.17.5
     cl_type: lodestar
-    cl_image: chainsafe/lodestar:v1.46.0
+    cl_image: chainsafe/lodestar:v1.47.0
     use_separate_vc: true
     vc_type: lodestar
-    vc_image: chainsafe/lodestar:v1.46.0
+    vc_image: chainsafe/lodestar:v1.47.0
     count: 2
     supernode: true
 
   - el_type: geth
     el_image: ethereum/client-go:v1.17.5
     cl_type: lodestar
-    cl_image: chainsafe/lodestar:v1.46.0
+    cl_image: chainsafe/lodestar:v1.47.0
     supernode: true
     use_separate_vc: true
     vc_type: charon
