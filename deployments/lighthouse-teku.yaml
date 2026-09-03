@@ -2,7 +2,7 @@ participants:
   - el_type: geth
     el_image: ethereum/client-go:v1.17.5
     cl_type: lighthouse
-    cl_image: sigp/lighthouse:v8.2.1
+    cl_image: sigp/lighthouse:v8.2.2
     use_separate_vc: true
     vc_type: teku
     vc_image: consensys/teku:26.8.0
@@ -12,7 +12,7 @@ participants:
   - el_type: geth
     el_image: ethereum/client-go:v1.17.5
     cl_type: lighthouse
-    cl_image: sigp/lighthouse:v8.2.1
+    cl_image: sigp/lighthouse:v8.2.2
     supernode: true
     use_separate_vc: true
     vc_type: charon

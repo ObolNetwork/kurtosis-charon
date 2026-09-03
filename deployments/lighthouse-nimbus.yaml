@@ -2,17 +2,17 @@ participants:
   - el_type: geth
     el_image: ethereum/client-go:v1.17.5
     cl_type: lighthouse
-    cl_image: sigp/lighthouse:v8.2.1
+    cl_image: sigp/lighthouse:v8.2.2
     use_separate_vc: true
     vc_type: nimbus
-    vc_image: statusim/nimbus-validator-client:multiarch-v26.7.0
+    vc_image: statusim/nimbus-validator-client:multiarch-v26.8.0
     count: 2
     supernode: true
 
   - el_type: geth
     el_image: ethereum/client-go:v1.17.5
     cl_type: lighthouse
-    cl_image: sigp/lighthouse:v8.2.1
+    cl_image: sigp/lighthouse:v8.2.2
     supernode: true
     use_separate_vc: true
     vc_type: charon
@@ -20,7 +20,7 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: nimbus
-      charon_vc_image: statusim/nimbus-validator-client:multiarch-v26.7.0
+      charon_vc_image: statusim/nimbus-validator-client:multiarch-v26.8.0
     vc_extra_env_vars:
       CHARON_FEATURE_SET_ENABLE: json_requests
     count: 1
