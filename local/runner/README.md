@@ -71,7 +71,8 @@ For each param file in the directory, in sorted order, forever:
    retrying once after 30s. A report failing both attempts is queued on
    disk (`runner-pending-posts.json`, next to the state file, capped at
    100) and delivered ahead of the next run's report, so an outage delays
-   reports but never loses or reorders them. The message summarizes: the
+   the reports that are posted (degraded/failed by default — see below) but
+   never loses or reorders them. The message summarizes: the
    param file's name, the discovered cluster, status (`ok` / `degraded` /
    `failed`), worst-node duty ratios, DV CPU/mem peaks, host stats, and any
    firing health checks. Healthy (`ok`) runs are **not** posted per-run

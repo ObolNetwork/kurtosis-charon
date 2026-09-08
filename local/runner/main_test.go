@@ -2678,9 +2678,10 @@ func TestPostBestEffortPendingQueue(t *testing.T) {
 // runs still post, and that a green run still flushes an earlier queued
 // backlog (only the fresh green report is suppressed, not queue delivery).
 func TestPostBestEffortSkipsGreenRuns(t *testing.T) {
-	oldPost, oldSleep := httpPost, sleepFn
-	defer func() { httpPost, sleepFn = oldPost, oldSleep }()
+	oldPost, oldSleep, oldFlag := httpPost, sleepFn, reportGreenRuns
+	defer func() { httpPost, sleepFn, reportGreenRuns = oldPost, oldSleep, oldFlag }()
 	sleepFn = func(time.Duration) {}
+	reportGreenRuns = false
 
 	cfg := config{slackWebhookURL: "http://hook"}
 
@@ -2709,7 +2710,7 @@ func TestPostBestEffortSkipsGreenRuns(t *testing.T) {
 		// Outage: a failed report is queued after both attempts fail.
 		httpPost = func(string, []byte) (int, error) { return 0, fmt.Errorf("dns down") }
 		postBestEffort(cfg, reportData{name: "aaa-combo", status: "failed"})
-		if q, err := loadPendingPosts(queueFile); err != nil || len(q) != 1 {
+		if q, err := loadPendingPosts(queueFile); err != nil || len(q) != 1 || q[0].Name != "aaa-combo" {
 			t.Fatalf("queue = %+v (err %v), want [aaa-combo]", q, err)
 		}
 
