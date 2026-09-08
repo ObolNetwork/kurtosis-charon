@@ -43,12 +43,6 @@
     },
     {
       "matchPackageNames": [
-        "kaloyantanev/lighthouse"
-      ],
-      "enabled": false
-    },
-    {
-      "matchPackageNames": [
         "statusim/nimbus-eth2",
         "statusim/nimbus-validator-client"
       ],
