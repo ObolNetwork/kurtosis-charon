@@ -753,6 +753,14 @@ func healthMD(health []healthCheck) string {
 // because the health checks are noisy in these matrix runs.
 var reportHealthChecks = false
 
+// reportGreenRuns gates per-run Slack notifications for healthy ("ok") runs.
+// When false (current default), a green run posts no per-run report — only
+// degraded and failed runs are worth a notification once the matrix is known
+// to be running smoothly. Green combos still appear in the periodic
+// full-matrix summary (postMatrixBestEffort), so no data is lost. Flip to true
+// to restore a per-run report for every run.
+var reportGreenRuns = false
+
 func buildBlocks(d reportData) []map[string]any {
 	e := statusEmoji[d.status]
 	header := fmt.Sprintf("%s %s", e, d.name)
@@ -1771,6 +1779,15 @@ func postBestEffort(cfg config, d reportData) {
 				fmt.Fprintf(os.Stderr, "runner: failed to save pending-posts queue: %v\n", err)
 			}
 		}
+	}
+
+	// Green ("ok") runs are intentionally not reported per-run (see
+	// reportGreenRuns). The queue flush above still ran, so any failure reports
+	// backlogged from an earlier Slack outage are delivered even on a green run;
+	// only the fresh green report is skipped. The queue is already consistent on
+	// disk (the flush loop persisted each dequeue), so no extra save is needed.
+	if d.status == "ok" && !reportGreenRuns {
+		return
 	}
 
 	blocks, err := json.Marshal(buildBlocks(d))
