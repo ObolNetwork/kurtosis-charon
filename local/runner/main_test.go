@@ -2673,6 +2673,67 @@ func TestPostBestEffortPendingQueue(t *testing.T) {
 	}
 }
 
+// TestPostBestEffortSkipsGreenRuns pins that healthy ("ok") runs post no
+// per-run Slack report while reportGreenRuns is off, that degraded and failed
+// runs still post, and that a green run still flushes an earlier queued
+// backlog (only the fresh green report is suppressed, not queue delivery).
+func TestPostBestEffortSkipsGreenRuns(t *testing.T) {
+	oldPost, oldSleep := httpPost, sleepFn
+	defer func() { httpPost, sleepFn = oldPost, oldSleep }()
+	sleepFn = func(time.Duration) {}
+
+	cfg := config{slackWebhookURL: "http://hook"}
+
+	countPosts := func(d reportData) int {
+		posts := 0
+		httpPost = func(string, []byte) (int, error) { posts++; return 200, nil }
+		postBestEffort(cfg, d)
+		return posts
+	}
+
+	if got := countPosts(reportData{name: "a-b", status: "ok"}); got != 0 {
+		t.Errorf("green run posted %d report(s), want 0 while reportGreenRuns is off", got)
+	}
+	if got := countPosts(reportData{name: "a-b", status: "degraded"}); got != 1 {
+		t.Errorf("degraded run posted %d report(s), want 1", got)
+	}
+	if got := countPosts(reportData{name: "a-b", status: "failed"}); got != 1 {
+		t.Errorf("failed run posted %d report(s), want 1", got)
+	}
+
+	t.Run("green run still flushes queued backlog", func(t *testing.T) {
+		dir := t.TempDir()
+		cfg := config{slackWebhookURL: "http://hook", statePath: filepath.Join(dir, "state.json")}
+		queueFile := filepath.Join(dir, "runner-pending-posts.json")
+
+		// Outage: a failed report is queued after both attempts fail.
+		httpPost = func(string, []byte) (int, error) { return 0, fmt.Errorf("dns down") }
+		postBestEffort(cfg, reportData{name: "aaa-combo", status: "failed"})
+		if q, err := loadPendingPosts(queueFile); err != nil || len(q) != 1 {
+			t.Fatalf("queue = %+v (err %v), want [aaa-combo]", q, err)
+		}
+
+		// Recovery on a GREEN run: the backlog is flushed even though the fresh
+		// green report itself is not posted.
+		var sent []string
+		httpPost = func(_ string, body []byte) (int, error) {
+			var p struct {
+				Text string `json:"text"`
+			}
+			_ = json.Unmarshal(body, &p)
+			sent = append(sent, p.Text)
+			return 200, nil
+		}
+		postBestEffort(cfg, reportData{name: "ccc-combo", status: "ok"})
+		if len(sent) != 1 || !strings.Contains(sent[0], "aaa-combo") {
+			t.Fatalf("sent = %v, want only the flushed backlog [aaa-combo]", sent)
+		}
+		if q, err := loadPendingPosts(queueFile); err != nil || len(q) != 0 {
+			t.Errorf("queue after green recovery = %+v (err %v), want empty", q, err)
+		}
+	})
+}
+
 // TestPendingPostsCap pins the queue bound: the oldest entries are dropped
 // beyond maxPendingPosts so a permanently broken webhook cannot grow the
 // file forever.

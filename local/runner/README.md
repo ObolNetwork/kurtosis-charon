@@ -74,7 +74,10 @@ For each param file in the directory, in sorted order, forever:
    reports but never loses or reorders them. The message summarizes: the
    param file's name, the discovered cluster, status (`ok` / `degraded` /
    `failed`), worst-node duty ratios, DV CPU/mem peaks, host stats, and any
-   firing health checks.
+   firing health checks. Healthy (`ok`) runs are **not** posted per-run
+   (only `degraded` / `failed` are — see `reportGreenRuns` in `main.go`);
+   green combos still show up in the persistent matrix summary below, and a
+   green run still flushes any queued backlog from an earlier Slack outage.
 8. Tear down the enclave (best-effort/idempotent) and advance to the next
    file, backing off (`RUNNER_INTER_RUN_BACKOFF_S`, capped at
    `RUNNER_MAX_BACKOFF_S`) after consecutive failures.
