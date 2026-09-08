@@ -30,20 +30,11 @@
       "labels": [
         "renovate/docker-deps"
       ],
-      "groupName": "Docker image updates",
-      "schedule": [
-        "every weekend"
-      ]
+      "groupName": "Docker image updates"
     },
     {
       "matchPackageNames": [
         "obolnetwork/charon"
-      ],
-      "enabled": false
-    },
-    {
-      "matchPackageNames": [
-        "kaloyantanev/lighthouse"
       ],
       "enabled": false
     },
