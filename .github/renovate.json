@@ -15,8 +15,7 @@
       "matchStrings": [
         "(?:el|cl|vc|charon_vc)_image:\\s*(?<depName>[^:]+):(?<currentValue>[^\\s]+)"
       ],
-      "datasourceTemplate": "docker",
-      "packageRules": []
+      "datasourceTemplate": "docker"
     }
   ],
   "packageRules": [
