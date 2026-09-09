@@ -5,7 +5,7 @@ participants:
     cl_image: chainsafe/lodestar:v1.47.0
     use_separate_vc: true
     vc_type: lighthouse
-    vc_image: sigp/lighthouse:v8.2.2
+    vc_image: kaloyantanev/lighthouse:chong-he-dvt_is_aggregator-0e52742
     count: 2
     supernode: true
 
@@ -20,7 +20,7 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: lighthouse
-      charon_vc_image: sigp/lighthouse:v8.2.2
+      charon_vc_image: kaloyantanev/lighthouse:chong-he-dvt_is_aggregator-0e52742
     count: 1
 network_params:
   network: kurtosis
