@@ -1,16 +1,16 @@
 participants:
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.5
+    el_image: ethereum/client-go:v1.17.6
     cl_type: grandine
     cl_image: sifrai/grandine:2.0.6
     use_separate_vc: true
     vc_type: teku
-    vc_image: consensys/teku:26.8.0
+    vc_image: consensys/teku:26.9.0
     count: 2
     supernode: true
 
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.5
+    el_image: ethereum/client-go:v1.17.6
     cl_type: grandine
     cl_image: sifrai/grandine:2.0.6
     supernode: true
@@ -20,7 +20,7 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: teku
-      charon_vc_image: consensys/teku:26.8.0
+      charon_vc_image: consensys/teku:26.9.0
     count: 1
 network_params:
   network: kurtosis

@@ -1,6 +1,6 @@
 participants:
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.5
+    el_image: ethereum/client-go:v1.17.6
     cl_type: lighthouse
     cl_image: sigp/lighthouse:v8.2.2
     use_separate_vc: true
@@ -10,7 +10,7 @@ participants:
     supernode: true
 
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.5
+    el_image: ethereum/client-go:v1.17.6
     cl_type: lighthouse
     cl_image: sigp/lighthouse:v8.2.2
     supernode: true
