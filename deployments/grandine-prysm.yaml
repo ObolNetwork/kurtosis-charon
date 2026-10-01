@@ -1,16 +1,16 @@
 participants:
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.5
+    el_image: ethereum/client-go:v1.17.7
     cl_type: grandine
     cl_image: sifrai/grandine:2.0.6
     use_separate_vc: true
     vc_type: prysm
-    vc_image: gcr.io/prysmaticlabs/prysm/validator:v7.1.8
+    vc_image: gcr.io/prysmaticlabs/prysm/validator:v7.2.0
     count: 2
     supernode: true
 
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.5
+    el_image: ethereum/client-go:v1.17.7
     cl_type: grandine
     cl_image: sifrai/grandine:2.0.6
     supernode: true
@@ -20,7 +20,7 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: prysm
-      charon_vc_image: gcr.io/prysmaticlabs/prysm/validator:v7.1.8
+      charon_vc_image: gcr.io/prysmaticlabs/prysm/validator:v7.2.0
     count: 1
 network_params:
   network: kurtosis
