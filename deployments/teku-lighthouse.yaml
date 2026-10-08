@@ -1,18 +1,18 @@
 participants:
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.5
+    el_image: ethereum/client-go:v1.17.8
     cl_type: teku
-    cl_image: consensys/teku:26.8.0
+    cl_image: consensys/teku:26.10.0
     use_separate_vc: true
     vc_type: lighthouse
-    vc_image: sigp/lighthouse:v8.2.2
+    vc_image: sigp/lighthouse:v8.2.3
     count: 2
     supernode: true
 
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.5
+    el_image: ethereum/client-go:v1.17.8
     cl_type: teku
-    cl_image: consensys/teku:26.8.0
+    cl_image: consensys/teku:26.10.0
     supernode: true
     use_separate_vc: true
     vc_type: charon
@@ -20,7 +20,7 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: lighthouse
-      charon_vc_image: sigp/lighthouse:v8.2.2
+      charon_vc_image: sigp/lighthouse:v8.2.3
     count: 1
 network_params:
   network: kurtosis
