@@ -21,6 +21,9 @@ participants:
     charon_params:
       charon_vc: teku
       charon_vc_image: consensys/teku:26.10.1
+      # Direct gloas builder: the DV participant's buildoor.
+      builder_urls:
+        - http://buildoor-prysm-geth-3:8080
     count: 1
 network_params:
   network: kurtosis
@@ -35,7 +38,11 @@ network_params:
 wait_for_finalization: false
 global_log_level: debug
 parallel_keystore_generation: false
-mev_type: mock
+# A buildoor on the DV participant (3): its beacon node's builder pre-gloas, p2p bids
+# and charon's direct builder from gloas.
+buildoor_params:
+  instances:
+    - participant: 3
 prometheus_params:
   storage_tsdb_retention_time: 3h
   remote_write_url: "https://vm.monitoring.gcp.obol.tech/write"
@@ -52,3 +59,4 @@ prometheus_params:
 additional_services:
   - spamoor
   - prometheus
+  - buildoor
