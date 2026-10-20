@@ -1,18 +1,18 @@
 participants:
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.5
+    el_image: ethereum/client-go:v1.17.8
     cl_type: teku
-    cl_image: consensys/teku:26.8.0
+    cl_image: consensys/teku:26.10.1
     use_separate_vc: true
     vc_type: lighthouse
-    vc_image: sigp/lighthouse:v8.2.2
+    vc_image: sigp/lighthouse:v8.3.0
     count: 2
     supernode: true
 
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.5
+    el_image: ethereum/client-go:v1.17.8
     cl_type: teku
-    cl_image: consensys/teku:26.8.0
+    cl_image: consensys/teku:26.10.1
     supernode: true
     use_separate_vc: true
     vc_type: charon
@@ -20,7 +20,7 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: lighthouse
-      charon_vc_image: sigp/lighthouse:v8.2.2
+      charon_vc_image: sigp/lighthouse:v8.3.0
     count: 1
 network_params:
   network: kurtosis
@@ -30,6 +30,7 @@ network_params:
   num_validator_keys_per_node: 128
   preregistered_validator_keys_mnemonic: "giant issue aisle success illegal bike spike question tent bar rely arctic volcano long crawl hungry vocal artwork sniff fantasy very lucky have athlete"
   shard_committee_period: 1
+  gloas_fork_epoch: 5
   prefunded_accounts: '{"0xb9e79D19f651a941757b35830232E7EFC77E1c79": {"balance": "100000ETH"}}'
 wait_for_finalization: false
 global_log_level: debug
