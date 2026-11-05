@@ -1,18 +1,18 @@
 participants:
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.8
+    el_image: ethereum/client-go:v1.17.10
     cl_type: prysm
-    cl_image: gcr.io/prysmaticlabs/prysm/beacon-chain:v7.3.0
+    cl_image: gcr.io/prysmaticlabs/prysm/beacon-chain:v7.3.1
     use_separate_vc: true
     vc_type: lighthouse
-    vc_image: sigp/lighthouse:v8.3.0
+    vc_image: sigp/lighthouse:v8.3.2
     count: 2
     supernode: true
 
   - el_type: geth
-    el_image: ethereum/client-go:v1.17.8
+    el_image: ethereum/client-go:v1.17.10
     cl_type: prysm
-    cl_image: gcr.io/prysmaticlabs/prysm/beacon-chain:v7.3.0
+    cl_image: gcr.io/prysmaticlabs/prysm/beacon-chain:v7.3.1
     supernode: true
     use_separate_vc: true
     vc_type: charon
@@ -20,7 +20,7 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: lighthouse
-      charon_vc_image: sigp/lighthouse:v8.3.0
+      charon_vc_image: sigp/lighthouse:v8.3.2
       # Direct gloas builder: the DV participant's buildoor.
       builder_urls:
         - http://buildoor-prysm-geth-3:8080
