@@ -2,7 +2,7 @@ participants:
   - el_type: geth
     el_image: ethereum/client-go:v1.17.10
     cl_type: lodestar
-    cl_image: chainsafe/lodestar:v1.50.1
+    cl_image: chainsafe/lodestar:v1.51.0
     use_separate_vc: true
     vc_type: nimbus
     vc_image: statusim/nimbus-validator-client:multiarch-v26.10.2
@@ -12,7 +12,7 @@ participants:
   - el_type: geth
     el_image: ethereum/client-go:v1.17.10
     cl_type: lodestar
-    cl_image: chainsafe/lodestar:v1.50.1
+    cl_image: chainsafe/lodestar:v1.51.0
     supernode: true
     use_separate_vc: true
     vc_type: charon

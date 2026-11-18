@@ -5,7 +5,7 @@ participants:
     cl_image: statusim/nimbus-eth2:multiarch-v26.10.2
     use_separate_vc: true
     vc_type: lodestar
-    vc_image: chainsafe/lodestar:v1.50.1
+    vc_image: chainsafe/lodestar:v1.51.0
     count: 2
     supernode: true
 
@@ -20,7 +20,7 @@ participants:
     charon_node_count: 4
     charon_params:
       charon_vc: lodestar
-      charon_vc_image: chainsafe/lodestar:v1.50.1
+      charon_vc_image: chainsafe/lodestar:v1.51.0
       # Direct gloas builder: the DV participant's buildoor.
       builder_urls:
         - http://buildoor-nimbus-geth-3:8080
